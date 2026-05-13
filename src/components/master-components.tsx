@@ -216,7 +216,7 @@ export function CompanyManager() {
                 </td>
                 <td>{company.segment}</td>
                 <td>
-                  <span className={`badge ${company.status === "ACTIVE" ? "success" : "danger"}`}>{company.status}</span>
+                  <span className={`badge ${company.status === "ACTIVE" ? "status-active" : company.status === "SUSPENDED" ? "status-suspended" : "status-inactive"}`}>{company.status === "ACTIVE" ? "Ativa" : company.status === "SUSPENDED" ? "Suspensa" : "Inativa"}</span>
                 </td>
                 <td>
                   {company._count?.users ?? 0} usuários, {company._count?.customers ?? 0} clientes,{" "}

@@ -7,6 +7,7 @@ import {
   Plus,
   RefreshCcw,
   Save,
+  Trash2,
   UserPlus,
   X
 } from "lucide-react";
@@ -39,6 +40,14 @@ const statusLabels: Record<string, string> = {
   NO_SHOW: "Não compareceu"
 };
 
+const statusBadgeClass: Record<string, string> = {
+  SCHEDULED: "status-scheduled",
+  CONFIRMED: "status-confirmed",
+  IN_PROGRESS: "status-in-progress",
+  COMPLETED: "status-completed",
+  CANCELLED: "status-cancelled",
+  NO_SHOW: "status-no-show"
+};
 
 
 function formatDateTime(value: string) {
@@ -250,7 +259,7 @@ export function CustomerManager() {
                   <br />
                   <span className="muted">{customer.phone ?? "-"}</span>
                 </td>
-                <td><span className="badge">{customer.status}</span></td>
+                <td><span className={`badge ${customer.status === "active" ? "status-active" : "status-inactive"}`}>{customer.status === "active" ? "Ativo" : customer.status}</span></td>
                 <td>{summarizeCustomValues(customer.customValues)}</td>
                 <td>
                   <button className="icon-button secondary" title="Anonimizar" onClick={() => anonymize(customer.id)} type="button">
@@ -784,7 +793,7 @@ function AppointmentTable({
                     ))}
                   </select>
                 ) : (
-                  <span className="badge">{statusLabels[appointment.status] ?? appointment.status}</span>
+                  <span className={`badge ${statusBadgeClass[appointment.status] ?? ""}`}>{statusLabels[appointment.status] ?? appointment.status}</span>
                 )}
               </td>
               {!compact ? <td>{summarizeCustomValues(appointment.customValues)}</td> : null}

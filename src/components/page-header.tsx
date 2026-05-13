@@ -24,7 +24,7 @@ export function StatCard({ label, value }: { label: string; value: string | numb
   return (
     <div className="card stat">
       <span>{label}</span>
-      <strong>{value}</strong>
+      <strong>{String(value)}</strong>
     </div>
   );
 }
