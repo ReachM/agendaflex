@@ -1,11 +1,23 @@
 "use client";
 
-import { Plus, RefreshCcw } from "lucide-react";
+import { Ban, Plus, RefreshCcw, Save, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
 import { PageHeader, StatCard } from "@/components/page-header";
 
 type AnyRecord = Record<string, any>;
+
+type CustomField = {
+  id: string;
+  entityType: string;
+  label: string;
+  fieldKey: string;
+  fieldType: string;
+  isRequired: boolean;
+  options?: string[] | null;
+  isActive: boolean;
+  sortOrder: number;
+};
 
 const segments = [
   ["CLINICA_MEDICA", "Clínica médica"],
@@ -15,6 +27,32 @@ const segments = [
   ["ASSISTENCIA_TECNICA", "Assistência técnica"],
   ["PRESTADOR_SERVICOS", "Prestador de serviços"],
   ["PERSONALIZADO", "Personalizado"]
+];
+
+const entityLabels: [string, string][] = [
+  ["CUSTOMER", "Clientes"],
+  ["APPOINTMENT", "Agendamentos"],
+  ["SERVICE", "Serviços"],
+  ["PROFESSIONAL", "Profissionais"]
+];
+
+const fieldTypes: [string, string][] = [
+  ["SHORT_TEXT", "Texto curto"],
+  ["LONG_TEXT", "Texto longo"],
+  ["NUMBER", "Número"],
+  ["MONEY", "Valor monetário"],
+  ["PERCENT", "Porcentagem"],
+  ["DATE", "Data"],
+  ["TIME", "Hora"],
+  ["DATETIME", "Data e hora"],
+  ["SINGLE_SELECT", "Seleção única"],
+  ["MULTI_SELECT", "Seleção múltipla"],
+  ["CHECKBOX", "Checkbox"],
+  ["BOOLEAN", "Sim/Não"],
+  ["EMAIL", "E-mail"],
+  ["PHONE", "Telefone"],
+  ["CPF_CNPJ", "CPF/CNPJ"],
+  ["FILE", "Arquivo"]
 ];
 
 export function MasterDashboard() {
@@ -203,23 +241,245 @@ export function CompanyManager() {
   );
 }
 
+export function MasterCustomFieldManager() {
+  const [companies, setCompanies] = useState<AnyRecord[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [selectedCompanyName, setSelectedCompanyName] = useState("");
+  const [fields, setFields] = useState<CustomField[]>([]);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    entityType: "CUSTOMER",
+    label: "",
+    fieldKey: "",
+    fieldType: "SHORT_TEXT",
+    isRequired: false,
+    sortOrder: "0",
+    placeholder: "",
+    helpText: "",
+    options: ""
+  });
+
+  useEffect(() => {
+    apiFetch<{ companies: AnyRecord[] }>("/api/companies")
+      .then((data) => setCompanies(data.companies))
+      .catch((err) => setError(err.message));
+  }, []);
+
+  async function loadFields(companyId: string) {
+    if (!companyId) {
+      setFields([]);
+      return;
+    }
+    try {
+      setError("");
+      const data = await apiFetch<{ customFields: CustomField[]; company: AnyRecord }>(
+        `/api/master/custom-fields?companyId=${companyId}`
+      );
+      setFields(data.customFields);
+      setSelectedCompanyName(data.company?.name ?? "");
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  function handleCompanyChange(companyId: string) {
+    setSelectedCompanyId(companyId);
+    const company = companies.find((c) => c.id === companyId);
+    setSelectedCompanyName(company?.name ?? "");
+    loadFields(companyId);
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    if (!selectedCompanyId) {
+      setError("Selecione uma empresa antes de criar um campo.");
+      return;
+    }
+    try {
+      await apiFetch("/api/master/custom-fields", {
+        method: "POST",
+        body: JSON.stringify({
+          companyId: selectedCompanyId,
+          ...form,
+          sortOrder: Number(form.sortOrder),
+          options: form.options
+            ? form.options.split(",").map((item) => item.trim()).filter(Boolean)
+            : undefined
+        })
+      });
+      setForm({ ...form, label: "", fieldKey: "", placeholder: "", helpText: "", options: "" });
+      await loadFields(selectedCompanyId);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function deactivate(id: string) {
+    try {
+      await apiFetch(`/api/master/custom-fields/${id}`, { method: "DELETE" });
+      await loadFields(selectedCompanyId);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Campos Personalizados"
+        subtitle="Gerenciar campos dinâmicos por empresa"
+        actions={
+          selectedCompanyId ? (
+            <button className="button secondary" onClick={() => loadFields(selectedCompanyId)} type="button">
+              <RefreshCcw size={16} />
+              Atualizar
+            </button>
+          ) : null
+        }
+      />
+      {error ? <div className="error-box">{error}</div> : null}
+
+      <section className="form-panel grid" style={{ marginBottom: 16 }}>
+        <h2 className="section-title">Selecionar empresa</h2>
+        <div className="form-grid">
+          <div className="field full">
+            <label>Empresa</label>
+            <select value={selectedCompanyId} onChange={(e) => handleCompanyChange(e.target.value)}>
+              <option value="">Selecione uma empresa</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name} — {company.segment}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {selectedCompanyId ? (
+        <>
+          <section className="form-panel grid">
+            <h2 className="section-title">
+              Novo campo para <strong>{selectedCompanyName}</strong>
+            </h2>
+            <form className="form-grid" onSubmit={submit}>
+              <Select label="Entidade" value={form.entityType} onChange={(entityType) => setForm({ ...form, entityType })} options={entityLabels} />
+              <Select label="Tipo" value={form.fieldType} onChange={(fieldType) => setForm({ ...form, fieldType })} options={fieldTypes} />
+              <Input label="Nome do campo" value={form.label} onChange={(label) => setForm({ ...form, label })} required />
+              <Input label="Chave interna" value={form.fieldKey} onChange={(fieldKey) => setForm({ ...form, fieldKey })} />
+              <Input label="Ordem" type="number" value={form.sortOrder} onChange={(sortOrder) => setForm({ ...form, sortOrder })} />
+              <Input label="Placeholder" value={form.placeholder} onChange={(placeholder) => setForm({ ...form, placeholder })} />
+              <Input label="Texto de ajuda" value={form.helpText} onChange={(helpText) => setForm({ ...form, helpText })} full />
+              <Input label="Opções separadas por vírgula" value={form.options} onChange={(options) => setForm({ ...form, options })} full />
+              <div className="field">
+                <label>Obrigatório</label>
+                <div className="checkbox-line">
+                  <input type="checkbox" checked={form.isRequired} onChange={(event) => setForm({ ...form, isRequired: event.target.checked })} />
+                  <span className="muted">Sim</span>
+                </div>
+              </div>
+              <div className="field full">
+                <button className="button" type="submit">
+                  <Plus size={16} />
+                  Criar campo
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section className="table-wrap" style={{ marginTop: 16 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Campo</th>
+                  <th>Entidade</th>
+                  <th>Tipo</th>
+                  <th>Obrigatório</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fields.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="empty">Nenhum campo personalizado cadastrado para esta empresa.</td>
+                  </tr>
+                ) : null}
+                {fields.map((field) => (
+                  <tr key={field.id}>
+                    <td><strong>{field.label}</strong><br /><span className="muted">{field.fieldKey}</span></td>
+                    <td>{entityLabels.find(([k]) => k === field.entityType)?.[1] ?? field.entityType}</td>
+                    <td>{fieldTypes.find(([k]) => k === field.fieldType)?.[1] ?? field.fieldType}</td>
+                    <td>{field.isRequired ? "Sim" : "Não"}</td>
+                    <td><span className={`badge ${field.isActive ? "success" : "danger"}`}>{field.isActive ? "Ativo" : "Inativo"}</span></td>
+                    <td>
+                      <button className="icon-button secondary" title="Desativar" onClick={() => deactivate(field.id)} type="button">
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        </>
+      ) : (
+        <section className="panel grid">
+          <div className="empty">Selecione uma empresa acima para gerenciar seus campos personalizados.</div>
+        </section>
+      )}
+    </>
+  );
+}
+
 function Input({
   label,
   value,
   onChange,
   required,
-  type = "text"
+  type = "text",
+  full
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
   type?: string;
+  full?: boolean;
+}) {
+  return (
+    <div className={`field ${full ? "full" : ""}`}>
+      <label>{label}</label>
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} required={required} />
+    </div>
+  );
+}
+
+function Select({
+  label,
+  value,
+  onChange,
+  options,
+  required
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: [string, string][];
+  required?: boolean;
 }) {
   return (
     <div className="field">
       <label>{label}</label>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} required={required} />
+      <select value={value} onChange={(event) => onChange(event.target.value)} required={required}>
+        <option value="">Selecionar</option>
+        {options.map(([optionValue, label]) => (
+          <option key={optionValue} value={optionValue}>
+            {label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

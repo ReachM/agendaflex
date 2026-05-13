@@ -1,12 +1,11 @@
-import type { Prisma } from "@prisma/client";
 import { NextRequest } from "next/server";
-import { ApiError, created, handleApiError, ok } from "@/lib/api/errors";
-import { audit } from "@/lib/audit";
-import { slugifyFieldKey } from "@/lib/custom-fields";
+import { handleApiError, ok } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/security/auth";
-import { assertSameOrigin } from "@/lib/security/csrf";
-import { customFieldCreateSchema } from "@/lib/validation/schemas";
+
+// Tenant custom-fields API is READ-ONLY.
+// Custom field creation/editing/deletion is exclusively managed by the Super Admin
+// via /api/master/custom-fields. Tenants can only READ fields to render dynamic forms.
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,47 +20,6 @@ export async function GET(request: NextRequest) {
     });
 
     return ok({ customFields });
-  } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    assertSameOrigin(request);
-    const context = await requireTenant(request, "custom_fields:manage");
-    const body = customFieldCreateSchema.parse(await request.json());
-    const fieldKey = slugifyFieldKey(body.fieldKey ?? body.label);
-
-    if (!fieldKey) {
-      throw new ApiError(422, "A chave interna do campo é inválida.");
-    }
-
-    const customField = await prisma.customField.create({
-      data: {
-        companyId: context.companyId,
-        entityType: body.entityType,
-        label: body.label,
-        fieldKey,
-        fieldType: body.fieldType,
-        isRequired: body.isRequired,
-        sortOrder: body.sortOrder,
-        placeholder: body.placeholder,
-        helpText: body.helpText,
-        options: body.options,
-        defaultValue: body.defaultValue as Prisma.InputJsonValue | undefined,
-        isActive: body.isActive
-      }
-    });
-
-    await audit(request, context, {
-      action: "custom_field.create",
-      entityType: "custom_field",
-      entityId: customField.id,
-      newValues: customField
-    });
-
-    return created({ customField });
   } catch (error) {
     return handleApiError(error);
   }

@@ -485,6 +485,69 @@ tr:last-child td {
   font-size: 14px;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(23, 32, 38, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+}
+
+.modal-content {
+  width: min(100%, 780px);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 24px 60px rgba(23, 32, 38, 0.22);
+  animation: modalIn 0.18s ease-out;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.badge-select {
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: var(--surface-muted);
+  color: #31424c;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.badge-select:focus {
+  outline: 2px solid rgba(47, 128, 237, 0.18);
+  border-color: var(--focus);
+}
+
+.appointment-chip.clickable {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.appointment-chip.clickable:hover {
+  background: #e8f6f4;
+  border-left-color: var(--primary-strong);
+}
+
 .empty {
   padding: 24px;
   color: var(--muted);

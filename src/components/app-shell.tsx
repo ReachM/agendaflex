@@ -31,7 +31,6 @@ const tenantLinks = [
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/servicos", label: "Serviços", icon: ClipboardList },
   { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
-  { href: "/campos-personalizados", label: "Campos", icon: SlidersHorizontal },
   { href: "/usuarios", label: "Usuários", icon: UserCog },
   { href: "/relatorios", label: "Relatórios", icon: Activity },
   { href: "/logs", label: "Logs", icon: FileClock },
@@ -41,6 +40,7 @@ const tenantLinks = [
 const masterLinks = [
   { href: "/master", label: "Master", icon: LayoutDashboard },
   { href: "/master/empresas", label: "Empresas", icon: Building2 },
+  { href: "/master/campos", label: "Campos", icon: SlidersHorizontal },
   { href: "/logs", label: "Logs", icon: FileClock }
 ];
 

@@ -1,0 +1,289 @@
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\server\next-font-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\server\\next-font-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\server\next-font-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\server\\next-font-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/api/master/dashboard'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/api/master/dashboard'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json',
+  page: '/login'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open 'C:\Users\moise\Downloads\AgendaFlex\.next\routes-manifest.json'] {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\moise\\Downloads\\AgendaFlex\\.next\\routes-manifest.json'
+}

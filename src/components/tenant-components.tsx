@@ -3,11 +3,12 @@
 import {
   Ban,
   CalendarPlus,
+  Edit2,
   Plus,
   RefreshCcw,
   Save,
-  Trash2,
-  UserPlus
+  UserPlus,
+  X
 } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -38,31 +39,7 @@ const statusLabels: Record<string, string> = {
   NO_SHOW: "Não compareceu"
 };
 
-const entityLabels: [string, string][] = [
-  ["CUSTOMER", "Clientes"],
-  ["APPOINTMENT", "Agendamentos"],
-  ["SERVICE", "Serviços"],
-  ["PROFESSIONAL", "Profissionais"]
-];
 
-const fieldTypes: [string, string][] = [
-  ["SHORT_TEXT", "Texto curto"],
-  ["LONG_TEXT", "Texto longo"],
-  ["NUMBER", "Número"],
-  ["MONEY", "Valor monetário"],
-  ["PERCENT", "Porcentagem"],
-  ["DATE", "Data"],
-  ["TIME", "Hora"],
-  ["DATETIME", "Data e hora"],
-  ["SINGLE_SELECT", "Seleção única"],
-  ["MULTI_SELECT", "Seleção múltipla"],
-  ["CHECKBOX", "Checkbox"],
-  ["BOOLEAN", "Sim/Não"],
-  ["EMAIL", "E-mail"],
-  ["PHONE", "Telefone"],
-  ["CPF_CNPJ", "CPF/CNPJ"],
-  ["FILE", "Arquivo"]
-];
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -510,6 +487,22 @@ export function AppointmentManager() {
     internalNotes: ""
   });
 
+  // ─── Editing state ─────────────────────────────────────────
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    customerId: "",
+    serviceId: "",
+    professionalId: "",
+    startAt: "",
+    endAt: "",
+    status: "SCHEDULED",
+    notes: "",
+    internalNotes: ""
+  });
+  const [editCustomValues, setEditCustomValues] = useState<CustomValues>({});
+  const [editError, setEditError] = useState("");
+  const [saving, setSaving] = useState(false);
+
   async function load() {
     const [appointmentData, customerData, serviceData, professionalData, fieldData] = await Promise.all([
       apiFetch<{ appointments: AnyRecord[] }>("/api/appointments"),
@@ -554,6 +547,71 @@ export function AppointmentManager() {
     await load();
   }
 
+  function openEdit(appointment: AnyRecord) {
+    setEditingId(appointment.id);
+    setEditError("");
+    setEditForm({
+      customerId: appointment.customerId ?? "",
+      serviceId: appointment.serviceId ?? "",
+      professionalId: appointment.professionalId ?? "",
+      startAt: toDateTimeInput(new Date(appointment.startAt)),
+      endAt: toDateTimeInput(new Date(appointment.endAt)),
+      status: appointment.status ?? "SCHEDULED",
+      notes: appointment.notes ?? "",
+      internalNotes: appointment.internalNotes ?? ""
+    });
+    // Load existing custom values
+    const cv: CustomValues = {};
+    if (appointment.customValues && typeof appointment.customValues === "object") {
+      for (const [key, value] of Object.entries(appointment.customValues)) {
+        cv[key] = value as any;
+      }
+    }
+    setEditCustomValues(cv);
+  }
+
+  function closeEdit() {
+    setEditingId(null);
+    setEditError("");
+  }
+
+  async function submitEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingId) return;
+    setEditError("");
+    setSaving(true);
+    try {
+      await apiFetch(`/api/appointments/${editingId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...editForm,
+          startAt: new Date(editForm.startAt).toISOString(),
+          endAt: new Date(editForm.endAt).toISOString(),
+          customValues: editCustomValues
+        })
+      });
+      closeEdit();
+      await load();
+    } catch (err) {
+      setEditError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changeStatus(id: string, status: string) {
+    setError("");
+    try {
+      await apiFetch(`/api/appointments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status })
+      });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -567,6 +625,42 @@ export function AppointmentManager() {
         }
       />
       <ErrorBox error={error} />
+
+      {/* ─── Edit Modal ───────────────────────────────────── */}
+      {editingId ? (
+        <div className="modal-overlay" onClick={closeEdit}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="toolbar" style={{ marginBottom: 16 }}>
+              <h2 className="section-title">Editar agendamento</h2>
+              <button className="icon-button secondary" onClick={closeEdit} type="button" title="Fechar">
+                <X size={16} />
+              </button>
+            </div>
+            <ErrorBox error={editError} />
+            <form className="form-grid" onSubmit={submitEdit}>
+              <Select label="Cliente" value={editForm.customerId} onChange={(customerId) => setEditForm({ ...editForm, customerId })} required options={customers.map((item) => [item.id, item.name])} />
+              <Select label="Serviço" value={editForm.serviceId} onChange={(serviceId) => setEditForm({ ...editForm, serviceId })} required options={services.map((item) => [item.id, item.name])} />
+              <Select label="Profissional" value={editForm.professionalId} onChange={(professionalId) => setEditForm({ ...editForm, professionalId })} required options={professionals.map((item) => [item.id, item.name])} />
+              <Select label="Status" value={editForm.status} onChange={(status) => setEditForm({ ...editForm, status })} options={Object.entries(statusLabels)} />
+              <Input label="Início" type="datetime-local" value={editForm.startAt} onChange={(startAt) => setEditForm({ ...editForm, startAt })} required />
+              <Input label="Fim" type="datetime-local" value={editForm.endAt} onChange={(endAt) => setEditForm({ ...editForm, endAt })} required min={editForm.startAt} />
+              <TextArea label="Observações gerais" value={editForm.notes} onChange={(notes) => setEditForm({ ...editForm, notes })} />
+              <TextArea label="Observações internas" value={editForm.internalNotes} onChange={(internalNotes) => setEditForm({ ...editForm, internalNotes })} />
+              <DynamicFields fields={fields} values={editCustomValues} onChange={setEditCustomValues} />
+              <div className="field full" style={{ display: "flex", gap: 12 }}>
+                <button className="button" type="submit" disabled={saving}>
+                  <Save size={16} />
+                  {saving ? "Salvando..." : "Salvar alterações"}
+                </button>
+                <button className="button secondary" type="button" onClick={closeEdit}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       <section className="form-panel grid">
         <h2 className="section-title">Novo agendamento</h2>
         <form className="form-grid" onSubmit={submit}>
@@ -604,7 +698,11 @@ export function AppointmentManager() {
             ))}
           </div>
         </div>
-        {view === "list" ? <AppointmentTable appointments={appointments} onCancel={cancel} /> : <CalendarBoard view={view} appointments={appointments} />}
+        {view === "list" ? (
+          <AppointmentTable appointments={appointments} onCancel={cancel} onEdit={openEdit} onStatusChange={changeStatus} />
+        ) : (
+          <CalendarBoard view={view} appointments={appointments} onEdit={openEdit} />
+        )}
       </section>
     </>
   );
@@ -641,10 +739,14 @@ function Select({
 function AppointmentTable({
   appointments,
   onCancel,
+  onEdit,
+  onStatusChange,
   compact
 }: {
   appointments: AnyRecord[];
   onCancel?: (id: string) => void;
+  onEdit?: (appointment: AnyRecord) => void;
+  onStatusChange?: (id: string, status: string) => void;
   compact?: boolean;
 }) {
   if (!appointments.length) return <div className="empty">Sem agendamentos.</div>;
@@ -660,7 +762,7 @@ function AppointmentTable({
             <th>Profissional</th>
             <th>Status</th>
             {!compact ? <th>Campos</th> : null}
-            {onCancel ? <th>Ações</th> : null}
+            {(onCancel || onEdit) ? <th>Ações</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -670,13 +772,36 @@ function AppointmentTable({
               <td>{appointment.customer?.name ?? "-"}</td>
               <td>{appointment.service?.name ?? "-"}</td>
               <td>{appointment.professional?.name ?? "-"}</td>
-              <td><span className="badge">{statusLabels[appointment.status] ?? appointment.status}</span></td>
+              <td>
+                {onStatusChange ? (
+                  <select
+                    className="badge-select"
+                    value={appointment.status}
+                    onChange={(e) => onStatusChange(appointment.id, e.target.value)}
+                  >
+                    {Object.entries(statusLabels).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="badge">{statusLabels[appointment.status] ?? appointment.status}</span>
+                )}
+              </td>
               {!compact ? <td>{summarizeCustomValues(appointment.customValues)}</td> : null}
-              {onCancel ? (
+              {(onCancel || onEdit) ? (
                 <td>
-                  <button className="icon-button secondary" title="Cancelar" onClick={() => onCancel(appointment.id)} type="button">
-                    <Ban size={16} />
-                  </button>
+                  <div className="toolbar" style={{ gap: 6 }}>
+                    {onEdit ? (
+                      <button className="icon-button secondary" title="Editar" onClick={() => onEdit(appointment)} type="button">
+                        <Edit2 size={16} />
+                      </button>
+                    ) : null}
+                    {onCancel && appointment.status !== "CANCELLED" ? (
+                      <button className="icon-button secondary" title="Cancelar" onClick={() => onCancel(appointment.id)} type="button">
+                        <Ban size={16} />
+                      </button>
+                    ) : null}
+                  </div>
                 </td>
               ) : null}
             </tr>
@@ -687,7 +812,7 @@ function AppointmentTable({
   );
 }
 
-function CalendarBoard({ appointments, view }: { appointments: AnyRecord[]; view: "day" | "week" | "month" }) {
+function CalendarBoard({ appointments, view, onEdit }: { appointments: AnyRecord[]; view: "day" | "week" | "month"; onEdit?: (appointment: AnyRecord) => void }) {
   const days = useMemo(() => {
     const count = view === "day" ? 1 : view === "week" ? 7 : 28;
     const start = new Date();
@@ -712,7 +837,14 @@ function CalendarBoard({ appointments, view }: { appointments: AnyRecord[]; view
           <div className="calendar-day" key={day.toISOString()}>
             <strong>{new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).format(day)}</strong>
             {items.map((appointment) => (
-              <div className="appointment-chip" key={appointment.id}>
+              <div
+                className="appointment-chip clickable"
+                key={appointment.id}
+                onClick={() => onEdit?.(appointment)}
+                title="Clique para editar"
+                role="button"
+                tabIndex={0}
+              >
                 <span>{new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(appointment.startAt))}</span>
                 <strong>{appointment.customer?.name ?? "-"}</strong>
                 <span>{appointment.professional?.name ?? "-"}</span>
@@ -725,119 +857,7 @@ function CalendarBoard({ appointments, view }: { appointments: AnyRecord[]; view
   );
 }
 
-export function CustomFieldManager() {
-  const [fields, setFields] = useState<CustomField[]>([]);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({
-    entityType: "CUSTOMER",
-    label: "",
-    fieldKey: "",
-    fieldType: "SHORT_TEXT",
-    isRequired: false,
-    sortOrder: "0",
-    placeholder: "",
-    helpText: "",
-    options: ""
-  });
 
-  async function load() {
-    const data = await apiFetch<{ customFields: CustomField[] }>("/api/custom-fields");
-    setFields(data.customFields);
-  }
-
-  useEffect(() => {
-    load().catch((err) => setError(err.message));
-  }, []);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    try {
-      await apiFetch("/api/custom-fields", {
-        method: "POST",
-        body: JSON.stringify({
-          ...form,
-          sortOrder: Number(form.sortOrder),
-          options: form.options
-            ? form.options.split(",").map((item) => item.trim()).filter(Boolean)
-            : undefined
-        })
-      });
-      setForm({ ...form, label: "", fieldKey: "", placeholder: "", helpText: "", options: "" });
-      await load();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-
-  async function deactivate(id: string) {
-    await apiFetch(`/api/custom-fields/${id}`, { method: "DELETE" });
-    await load();
-  }
-
-  return (
-    <>
-      <PageHeader title="Campos personalizados" subtitle="Configuração dinâmica por entidade" />
-      <ErrorBox error={error} />
-      <section className="form-panel grid">
-        <h2 className="section-title">Novo campo</h2>
-        <form className="form-grid" onSubmit={submit}>
-          <Select label="Entidade" value={form.entityType} onChange={(entityType) => setForm({ ...form, entityType })} options={entityLabels} />
-          <Select label="Tipo" value={form.fieldType} onChange={(fieldType) => setForm({ ...form, fieldType })} options={fieldTypes} />
-          <Input label="Nome do campo" value={form.label} onChange={(label) => setForm({ ...form, label })} required />
-          <Input label="Chave interna" value={form.fieldKey} onChange={(fieldKey) => setForm({ ...form, fieldKey })} />
-          <Input label="Ordem" type="number" value={form.sortOrder} onChange={(sortOrder) => setForm({ ...form, sortOrder })} />
-          <Input label="Placeholder" value={form.placeholder} onChange={(placeholder) => setForm({ ...form, placeholder })} />
-          <Input label="Texto de ajuda" value={form.helpText} onChange={(helpText) => setForm({ ...form, helpText })} full />
-          <Input label="Opções separadas por vírgula" value={form.options} onChange={(options) => setForm({ ...form, options })} full />
-          <div className="field">
-            <label>Obrigatório</label>
-            <div className="checkbox-line">
-              <input type="checkbox" checked={form.isRequired} onChange={(event) => setForm({ ...form, isRequired: event.target.checked })} />
-              <span className="muted">Sim</span>
-            </div>
-          </div>
-          <div className="field full">
-            <button className="button" type="submit">
-              <Plus size={16} />
-              Criar campo
-            </button>
-          </div>
-        </form>
-      </section>
-      <section className="table-wrap" style={{ marginTop: 16 }}>
-        <table>
-          <thead>
-            <tr>
-              <th>Campo</th>
-              <th>Entidade</th>
-              <th>Tipo</th>
-              <th>Obrigatório</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fields.map((field) => (
-              <tr key={field.id}>
-                <td><strong>{field.label}</strong><br /><span className="muted">{field.fieldKey}</span></td>
-                <td>{field.entityType}</td>
-                <td>{field.fieldType}</td>
-                <td>{field.isRequired ? "Sim" : "Não"}</td>
-                <td><span className={`badge ${field.isActive ? "success" : "danger"}`}>{field.isActive ? "Ativo" : "Inativo"}</span></td>
-                <td>
-                  <button className="icon-button secondary" title="Desativar" onClick={() => deactivate(field.id)} type="button">
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-    </>
-  );
-}
 
 export function UserManager() {
   const [users, setUsers] = useState<AnyRecord[]>([]);
