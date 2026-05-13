@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agendaflex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agendaflex
+      POSTGRES_PASSWORD: agendaflex
+      POSTGRES_DB: agendaflex
+    ports:
+      - "5432:5432"
+    volumes:
+      - agendaflex-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agendaflex -d agendaflex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  agendaflex-postgres-data:

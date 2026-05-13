@@ -1,0 +1,30 @@
+import type { ReactNode } from "react";
+
+export function PageHeader({
+  title,
+  subtitle,
+  actions
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="topbar">
+      <div className="page-title">
+        <h1>{title}</h1>
+        {subtitle ? <p className="muted">{subtitle}</p> : null}
+      </div>
+      {actions ? <div className="toolbar">{actions}</div> : null}
+    </div>
+  );
+}
+
+export function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="card stat">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}

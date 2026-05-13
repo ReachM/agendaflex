@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum BusinessSegment {
+  CLINICA_MEDICA
+  OFICINA_MECANICA
+  SALAO_BELEZA
+  CONSULTORIO
+  ASSISTENCIA_TECNICA
+  PRESTADOR_SERVICOS
+  PERSONALIZADO
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum RoleName {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  MANAGER
+  STAFF
+  USER
+}
+
+enum RoleScope {
+  SYSTEM
+  TENANT
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum EntityType {
+  CUSTOMER
+  SERVICE
+  PROFESSIONAL
+  APPOINTMENT
+}
+
+enum CustomFieldType {
+  SHORT_TEXT
+  LONG_TEXT
+  NUMBER
+  MONEY
+  PERCENT
+  DATE
+  TIME
+  DATETIME
+  SINGLE_SELECT
+  MULTI_SELECT
+  CHECKBOX
+  BOOLEAN
+  EMAIL
+  PHONE
+  CPF_CNPJ
+  FILE
+}
+
+model Company {
+  id             String          @id @default(cuid())
+  name           String
+  tradeName      String?
+  document       String?
+  email          String
+  phone          String?
+  segment        BusinessSegment @default(PERSONALIZADO)
+  status         CompanyStatus   @default(ACTIVE)
+  plan           String          @default("starter")
+  settings       Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  users          CompanyUser[]
+  customers      Customer[]
+  services       Service[]
+  professionals  Professional[]
+  appointments   Appointment[]
+  customFields   CustomField[]
+  fieldValues    CustomFieldValue[]
+  auditLogs      AuditLog[]
+
+  @@index([status])
+  @@index([segment])
+}
+
+model User {
+  id             String        @id @default(cuid())
+  name           String
+  email          String        @unique
+  passwordHash   String
+  status         UserStatus    @default(ACTIVE)
+  systemRoleId   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  systemRole     Role?         @relation("SystemRole", fields: [systemRoleId], references: [id])
+  memberships    CompanyUser[]
+  createdAppointments Appointment[] @relation("AppointmentCreatedBy")
+  updatedAppointments Appointment[] @relation("AppointmentUpdatedBy")
+  auditLogs      AuditLog[]
+
+  @@index([status])
+  @@index([systemRoleId])
+}
+
+model CompanyUser {
+  id          String      @id @default(cuid())
+  companyId   String
+  userId      String
+  roleId      String
+  status      UserStatus  @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        Role        @relation(fields: [roleId], references: [id])
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([status])
+}
+
+model Role {
+  id              String           @id @default(cuid())
+  name            RoleName         @unique
+  scope           RoleScope
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  users           User[]           @relation("SystemRole")
+  companyUsers    CompanyUser[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  key             String           @unique
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id            String      @id @default(cuid())
+  roleId        String
+  permissionId  String
+
+  role          Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model Customer {
+  id             String    @id @default(cuid())
+  companyId      String
+  name           String
+  email          String?
+  phone          String?
+  cpf            String?
+  birthDate      DateTime?
+  notes          String?
+  status         String    @default("active")
+  anonymizedAt   DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointments   Appointment[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([companyId, name])
+  @@index([companyId, email])
+}
+
+model Service {
+  id              String    @id @default(cuid())
+  companyId       String
+  name            String
+  description     String?
+  basePrice       Decimal?  @db.Decimal(12, 2)
+  durationMinutes Int       @default(60)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+
+  @@index([companyId])
+  @@index([companyId, isActive])
+  @@index([companyId, name])
+}
+
+model Professional {
+  id             String    @id @default(cuid())
+  companyId      String
+  name           String
+  email          String?
+  phone          String?
+  specialty      String?
+  isActive       Boolean   @default(true)
+  workingHours   Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointments   Appointment[]
+
+  @@index([companyId])
+  @@index([companyId, isActive])
+  @@index([companyId, name])
+}
+
+model Appointment {
+  id              String            @id @default(cuid())
+  companyId       String
+  customerId      String
+  serviceId       String
+  professionalId  String
+  startAt         DateTime
+  endAt           DateTime
+  status          AppointmentStatus @default(SCHEDULED)
+  notes           String?
+  internalNotes   String?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  service         Service           @relation(fields: [serviceId], references: [id])
+  professional    Professional      @relation(fields: [professionalId], references: [id])
+  createdBy       User?             @relation("AppointmentCreatedBy", fields: [createdById], references: [id])
+  updatedBy       User?             @relation("AppointmentUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, startAt])
+  @@index([companyId, status])
+  @@index([companyId, professionalId, startAt, endAt])
+  @@index([customerId])
+  @@index([serviceId])
+  @@index([professionalId])
+}
+
+model CustomField {
+  id            String          @id @default(cuid())
+  companyId     String
+  entityType    EntityType
+  label         String
+  fieldKey      String
+  fieldType     CustomFieldType
+  isRequired    Boolean         @default(false)
+  sortOrder     Int             @default(0)
+  placeholder   String?
+  helpText      String?
+  options       Json?
+  defaultValue  Json?
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  values        CustomFieldValue[]
+
+  @@unique([companyId, entityType, fieldKey])
+  @@index([companyId])
+  @@index([companyId, entityType, isActive])
+}
+
+model CustomFieldValue {
+  id             String      @id @default(cuid())
+  companyId      String
+  customFieldId  String
+  entityType     EntityType
+  entityId       String
+  value          Json
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  company        Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customField    CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, customFieldId, entityType, entityId])
+  @@index([companyId])
+  @@index([companyId, entityType, entityId])
+  @@index([customFieldId])
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  companyId   String?
+  userId      String?
+  action      String
+  entityType  String
+  entityId    String?
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
