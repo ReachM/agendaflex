@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  Briefcase,
   Building2,
   CalendarDays,
   ClipboardList,
@@ -10,7 +11,6 @@ import {
   LogOut,
   Settings,
   SlidersHorizontal,
-  Stethoscope,
   UserCog,
   Users
 } from "lucide-react";
@@ -30,7 +30,7 @@ const tenantLinks = [
   { href: "/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/servicos", label: "Serviços", icon: ClipboardList },
-  { href: "/profissionais", label: "Profissionais", icon: Stethoscope },
+  { href: "/profissionais", label: "Profissionais", icon: Briefcase },
   { href: "/usuarios", label: "Usuários", icon: UserCog },
   { href: "/relatorios", label: "Relatórios", icon: Activity },
   { href: "/logs", label: "Logs", icon: FileClock },

@@ -3,11 +3,17 @@
 import {
   Ban,
   CalendarPlus,
+  Check,
+  CheckCircle,
+  Clock,
+  DollarSign,
   Edit2,
+  Eye,
   Plus,
   RefreshCcw,
   Save,
   Trash2,
+  User,
   UserPlus,
   X
 } from "lucide-react";
@@ -132,6 +138,7 @@ function ErrorBox({ error }: { error: string }) {
 export function TenantDashboard() {
   const [data, setData] = useState<AnyRecord | null>(null);
   const [error, setError] = useState("");
+  const [selectedAppointment, setSelectedAppointment] = useState<AnyRecord | null>(null);
 
   useEffect(() => {
     apiFetch<AnyRecord>("/api/dashboard").then(setData).catch((err) => setError(err.message));
@@ -166,8 +173,92 @@ export function TenantDashboard() {
       </div>
       <section className="panel grid" style={{ marginTop: 16 }}>
         <h2 className="section-title">Próximos agendamentos</h2>
-        <AppointmentTable appointments={data?.nextAppointments ?? []} compact />
+        <AppointmentTable
+          appointments={data?.nextAppointments ?? []}
+          compact
+          onView={setSelectedAppointment}
+        />
       </section>
+
+      {/* ─── Appointment Detail Modal ─────────────────────── */}
+      {selectedAppointment ? (
+        <div className="modal-overlay" onClick={() => setSelectedAppointment(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="toolbar" style={{ marginBottom: 20 }}>
+              <h2 className="section-title">Detalhes do agendamento</h2>
+              <button className="icon-button secondary" onClick={() => setSelectedAppointment(null)} type="button" title="Fechar">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="detail-cards">
+              {/* Service Info */}
+              <div className="detail-card detail-card--service">
+                <div className="detail-card__icon">
+                  <DollarSign size={20} />
+                </div>
+                <div className="detail-card__body">
+                  <span className="detail-card__label">Serviço</span>
+                  <strong className="detail-card__value">{selectedAppointment.service?.name ?? "-"}</strong>
+                  {selectedAppointment.service?.description ? (
+                    <p className="detail-card__desc">{selectedAppointment.service.description}</p>
+                  ) : null}
+                  <div className="detail-card__meta">
+                    <span><Clock size={13} /> {selectedAppointment.service?.durationMinutes ?? "-"} min</span>
+                    <span><DollarSign size={13} /> {formatMoney(selectedAppointment.service?.basePrice)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Client Info */}
+              <div className="detail-card detail-card--client">
+                <div className="detail-card__icon">
+                  <User size={20} />
+                </div>
+                <div className="detail-card__body">
+                  <span className="detail-card__label">Cliente</span>
+                  <strong className="detail-card__value">{selectedAppointment.customer?.name ?? "-"}</strong>
+                  <div className="detail-card__meta">
+                    {selectedAppointment.customer?.email ? <span>{selectedAppointment.customer.email}</span> : null}
+                    {selectedAppointment.customer?.phone ? <span>{selectedAppointment.customer.phone}</span> : null}
+                  </div>
+                </div>
+              </div>
+
+              {/* Schedule & Professional */}
+              <div className="detail-card detail-card--schedule">
+                <div className="detail-card__icon">
+                  <CalendarPlus size={20} />
+                </div>
+                <div className="detail-card__body">
+                  <span className="detail-card__label">Agendamento</span>
+                  <strong className="detail-card__value">{formatDateTime(selectedAppointment.startAt)}</strong>
+                  <div className="detail-card__meta">
+                    <span>Profissional: <strong>{selectedAppointment.professional?.name ?? "-"}</strong></span>
+                    <span className={`badge ${statusBadgeClass[selectedAppointment.status] ?? ""}`}>
+                      {statusLabels[selectedAppointment.status] ?? selectedAppointment.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {selectedAppointment.notes ? (
+              <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--surface-muted)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--text-secondary)" }}>
+                <strong style={{ display: "block", marginBottom: 4, fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Observações</strong>
+                {selectedAppointment.notes}
+              </div>
+            ) : null}
+
+            <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}>
+              <Link className="button" href="/agenda">
+                <Edit2 size={16} />
+                Ir para agenda
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -178,6 +269,13 @@ export function CustomerManager() {
   const [customValues, setCustomValues] = useState<CustomValues>({});
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", email: "", phone: "", cpf: "", birthDate: "", notes: "" });
+
+  // ─── Editing state ─────────────────────────────────────────
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", cpf: "", birthDate: "", notes: "" });
+  const [editCustomValues, setEditCustomValues] = useState<CustomValues>({});
+  const [editError, setEditError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   async function load() {
     const [customerData, fieldData] = await Promise.all([
@@ -208,6 +306,50 @@ export function CustomerManager() {
     }
   }
 
+  function openEdit(customer: AnyRecord) {
+    setEditingId(customer.id);
+    setEditError("");
+    setEditForm({
+      name: customer.name ?? "",
+      email: customer.email ?? "",
+      phone: customer.phone ?? "",
+      cpf: customer.cpf ?? "",
+      birthDate: customer.birthDate ? customer.birthDate.slice(0, 10) : "",
+      notes: customer.notes ?? ""
+    });
+    const cv: CustomValues = {};
+    if (customer.customValues && typeof customer.customValues === "object") {
+      for (const [key, value] of Object.entries(customer.customValues)) {
+        cv[key] = value as any;
+      }
+    }
+    setEditCustomValues(cv);
+  }
+
+  function closeEdit() {
+    setEditingId(null);
+    setEditError("");
+  }
+
+  async function submitEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingId) return;
+    setEditError("");
+    setSaving(true);
+    try {
+      await apiFetch(`/api/customers/${editingId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ ...editForm, customValues: editCustomValues })
+      });
+      closeEdit();
+      await load();
+    } catch (err) {
+      setEditError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function anonymize(id: string) {
     await apiFetch(`/api/customers/${id}?mode=anonymize`, { method: "DELETE" });
     await load();
@@ -217,6 +359,40 @@ export function CustomerManager() {
     <>
       <PageHeader title="Clientes" subtitle="Clientes finais, pacientes ou consumidores" />
       <ErrorBox error={error} />
+
+      {/* ─── Edit Modal ───────────────────────────────────── */}
+      {editingId ? (
+        <div className="modal-overlay" onClick={closeEdit}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="toolbar" style={{ marginBottom: 16 }}>
+              <h2 className="section-title">Editar cliente</h2>
+              <button className="icon-button secondary" onClick={closeEdit} type="button" title="Fechar">
+                <X size={16} />
+              </button>
+            </div>
+            <ErrorBox error={editError} />
+            <form className="form-grid" onSubmit={submitEdit}>
+              <Input label="Nome" value={editForm.name} onChange={(name) => setEditForm({ ...editForm, name })} required />
+              <Input label="E-mail" type="email" value={editForm.email} onChange={(email) => setEditForm({ ...editForm, email })} />
+              <Input label="Telefone" value={editForm.phone} onChange={(phone) => setEditForm({ ...editForm, phone })} />
+              <Input label="CPF" value={editForm.cpf} onChange={(cpf) => setEditForm({ ...editForm, cpf })} />
+              <Input label="Nascimento" type="date" value={editForm.birthDate} onChange={(birthDate) => setEditForm({ ...editForm, birthDate })} />
+              <TextArea label="Observações" value={editForm.notes} onChange={(notes) => setEditForm({ ...editForm, notes })} />
+              <DynamicFields fields={fields} values={editCustomValues} onChange={setEditCustomValues} />
+              <div className="field full" style={{ display: "flex", gap: 12 }}>
+                <button className="button" type="submit" disabled={saving}>
+                  <Save size={16} />
+                  {saving ? "Salvando..." : "Salvar alterações"}
+                </button>
+                <button className="button secondary" type="button" onClick={closeEdit}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       <section className="form-panel grid">
         <h2 className="section-title">Novo cliente</h2>
         <form className="form-grid" onSubmit={submit}>
@@ -262,9 +438,14 @@ export function CustomerManager() {
                 <td><span className={`badge ${customer.status === "active" ? "status-active" : "status-inactive"}`}>{customer.status === "active" ? "Ativo" : customer.status}</span></td>
                 <td>{summarizeCustomValues(customer.customValues)}</td>
                 <td>
-                  <button className="icon-button secondary" title="Anonimizar" onClick={() => anonymize(customer.id)} type="button">
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="toolbar" style={{ gap: 6 }}>
+                    <button className="icon-button secondary" title="Editar" onClick={() => openEdit(customer)} type="button">
+                      <Edit2 size={16} />
+                    </button>
+                    <button className="icon-button secondary" title="Anonimizar" onClick={() => anonymize(customer.id)} type="button">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -281,6 +462,13 @@ export function ServiceManager() {
   const [customValues, setCustomValues] = useState<CustomValues>({});
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", description: "", basePrice: "", durationMinutes: "60" });
+
+  // ─── Editing state ─────────────────────────────────────────
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", description: "", basePrice: "", durationMinutes: "60" });
+  const [editCustomValues, setEditCustomValues] = useState<CustomValues>({});
+  const [editError, setEditError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   async function load() {
     const [serviceData, fieldData] = await Promise.all([
@@ -316,10 +504,57 @@ export function ServiceManager() {
     }
   }
 
-  async function deactivate(id: string) {
+  function openEdit(service: AnyRecord) {
+    setEditingId(service.id);
+    setEditError("");
+    setEditForm({
+      name: service.name ?? "",
+      description: service.description ?? "",
+      basePrice: service.basePrice != null ? String(service.basePrice) : "",
+      durationMinutes: service.durationMinutes != null ? String(service.durationMinutes) : "60"
+    });
+    const cv: CustomValues = {};
+    if (service.customValues && typeof service.customValues === "object") {
+      for (const [key, value] of Object.entries(service.customValues)) {
+        cv[key] = value as any;
+      }
+    }
+    setEditCustomValues(cv);
+  }
+
+  function closeEdit() {
+    setEditingId(null);
+    setEditError("");
+  }
+
+  async function submitEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingId) return;
+    setEditError("");
+    setSaving(true);
+    try {
+      await apiFetch(`/api/services/${editingId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...editForm,
+          basePrice: editForm.basePrice ? Number(editForm.basePrice) : undefined,
+          durationMinutes: Number(editForm.durationMinutes),
+          customValues: editCustomValues
+        })
+      });
+      closeEdit();
+      await load();
+    } catch (err) {
+      setEditError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleActive(id: string, active: boolean) {
     await apiFetch(`/api/services/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ isActive: false })
+      body: JSON.stringify({ isActive: active })
     });
     await load();
   }
@@ -328,6 +563,38 @@ export function ServiceManager() {
     <>
       <PageHeader title="Serviços" subtitle="Catálogo de serviços do tenant" />
       <ErrorBox error={error} />
+
+      {/* ─── Edit Modal ───────────────────────────────────── */}
+      {editingId ? (
+        <div className="modal-overlay" onClick={closeEdit}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="toolbar" style={{ marginBottom: 16 }}>
+              <h2 className="section-title">Editar serviço</h2>
+              <button className="icon-button secondary" onClick={closeEdit} type="button" title="Fechar">
+                <X size={16} />
+              </button>
+            </div>
+            <ErrorBox error={editError} />
+            <form className="form-grid" onSubmit={submitEdit}>
+              <Input label="Nome" value={editForm.name} onChange={(name) => setEditForm({ ...editForm, name })} required />
+              <Input label="Valor base" type="number" value={editForm.basePrice} onChange={(basePrice) => setEditForm({ ...editForm, basePrice })} />
+              <Input label="Duração em minutos" type="number" value={editForm.durationMinutes} onChange={(durationMinutes) => setEditForm({ ...editForm, durationMinutes })} required />
+              <TextArea label="Descrição" value={editForm.description} onChange={(description) => setEditForm({ ...editForm, description })} />
+              <DynamicFields fields={fields} values={editCustomValues} onChange={setEditCustomValues} />
+              <div className="field full" style={{ display: "flex", gap: 12 }}>
+                <button className="button" type="submit" disabled={saving}>
+                  <Save size={16} />
+                  {saving ? "Salvando..." : "Salvar alterações"}
+                </button>
+                <button className="button secondary" type="button" onClick={closeEdit}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       <section className="form-panel grid">
         <h2 className="section-title">Novo serviço</h2>
         <form className="form-grid" onSubmit={submit}>
@@ -365,9 +632,20 @@ export function ServiceManager() {
                 <td><span className={`badge ${service.isActive ? "success" : "danger"}`}>{service.isActive ? "Ativo" : "Inativo"}</span></td>
                 <td>{summarizeCustomValues(service.customValues)}</td>
                 <td>
-                  <button className="icon-button secondary" title="Desativar" onClick={() => deactivate(service.id)} type="button">
-                    <Ban size={16} />
-                  </button>
+                  <div className="toolbar" style={{ gap: 6 }}>
+                    <button className="icon-button secondary" title="Editar" onClick={() => openEdit(service)} type="button">
+                      <Edit2 size={16} />
+                    </button>
+                    {service.isActive ? (
+                      <button className="icon-button secondary" title="Desativar" onClick={() => toggleActive(service.id, false)} type="button">
+                        <Ban size={16} />
+                      </button>
+                    ) : (
+                      <button className="icon-button" title="Ativar" onClick={() => toggleActive(service.id, true)} type="button" style={{ background: 'linear-gradient(135deg, var(--success) 0%, #15803d 100%)' }}>
+                        <CheckCircle size={16} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -485,9 +763,11 @@ export function AppointmentManager() {
   const [customValues, setCustomValues] = useState<CustomValues>({});
   const [view, setView] = useState<"list" | "day" | "week" | "month">("week");
   const [error, setError] = useState("");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [pricing, setPricing] = useState({ partsValue: "", laborValue: "", discountPercent: "" });
+
   const [form, setForm] = useState({
     customerId: "",
-    serviceId: "",
     professionalId: "",
     startAt: toDateTimeInput(now),
     endAt: toDateTimeInput(later),
@@ -496,11 +776,24 @@ export function AppointmentManager() {
     internalNotes: ""
   });
 
+  const selectedServicesTotal = useMemo(() => {
+    return selectedServiceIds.reduce((sum, id) => {
+      const svc = services.find((s) => s.id === id);
+      return sum + (svc?.basePrice ? Number(svc.basePrice) : 0);
+    }, 0);
+  }, [selectedServiceIds, services]);
+
+  const selectedServiceNames = useMemo(() => {
+    return selectedServiceIds.map((id) => services.find((s) => s.id === id)?.name).filter(Boolean).join(", ");
+  }, [selectedServiceIds, services]);
+
   // ─── Editing state ─────────────────────────────────────────
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editSelectedServiceIds, setEditSelectedServiceIds] = useState<string[]>([]);
+  const [editPricing, setEditPricing] = useState({ partsValue: "", laborValue: "", discountPercent: "" });
+
   const [editForm, setEditForm] = useState({
     customerId: "",
-    serviceId: "",
     professionalId: "",
     startAt: "",
     endAt: "",
@@ -510,6 +803,13 @@ export function AppointmentManager() {
   });
   const [editCustomValues, setEditCustomValues] = useState<CustomValues>({});
   const [editError, setEditError] = useState("");
+
+  const editServicesTotal = useMemo(() => {
+    return editSelectedServiceIds.reduce((sum, id) => {
+      const svc = services.find((s) => s.id === id);
+      return sum + (svc?.basePrice ? Number(svc.basePrice) : 0);
+    }, 0);
+  }, [editSelectedServiceIds, services]);
   const [saving, setSaving] = useState(false);
 
   async function load() {
@@ -527,6 +827,10 @@ export function AppointmentManager() {
     setFields(fieldData.customFields.filter((field) => field.isActive));
   }
 
+  // Filter out old pricing custom fields — now handled by PricingCalculator
+  const pricingFieldKeys = new Set(["valor_da_peca", "valor_da_mao_de_obra", "desconto_em_porcentagem", "valor_total"]);
+  const filteredFields = useMemo(() => fields.filter((f) => !pricingFieldKeys.has(f.fieldKey)), [fields]);
+
   useEffect(() => {
     load().catch((err) => setError(err.message));
   }, []);
@@ -534,17 +838,37 @@ export function AppointmentManager() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    if (selectedServiceIds.length === 0) {
+      setError("Selecione pelo menos um serviço.");
+      return;
+    }
     try {
+      const parts = pricing.partsValue ? Number(pricing.partsValue) : 0;
+      const labor = pricing.laborValue ? Number(pricing.laborValue) : 0;
+      const discount = pricing.discountPercent ? Number(pricing.discountPercent) : 0;
+      const subtotal = selectedServicesTotal + parts + labor;
+      const grandTotal = subtotal - (subtotal * discount / 100);
       await apiFetch("/api/appointments", {
         method: "POST",
         body: JSON.stringify({
           ...form,
+          serviceId: selectedServiceIds[0],
           startAt: new Date(form.startAt).toISOString(),
           endAt: new Date(form.endAt).toISOString(),
-          customValues
+          customValues: {
+            ...customValues,
+            _serviceIds: selectedServiceIds,
+            _servicesTotal: selectedServicesTotal,
+            _partsValue: parts,
+            _laborValue: labor,
+            _discountPercent: discount,
+            _grandTotal: grandTotal
+          }
         })
       });
       setCustomValues({});
+      setSelectedServiceIds([]);
+      setPricing({ partsValue: "", laborValue: "", discountPercent: "" });
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -561,7 +885,6 @@ export function AppointmentManager() {
     setEditError("");
     setEditForm({
       customerId: appointment.customerId ?? "",
-      serviceId: appointment.serviceId ?? "",
       professionalId: appointment.professionalId ?? "",
       startAt: toDateTimeInput(new Date(appointment.startAt)),
       endAt: toDateTimeInput(new Date(appointment.endAt)),
@@ -569,11 +892,28 @@ export function AppointmentManager() {
       notes: appointment.notes ?? "",
       internalNotes: appointment.internalNotes ?? ""
     });
+    // Restore multi-service selection
+    const savedIds = appointment.customValues?._serviceIds;
+    if (Array.isArray(savedIds) && savedIds.length > 0) {
+      setEditSelectedServiceIds(savedIds);
+    } else {
+      setEditSelectedServiceIds(appointment.serviceId ? [appointment.serviceId] : []);
+    }
+    // Restore pricing fields
+    const cv_pricing = appointment.customValues ?? {};
+    setEditPricing({
+      partsValue: cv_pricing._partsValue != null ? String(cv_pricing._partsValue) : "",
+      laborValue: cv_pricing._laborValue != null ? String(cv_pricing._laborValue) : "",
+      discountPercent: cv_pricing._discountPercent != null ? String(cv_pricing._discountPercent) : ""
+    });
     // Load existing custom values
+    const reservedKeys = new Set(["_serviceIds", "_servicesTotal", "_grandTotal", "_totalPrice", "_partsValue", "_laborValue", "_discountPercent"]);
     const cv: CustomValues = {};
     if (appointment.customValues && typeof appointment.customValues === "object") {
       for (const [key, value] of Object.entries(appointment.customValues)) {
-        cv[key] = value as any;
+        if (!reservedKeys.has(key)) {
+          cv[key] = value as any;
+        }
       }
     }
     setEditCustomValues(cv);
@@ -587,16 +927,34 @@ export function AppointmentManager() {
   async function submitEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editingId) return;
+    if (editSelectedServiceIds.length === 0) {
+      setEditError("Selecione pelo menos um serviço.");
+      return;
+    }
     setEditError("");
     setSaving(true);
     try {
+      const parts = editPricing.partsValue ? Number(editPricing.partsValue) : 0;
+      const labor = editPricing.laborValue ? Number(editPricing.laborValue) : 0;
+      const discount = editPricing.discountPercent ? Number(editPricing.discountPercent) : 0;
+      const subtotal = editServicesTotal + parts + labor;
+      const grandTotal = subtotal - (subtotal * discount / 100);
       await apiFetch(`/api/appointments/${editingId}`, {
         method: "PATCH",
         body: JSON.stringify({
           ...editForm,
+          serviceId: editSelectedServiceIds[0],
           startAt: new Date(editForm.startAt).toISOString(),
           endAt: new Date(editForm.endAt).toISOString(),
-          customValues: editCustomValues
+          customValues: {
+            ...editCustomValues,
+            _serviceIds: editSelectedServiceIds,
+            _servicesTotal: editServicesTotal,
+            _partsValue: parts,
+            _laborValue: labor,
+            _discountPercent: discount,
+            _grandTotal: grandTotal
+          }
         })
       });
       closeEdit();
@@ -648,14 +1006,15 @@ export function AppointmentManager() {
             <ErrorBox error={editError} />
             <form className="form-grid" onSubmit={submitEdit}>
               <Select label="Cliente" value={editForm.customerId} onChange={(customerId) => setEditForm({ ...editForm, customerId })} required options={customers.map((item) => [item.id, item.name])} />
-              <Select label="Serviço" value={editForm.serviceId} onChange={(serviceId) => setEditForm({ ...editForm, serviceId })} required options={services.map((item) => [item.id, item.name])} />
               <Select label="Profissional" value={editForm.professionalId} onChange={(professionalId) => setEditForm({ ...editForm, professionalId })} required options={professionals.map((item) => [item.id, item.name])} />
               <Select label="Status" value={editForm.status} onChange={(status) => setEditForm({ ...editForm, status })} options={Object.entries(statusLabels)} />
+              <MultiServiceSelect services={services} selectedIds={editSelectedServiceIds} onChange={setEditSelectedServiceIds} />
               <Input label="Início" type="datetime-local" value={editForm.startAt} onChange={(startAt) => setEditForm({ ...editForm, startAt })} required />
               <Input label="Fim" type="datetime-local" value={editForm.endAt} onChange={(endAt) => setEditForm({ ...editForm, endAt })} required min={editForm.startAt} />
               <TextArea label="Observações gerais" value={editForm.notes} onChange={(notes) => setEditForm({ ...editForm, notes })} />
               <TextArea label="Observações internas" value={editForm.internalNotes} onChange={(internalNotes) => setEditForm({ ...editForm, internalNotes })} />
-              <DynamicFields fields={fields} values={editCustomValues} onChange={setEditCustomValues} />
+              <DynamicFields fields={filteredFields} values={editCustomValues} onChange={setEditCustomValues} />
+              <PricingSummary services={services} selectedIds={editSelectedServiceIds} servicesTotal={editServicesTotal} pricing={editPricing} onPricingChange={setEditPricing} />
               <div className="field full" style={{ display: "flex", gap: 12 }}>
                 <button className="button" type="submit" disabled={saving}>
                   <Save size={16} />
@@ -674,14 +1033,15 @@ export function AppointmentManager() {
         <h2 className="section-title">Novo agendamento</h2>
         <form className="form-grid" onSubmit={submit}>
           <Select label="Cliente" value={form.customerId} onChange={(customerId) => setForm({ ...form, customerId })} required options={customers.map((item) => [item.id, item.name])} />
-          <Select label="Serviço" value={form.serviceId} onChange={(serviceId) => setForm({ ...form, serviceId })} required options={services.map((item) => [item.id, item.name])} />
           <Select label="Profissional" value={form.professionalId} onChange={(professionalId) => setForm({ ...form, professionalId })} required options={professionals.map((item) => [item.id, item.name])} />
           <Select label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={Object.entries(statusLabels)} />
+          <MultiServiceSelect services={services} selectedIds={selectedServiceIds} onChange={setSelectedServiceIds} />
           <Input label="Início" type="datetime-local" value={form.startAt} onChange={(startAt) => setForm({ ...form, startAt })} required />
           <Input label="Fim" type="datetime-local" value={form.endAt} onChange={(endAt) => setForm({ ...form, endAt })} required min={form.startAt} />
           <TextArea label="Observações gerais" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} />
           <TextArea label="Observações internas" value={form.internalNotes} onChange={(internalNotes) => setForm({ ...form, internalNotes })} />
-          <DynamicFields fields={fields} values={customValues} onChange={setCustomValues} />
+          <DynamicFields fields={filteredFields} values={customValues} onChange={setCustomValues} />
+          <PricingSummary services={services} selectedIds={selectedServiceIds} servicesTotal={selectedServicesTotal} pricing={pricing} onPricingChange={setPricing} />
           <div className="field full">
             <button className="button" type="submit">
               <CalendarPlus size={16} />
@@ -745,17 +1105,195 @@ function Select({
   );
 }
 
+function MultiServiceSelect({
+  services,
+  selectedIds,
+  onChange
+}: {
+  services: AnyRecord[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  function toggle(id: string) {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter((sid) => sid !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  }
+
+  return (
+    <div className="field full">
+      <label>Serviços <span className="muted" style={{ fontWeight: 400 }}>({selectedIds.length} selecionado{selectedIds.length !== 1 ? "s" : ""})</span></label>
+      <div className="multi-service-grid">
+        {services.length === 0 ? (
+          <span className="muted" style={{ padding: 8 }}>Nenhum serviço ativo cadastrado.</span>
+        ) : (
+          services.map((svc) => {
+            const checked = selectedIds.includes(svc.id);
+            return (
+              <div
+                key={svc.id}
+                className={`service-chip ${checked ? "selected" : ""}`}
+                onClick={() => toggle(svc.id)}
+                role="checkbox"
+                aria-checked={checked}
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(svc.id); } }}
+              >
+                <div className={`service-chip__check ${checked ? "active" : ""}`}>
+                  {checked ? <Check size={14} /> : null}
+                </div>
+                <div className="service-chip__info">
+                  <strong>{svc.name}</strong>
+                  {svc.description ? <span className="muted">{svc.description}</span> : null}
+                </div>
+                <div className="service-chip__price">
+                  {svc.basePrice != null ? formatMoney(svc.basePrice) : "-"}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PricingSummary({
+  services,
+  selectedIds,
+  servicesTotal,
+  pricing,
+  onPricingChange
+}: {
+  services: AnyRecord[];
+  selectedIds: string[];
+  servicesTotal: number;
+  pricing: { partsValue: string; laborValue: string; discountPercent: string };
+  onPricingChange: (p: { partsValue: string; laborValue: string; discountPercent: string }) => void;
+}) {
+  const parts = pricing.partsValue ? Number(pricing.partsValue) : 0;
+  const labor = pricing.laborValue ? Number(pricing.laborValue) : 0;
+  const discount = pricing.discountPercent ? Number(pricing.discountPercent) : 0;
+  const subtotal = servicesTotal + parts + labor;
+  const discountValue = subtotal * discount / 100;
+  const grandTotal = subtotal - discountValue;
+
+  return (
+    <div className="field full">
+      <div className="price-calculator">
+        {/* Serviços selecionados */}
+        {selectedIds.length > 0 ? (
+          <div className="price-calculator__section">
+            <div className="price-calculator__section-title">
+              <DollarSign size={14} />
+              Serviços selecionados
+            </div>
+            {selectedIds.map((id) => {
+              const svc = services.find((s) => s.id === id);
+              if (!svc) return null;
+              return (
+                <div key={id} className="price-calculator__row">
+                  <span>{svc.name}</span>
+                  <span>{svc.basePrice != null ? formatMoney(svc.basePrice) : "-"}</span>
+                </div>
+              );
+            })}
+            <div className="price-calculator__row subtotal">
+              <span>Subtotal serviços</span>
+              <strong>{formatMoney(servicesTotal)}</strong>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Campos editáveis */}
+        <div className="price-calculator__fields">
+          <div className="price-calculator__field">
+            <label>Valor da Peça (R$)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+              value={pricing.partsValue}
+              onChange={(e) => onPricingChange({ ...pricing, partsValue: e.target.value })}
+            />
+          </div>
+          <div className="price-calculator__field">
+            <label>Mão de Obra (R$)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+              value={pricing.laborValue}
+              onChange={(e) => onPricingChange({ ...pricing, laborValue: e.target.value })}
+            />
+          </div>
+          <div className="price-calculator__field">
+            <label>Desconto (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              placeholder="0"
+              value={pricing.discountPercent}
+              onChange={(e) => onPricingChange({ ...pricing, discountPercent: e.target.value })}
+            />
+          </div>
+        </div>
+
+        {/* Totais */}
+        <div className="price-calculator__totals">
+          <div className="price-calculator__row">
+            <span>Serviços</span>
+            <span>{formatMoney(servicesTotal)}</span>
+          </div>
+          {parts > 0 ? (
+            <div className="price-calculator__row">
+              <span>Peças</span>
+              <span>{formatMoney(parts)}</span>
+            </div>
+          ) : null}
+          {labor > 0 ? (
+            <div className="price-calculator__row">
+              <span>Mão de obra</span>
+              <span>{formatMoney(labor)}</span>
+            </div>
+          ) : null}
+          {discount > 0 ? (
+            <div className="price-calculator__row discount">
+              <span>Desconto ({discount}%)</span>
+              <span>- {formatMoney(discountValue)}</span>
+            </div>
+          ) : null}
+          <div className="price-calculator__grand-total">
+            <span>Valor Total</span>
+            <strong>{formatMoney(grandTotal)}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 function AppointmentTable({
   appointments,
   onCancel,
   onEdit,
   onStatusChange,
+  onView,
   compact
 }: {
   appointments: AnyRecord[];
   onCancel?: (id: string) => void;
   onEdit?: (appointment: AnyRecord) => void;
   onStatusChange?: (id: string, status: string) => void;
+  onView?: (appointment: AnyRecord) => void;
   compact?: boolean;
 }) {
   if (!appointments.length) return <div className="empty">Sem agendamentos.</div>;
@@ -772,11 +1310,17 @@ function AppointmentTable({
             <th>Status</th>
             {!compact ? <th>Campos</th> : null}
             {(onCancel || onEdit) ? <th>Ações</th> : null}
+            {onView && compact ? <th></th> : null}
           </tr>
         </thead>
         <tbody>
           {appointments.map((appointment) => (
-            <tr key={appointment.id}>
+            <tr
+              key={appointment.id}
+              className={onView ? "clickable-row" : ""}
+              onClick={onView ? () => onView(appointment) : undefined}
+              style={onView ? { cursor: "pointer" } : undefined}
+            >
               <td>{formatDateTime(appointment.startAt)}</td>
               <td>{appointment.customer?.name ?? "-"}</td>
               <td>{appointment.service?.name ?? "-"}</td>
@@ -786,7 +1330,11 @@ function AppointmentTable({
                   <select
                     className="badge-select"
                     value={appointment.status}
-                    onChange={(e) => onStatusChange(appointment.id, e.target.value)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      onStatusChange(appointment.id, e.target.value);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     {Object.entries(statusLabels).map(([value, label]) => (
                       <option key={value} value={value}>{label}</option>
@@ -801,16 +1349,28 @@ function AppointmentTable({
                 <td>
                   <div className="toolbar" style={{ gap: 6 }}>
                     {onEdit ? (
-                      <button className="icon-button secondary" title="Editar" onClick={() => onEdit(appointment)} type="button">
+                      <button className="icon-button secondary" title="Editar" onClick={(e) => { e.stopPropagation(); onEdit(appointment); }} type="button">
                         <Edit2 size={16} />
                       </button>
                     ) : null}
                     {onCancel && appointment.status !== "CANCELLED" ? (
-                      <button className="icon-button secondary" title="Cancelar" onClick={() => onCancel(appointment.id)} type="button">
+                      <button className="icon-button secondary" title="Cancelar" onClick={(e) => { e.stopPropagation(); onCancel(appointment.id); }} type="button">
                         <Ban size={16} />
                       </button>
                     ) : null}
                   </div>
+                </td>
+              ) : null}
+              {onView && compact ? (
+                <td>
+                  <button
+                    className="icon-button secondary"
+                    title="Ver detalhes"
+                    onClick={(e) => { e.stopPropagation(); onView(appointment); }}
+                    type="button"
+                  >
+                    <Eye size={16} />
+                  </button>
                 </td>
               ) : null}
             </tr>

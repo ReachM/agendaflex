@@ -13,6 +13,44 @@ type CustomField = {
 
 export type CustomValues = Record<string, unknown>;
 
+/**
+ * Auto-calculation rules for custom field groups.
+ * When one of the source fields changes, the target field is computed automatically.
+ *
+ * Rule: valor_total = (valor_da_peca + valor_da_mao_de_obra) * (1 - desconto / 100)
+ */
+const AUTO_CALC_RULES: {
+  sourceKeys: string[];
+  targetKey: string;
+  compute: (values: CustomValues) => number;
+}[] = [
+  {
+    sourceKeys: ["valor_da_peca", "valor_da_mao_de_obra", "desconto_em_porcentagem"],
+    targetKey: "valor_total",
+    compute: (values) => {
+      const peca = Number(values["valor_da_peca"]) || 0;
+      const maoDeObra = Number(values["valor_da_mao_de_obra"]) || 0;
+      const desconto = Number(values["desconto_em_porcentagem"]) || 0;
+      const subtotal = peca + maoDeObra;
+      const total = subtotal * (1 - Math.min(desconto, 100) / 100);
+      return Math.round(total * 100) / 100;
+    }
+  }
+];
+
+function applyAutoCalc(updatedValues: CustomValues, fieldKeys: Set<string>): CustomValues {
+  let result = { ...updatedValues };
+  for (const rule of AUTO_CALC_RULES) {
+    // Only apply if both source fields AND target field exist in this form
+    const hasSourceFields = rule.sourceKeys.some((key) => fieldKeys.has(key));
+    const hasTargetField = fieldKeys.has(rule.targetKey);
+    if (hasSourceFields && hasTargetField) {
+      result[rule.targetKey] = rule.compute(result);
+    }
+  }
+  return result;
+}
+
 export function DynamicFields({
   fields,
   values,
@@ -22,8 +60,17 @@ export function DynamicFields({
   values: CustomValues;
   onChange: (values: CustomValues) => void;
 }) {
+  const fieldKeys = new Set(fields.map((f) => f.fieldKey));
+
   function setValue(key: string, value: unknown) {
-    onChange({ ...values, [key]: value });
+    const updated = { ...values, [key]: value };
+    // Check if this field is a source for any auto-calc rule
+    const isAutoCalcSource = AUTO_CALC_RULES.some((rule) => rule.sourceKeys.includes(key));
+    if (isAutoCalcSource) {
+      onChange(applyAutoCalc(updated, fieldKeys));
+    } else {
+      onChange(updated);
+    }
   }
 
   if (fields.length === 0) return null;
@@ -33,6 +80,12 @@ export function DynamicFields({
       {fields.map((field) => {
         const value = values[field.fieldKey] ?? "";
         const required = field.isRequired;
+        // Mark auto-calculated fields as read-only
+        const isAutoTarget = AUTO_CALC_RULES.some(
+          (rule) =>
+            rule.targetKey === field.fieldKey &&
+            rule.sourceKeys.some((key) => fieldKeys.has(key))
+        );
         const common = {
           id: field.fieldKey,
           required,
@@ -134,16 +187,30 @@ export function DynamicFields({
                       ? "tel"
                       : "text";
 
+        // Show currency prefix for MONEY fields, % suffix for PERCENT
+        const prefix = field.fieldType === "MONEY" ? "R$" : undefined;
+        const suffix = field.fieldType === "PERCENT" ? "%" : undefined;
+
         return (
-          <div className="field" key={field.id}>
-            <label htmlFor={field.fieldKey}>{field.label}</label>
-            <input
-              {...common}
-              type={inputType}
-              step={["MONEY", "PERCENT"].includes(field.fieldType) ? "0.01" : undefined}
-              value={String(value)}
-              onChange={(event) => setValue(field.fieldKey, event.target.value)}
-            />
+          <div className={`field ${isAutoTarget ? "auto-calc" : ""}`} key={field.id}>
+            <label htmlFor={field.fieldKey}>
+              {field.label}
+              {isAutoTarget ? <span className="auto-calc-badge">automático</span> : null}
+            </label>
+            <div className={prefix || suffix ? "input-addon-wrap" : ""}>
+              {prefix ? <span className="input-addon prefix">{prefix}</span> : null}
+              <input
+                {...common}
+                type={inputType}
+                step={["MONEY", "PERCENT"].includes(field.fieldType) ? "0.01" : undefined}
+                value={String(value)}
+                readOnly={isAutoTarget}
+                tabIndex={isAutoTarget ? -1 : undefined}
+                className={isAutoTarget ? "auto-calc-input" : ""}
+                onChange={(event) => setValue(field.fieldKey, event.target.value)}
+              />
+              {suffix ? <span className="input-addon suffix">{suffix}</span> : null}
+            </div>
           </div>
         );
       })}
