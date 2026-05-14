@@ -76,32 +76,162 @@ enum CustomFieldType {
   FILE
 }
 
-model Company {
-  id             String          @id @default(cuid())
-  name           String
-  tradeName      String?
-  document       String?
-  email          String
-  phone          String?
-  segment        BusinessSegment @default(PERSONALIZADO)
-  status         CompanyStatus   @default(ACTIVE)
-  plan           String          @default("starter")
-  settings       Json?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIALLY_PAID
+  CANCELLED
+  REFUNDED
+}
 
-  users          CompanyUser[]
-  customers      Customer[]
-  services       Service[]
-  professionals  Professional[]
-  appointments   Appointment[]
-  customFields   CustomField[]
-  fieldValues    CustomFieldValue[]
-  auditLogs      AuditLog[]
+enum PaymentMethod {
+  CASH
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  BOLETO
+  TRANSFER
+  OTHER
+}
+
+enum InvoiceStatus {
+  NOT_REQUESTED
+  REQUESTED
+  UNDER_REVIEW
+  ISSUED
+  SENT_TO_CUSTOMER
+  CANCELLED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum FinancialRecordType {
+  REVENUE
+  DISCOUNT
+  REFUND
+  ADJUSTMENT
+}
+
+// ═══════════════════════════════════════════════════
+// PLANS & SUBSCRIPTIONS
+// ═══════════════════════════════════════════════════
+
+model Plan {
+  id                                  String    @id @default(cuid())
+  name                                String
+  slug                                String    @unique
+  description                         String?
+  price                               Decimal   @default(0) @db.Decimal(12, 2)
+  maxUsers                            Int       @default(3)
+  maxProfessionals                    Int       @default(5)
+  maxCustomers                        Int       @default(100)
+  maxAppointmentsPerMonth             Int       @default(200)
+  allowClientSelfScheduling           Boolean   @default(false)
+  allowAdvancedReports                Boolean   @default(false)
+  allowFinancialControl               Boolean   @default(false)
+  allowInvoiceRequest                 Boolean   @default(false)
+  allowCustomerChecklist              Boolean   @default(false)
+  allowAuditLogs                      Boolean   @default(true)
+  allowCustomFields                   Boolean   @default(true)
+  allowMultipleServicesPerAppointment Boolean   @default(true)
+  isActive                            Boolean   @default(true)
+  sortOrder                           Int       @default(0)
+  createdAt                           DateTime  @default(now())
+  updatedAt                           DateTime  @updatedAt
+
+  features      PlanFeature[]
+  subscriptions CompanySubscription[]
+
+  @@index([isActive])
+}
+
+model PlanFeature {
+  id           String    @id @default(cuid())
+  planId       String
+  featureKey   String
+  featureName  String
+  enabled      Boolean   @default(true)
+  limitValue   Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureKey])
+  @@index([planId])
+}
+
+model CompanySubscription {
+  id           String             @id @default(cuid())
+  companyId    String
+  planId       String
+  status       SubscriptionStatus @default(ACTIVE)
+  startsAt     DateTime           @default(now())
+  endsAt       DateTime?
+  trialEndsAt  DateTime?
+  canceledAt   DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan    Plan    @relation(fields: [planId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([planId])
+}
+
+// ═══════════════════════════════════════════════════
+// COMPANY
+// ═══════════════════════════════════════════════════
+
+model Company {
+  id                    String          @id @default(cuid())
+  name                  String
+  tradeName             String?
+  document              String?
+  email                 String
+  phone                 String?
+  slug                  String?         @unique
+  segment               BusinessSegment @default(PERSONALIZADO)
+  status                CompanyStatus   @default(ACTIVE)
+  plan                  String          @default("starter")
+  publicBookingEnabled  Boolean         @default(false)
+  autoConfirmBooking    Boolean         @default(false)
+  settings              Json?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  users               CompanyUser[]
+  customers           Customer[]
+  services            Service[]
+  professionals       Professional[]
+  appointments        Appointment[]
+  appointmentServices AppointmentService[]
+  customFields        CustomField[]
+  fieldValues         CustomFieldValue[]
+  auditLogs           AuditLog[]
+  subscriptions       CompanySubscription[]
+  financialRecords    FinancialRecord[]
+  invoiceRequests     InvoiceRequest[]
+  checklists          Checklist[]
+  checklistItems      ChecklistItem[]
+  customerCopies      CustomerCopy[]
 
   @@index([status])
   @@index([segment])
+  @@index([slug])
 }
+
+// ═══════════════════════════════════════════════════
+// USERS & ROLES
+// ═══════════════════════════════════════════════════
 
 model User {
   id             String        @id @default(cuid())
@@ -118,6 +248,8 @@ model User {
   createdAppointments Appointment[] @relation("AppointmentCreatedBy")
   updatedAppointments Appointment[] @relation("AppointmentUpdatedBy")
   auditLogs      AuditLog[]
+  createdChecklists Checklist[]
+  invoiceRequests   InvoiceRequest[] @relation("InvoiceRequestedBy")
 
   @@index([status])
   @@index([systemRoleId])
@@ -179,6 +311,10 @@ model RolePermission {
   @@index([permissionId])
 }
 
+// ═══════════════════════════════════════════════════
+// CUSTOMER
+// ═══════════════════════════════════════════════════
+
 model Customer {
   id             String    @id @default(cuid())
   companyId      String
@@ -196,12 +332,18 @@ model Customer {
 
   company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   appointments   Appointment[]
+  financialRecords FinancialRecord[]
+  invoiceRequests  InvoiceRequest[]
 
   @@index([companyId])
   @@index([companyId, status])
   @@index([companyId, name])
   @@index([companyId, email])
 }
+
+// ═══════════════════════════════════════════════════
+// SERVICE
+// ═══════════════════════════════════════════════════
 
 model Service {
   id              String    @id @default(cuid())
@@ -211,16 +353,23 @@ model Service {
   basePrice       Decimal?  @db.Decimal(12, 2)
   durationMinutes Int       @default(60)
   isActive        Boolean   @default(true)
+  isPublic        Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  appointments    Appointment[]
+  company             Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointments        Appointment[]
+  appointmentServices AppointmentService[]
 
   @@index([companyId])
   @@index([companyId, isActive])
   @@index([companyId, name])
+  @@index([companyId, isPublic])
 }
+
+// ═══════════════════════════════════════════════════
+// PROFESSIONAL
+// ═══════════════════════════════════════════════════
 
 model Professional {
   id             String    @id @default(cuid())
@@ -242,28 +391,47 @@ model Professional {
   @@index([companyId, name])
 }
 
-model Appointment {
-  id              String            @id @default(cuid())
-  companyId       String
-  customerId      String
-  serviceId       String
-  professionalId  String
-  startAt         DateTime
-  endAt           DateTime
-  status          AppointmentStatus @default(SCHEDULED)
-  notes           String?
-  internalNotes   String?
-  createdById     String?
-  updatedById     String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+// ═══════════════════════════════════════════════════
+// APPOINTMENT (evolved with multi-service + financial)
+// ═══════════════════════════════════════════════════
 
-  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customer        Customer          @relation(fields: [customerId], references: [id])
-  service         Service           @relation(fields: [serviceId], references: [id])
-  professional    Professional      @relation(fields: [professionalId], references: [id])
-  createdBy       User?             @relation("AppointmentCreatedBy", fields: [createdById], references: [id])
-  updatedBy       User?             @relation("AppointmentUpdatedBy", fields: [updatedById], references: [id])
+model Appointment {
+  id                String            @id @default(cuid())
+  companyId         String
+  customerId        String
+  serviceId         String?
+  professionalId    String
+  startAt           DateTime
+  endAt             DateTime
+  status            AppointmentStatus @default(SCHEDULED)
+  notes             String?
+  internalNotes     String?
+  // Financial fields
+  partsValue        Decimal?          @db.Decimal(12, 2)
+  laborValue        Decimal?          @db.Decimal(12, 2)
+  discountPercent   Decimal?          @db.Decimal(5, 2)
+  discountValue     Decimal?          @db.Decimal(12, 2)
+  totalValue        Decimal?          @db.Decimal(12, 2)
+  paymentStatus     PaymentStatus?
+  paymentMethod     PaymentMethod?
+  paidAt            DateTime?
+  // Source tracking
+  bookedByClient    Boolean           @default(false)
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer          Customer          @relation(fields: [customerId], references: [id])
+  service           Service?          @relation(fields: [serviceId], references: [id])
+  professional      Professional      @relation(fields: [professionalId], references: [id])
+  createdBy         User?             @relation("AppointmentCreatedBy", fields: [createdById], references: [id])
+  updatedBy         User?             @relation("AppointmentUpdatedBy", fields: [updatedById], references: [id])
+  appointmentServices AppointmentService[]
+  financialRecords  FinancialRecord[]
+  invoiceRequests   InvoiceRequest[]
+  checklists        Checklist[]
 
   @@index([companyId])
   @@index([companyId, startAt])
@@ -272,7 +440,172 @@ model Appointment {
   @@index([customerId])
   @@index([serviceId])
   @@index([professionalId])
+  @@index([companyId, paymentStatus])
 }
+
+// ═══════════════════════════════════════════════════
+// APPOINTMENT SERVICES (multi-service per appointment)
+// ═══════════════════════════════════════════════════
+
+model AppointmentService {
+  id                  String    @id @default(cuid())
+  companyId           String
+  appointmentId       String
+  serviceId           String
+  serviceNameSnapshot String
+  quantity            Int       @default(1)
+  unitPrice           Decimal?  @db.Decimal(12, 2)
+  discountPercentage  Decimal?  @db.Decimal(5, 2)
+  totalPrice          Decimal?  @db.Decimal(12, 2)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  service     Service     @relation(fields: [serviceId], references: [id])
+
+  @@index([companyId])
+  @@index([appointmentId])
+  @@index([serviceId])
+}
+
+// ═══════════════════════════════════════════════════
+// FINANCIAL RECORDS
+// ═══════════════════════════════════════════════════
+
+model FinancialRecord {
+  id                 String              @id @default(cuid())
+  companyId          String
+  appointmentId      String?
+  customerId         String?
+  type               FinancialRecordType @default(REVENUE)
+  description        String?
+  amount             Decimal             @db.Decimal(12, 2)
+  discountAmount     Decimal?            @db.Decimal(12, 2)
+  discountPercentage Decimal?            @db.Decimal(5, 2)
+  paymentStatus      PaymentStatus       @default(PENDING)
+  paymentMethod      PaymentMethod?
+  paidAt             DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, type])
+  @@index([companyId, paymentStatus])
+  @@index([companyId, createdAt])
+  @@index([appointmentId])
+  @@index([customerId])
+}
+
+// ═══════════════════════════════════════════════════
+// INVOICE REQUESTS
+// ═══════════════════════════════════════════════════
+
+model InvoiceRequest {
+  id                    String        @id @default(cuid())
+  companyId             String
+  appointmentId         String?
+  customerId            String?
+  requestedByUserId     String?
+  legalName             String
+  documentNumber        String
+  email                 String?
+  phone                 String?
+  address               String?
+  number                String?
+  neighborhood          String?
+  city                  String?
+  state                 String?
+  zipCode               String?
+  municipalRegistration String?
+  amount                Decimal       @db.Decimal(12, 2)
+  status                InvoiceStatus @default(REQUESTED)
+  invoiceNumber         String?
+  issuedAt              DateTime?
+  fileUrl               String?
+  notes                 String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  requestedBy User?        @relation("InvoiceRequestedBy", fields: [requestedByUserId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([appointmentId])
+  @@index([customerId])
+}
+
+// ═══════════════════════════════════════════════════
+// CHECKLISTS & CUSTOMER COPIES
+// ═══════════════════════════════════════════════════
+
+model Checklist {
+  id              String    @id @default(cuid())
+  companyId       String
+  appointmentId   String
+  title           String
+  notes           String?
+  status          String    @default("draft")
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointment  Appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  createdBy    User?          @relation(fields: [createdByUserId], references: [id])
+  items        ChecklistItem[]
+  customerCopy CustomerCopy?
+
+  @@index([companyId])
+  @@index([appointmentId])
+}
+
+model ChecklistItem {
+  id          String    @id @default(cuid())
+  companyId   String
+  checklistId String
+  description String
+  isChecked   Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([checklistId])
+}
+
+model CustomerCopy {
+  id            String    @id @default(cuid())
+  companyId     String
+  appointmentId String
+  checklistId   String    @unique
+  content       Json?
+  publicToken   String    @unique @default(cuid())
+  status        String    @default("active")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  checklist   Checklist   @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([appointmentId])
+  @@index([publicToken])
+}
+
+// ═══════════════════════════════════════════════════
+// CUSTOM FIELDS
+// ═══════════════════════════════════════════════════
 
 model CustomField {
   id            String          @id @default(cuid())
@@ -288,6 +621,7 @@ model CustomField {
   options       Json?
   defaultValue  Json?
   isActive      Boolean         @default(true)
+  isPublic      Boolean         @default(false)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
@@ -297,6 +631,7 @@ model CustomField {
   @@unique([companyId, entityType, fieldKey])
   @@index([companyId])
   @@index([companyId, entityType, isActive])
+  @@index([companyId, entityType, isPublic])
 }
 
 model CustomFieldValue {
@@ -317,6 +652,10 @@ model CustomFieldValue {
   @@index([companyId, entityType, entityId])
   @@index([customFieldId])
 }
+
+// ═══════════════════════════════════════════════════
+// AUDIT LOG
+// ═══════════════════════════════════════════════════
 
 model AuditLog {
   id          String    @id @default(cuid())

@@ -2,6 +2,7 @@
 
 import {
   Ban,
+  Briefcase,
   CalendarPlus,
   Check,
   CheckCircle,
@@ -15,6 +16,7 @@ import {
   Trash2,
   User,
   UserPlus,
+  Users,
   X
 } from "lucide-react";
 import Link from "next/link";
@@ -144,6 +146,13 @@ export function TenantDashboard() {
     apiFetch<AnyRecord>("/api/dashboard").then(setData).catch((err) => setError(err.message));
   }, []);
 
+  const planUsagePercent = data?.plan
+    ? Math.min(100, Math.round((data.plan.usedAppointmentsThisMonth / Math.max(data.plan.maxAppointmentsPerMonth, 1)) * 100))
+    : 0;
+  const planBarClass = planUsagePercent > 85 ? "progress-bar__fill--danger" : planUsagePercent > 60 ? "progress-bar__fill--warning" : "";
+
+  const topServicesMax = Math.max(...(data?.topServices ?? []).map((s: AnyRecord) => s.count), 1);
+
   return (
     <>
       <PageHeader
@@ -163,16 +172,78 @@ export function TenantDashboard() {
         }
       />
       <ErrorBox error={error} />
+
+      {/* ─── Stat Cards ───────────────────────────────── */}
       <div className="grid cols-3">
-        <StatCard label="Agendamentos hoje" value={data?.metrics?.todayAppointments ?? "-"} />
-        <StatCard label="Pendentes" value={data?.metrics?.pendingAppointments ?? "-"} />
-        <StatCard label="Concluídos" value={data?.metrics?.completedAppointments ?? "-"} />
-        <StatCard label="Clientes" value={data?.metrics?.customers ?? "-"} />
-        <StatCard label="Serviços" value={data?.metrics?.services ?? "-"} />
-        <StatCard label="Profissionais" value={data?.metrics?.professionals ?? "-"} />
+        <div className="stat-card stat-card--info">
+          <div className="stat-card__header">
+            <div className="stat-card__label">Agendamentos hoje</div>
+            <div className="stat-card__icon"><CalendarPlus size={18} /></div>
+          </div>
+          <div className="stat-card__value">{data?.metrics?.todayAppointments ?? "-"}</div>
+          <div className="stat-card__footer">Total no mês: {data?.metrics?.monthlyAppointments ?? "-"}</div>
+        </div>
+        <div className="stat-card stat-card--warning">
+          <div className="stat-card__header">
+            <div className="stat-card__label">Pendentes</div>
+            <div className="stat-card__icon"><Clock size={18} /></div>
+          </div>
+          <div className="stat-card__value">{data?.metrics?.pendingAppointments ?? "-"}</div>
+          <div className="stat-card__footer">Aguardando confirmação</div>
+        </div>
+        <div className="stat-card stat-card--success">
+          <div className="stat-card__header">
+            <div className="stat-card__label">Concluídos</div>
+            <div className="stat-card__icon"><CheckCircle size={18} /></div>
+          </div>
+          <div className="stat-card__value">{data?.metrics?.completedAppointments ?? "-"}</div>
+          <div className="stat-card__footer">Confirmados: {data?.metrics?.confirmedAppointments ?? "-"}</div>
+        </div>
+        <div className="stat-card stat-card--danger">
+          <div className="stat-card__header">
+            <div className="stat-card__label">Cancelados</div>
+            <div className="stat-card__icon"><Ban size={18} /></div>
+          </div>
+          <div className="stat-card__value">{data?.metrics?.cancelledAppointments ?? "-"}</div>
+        </div>
+        <div className="stat-card stat-card--purple">
+          <div className="stat-card__header">
+            <div className="stat-card__label">Clientes</div>
+            <div className="stat-card__icon"><Users size={18} /></div>
+          </div>
+          <div className="stat-card__value">{data?.metrics?.customers ?? "-"}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__header">
+            <div className="stat-card__label">Serviços ativos</div>
+            <div className="stat-card__icon"><Briefcase size={18} /></div>
+          </div>
+          <div className="stat-card__value">{data?.metrics?.services ?? "-"}</div>
+          <div className="stat-card__footer">Profissionais: {data?.metrics?.professionals ?? "-"}</div>
+        </div>
       </div>
-      <section className="panel grid" style={{ marginTop: 16 }}>
-        <h2 className="section-title">Próximos agendamentos</h2>
+
+      {/* ─── Plan Usage ───────────────────────────────── */}
+      {data?.plan ? (
+        <section className="panel" style={{ marginTop: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h2 className="section-title" style={{ margin: 0 }}>Uso do plano</h2>
+            <span className={`plan-badge plan-badge--${data.plan.slug}`}>{data.plan.name}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+            <span style={{ color: "var(--text-secondary)" }}>Agendamentos no mês</span>
+            <strong>{data.plan.usedAppointmentsThisMonth} / {data.plan.maxAppointmentsPerMonth}</strong>
+          </div>
+          <div className="progress-bar">
+            <div className={`progress-bar__fill ${planBarClass}`} style={{ width: `${planUsagePercent}%` }} />
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>{planUsagePercent}% utilizado</div>
+        </section>
+      ) : null}
+
+      {/* ─── Next Appointments ────────────────────────── */}
+      <div className="section-divider"><h2>Próximos agendamentos</h2></div>
+      <section className="panel">
         <AppointmentTable
           appointments={data?.nextAppointments ?? []}
           compact
@@ -180,85 +251,122 @@ export function TenantDashboard() {
         />
       </section>
 
-      {/* ─── Appointment Detail Modal ─────────────────────── */}
+      {/* ─── Appointment Detail Modal ─────────────────── */}
       {selectedAppointment ? (
         <div className="modal-overlay" onClick={() => setSelectedAppointment(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 600 }}>
             <div className="toolbar" style={{ marginBottom: 20 }}>
               <h2 className="section-title">Detalhes do agendamento</h2>
-              <button className="icon-button secondary" onClick={() => setSelectedAppointment(null)} type="button" title="Fechar">
-                <X size={16} />
-              </button>
+              <button className="icon-button secondary" onClick={() => setSelectedAppointment(null)} type="button" title="Fechar"><X size={16} /></button>
             </div>
-
             <div className="detail-cards">
-              {/* Service Info */}
-              <div className="detail-card detail-card--service">
-                <div className="detail-card__icon">
-                  <DollarSign size={20} />
-                </div>
-                <div className="detail-card__body">
-                  <span className="detail-card__label">Serviço</span>
-                  <strong className="detail-card__value">{selectedAppointment.service?.name ?? "-"}</strong>
-                  {selectedAppointment.service?.description ? (
-                    <p className="detail-card__desc">{selectedAppointment.service.description}</p>
-                  ) : null}
-                  <div className="detail-card__meta">
-                    <span><Clock size={13} /> {selectedAppointment.service?.durationMinutes ?? "-"} min</span>
-                    <span><DollarSign size={13} /> {formatMoney(selectedAppointment.service?.basePrice)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Client Info */}
               <div className="detail-card detail-card--client">
-                <div className="detail-card__icon">
-                  <User size={20} />
-                </div>
+                <div className="detail-card__icon"><User size={20} /></div>
                 <div className="detail-card__body">
                   <span className="detail-card__label">Cliente</span>
                   <strong className="detail-card__value">{selectedAppointment.customer?.name ?? "-"}</strong>
                   <div className="detail-card__meta">
-                    {selectedAppointment.customer?.email ? <span>{selectedAppointment.customer.email}</span> : null}
                     {selectedAppointment.customer?.phone ? <span>{selectedAppointment.customer.phone}</span> : null}
+                    {selectedAppointment.customer?.email ? <span>{selectedAppointment.customer.email}</span> : null}
                   </div>
                 </div>
               </div>
-
-              {/* Schedule & Professional */}
               <div className="detail-card detail-card--schedule">
-                <div className="detail-card__icon">
-                  <CalendarPlus size={20} />
-                </div>
+                <div className="detail-card__icon"><CalendarPlus size={20} /></div>
                 <div className="detail-card__body">
                   <span className="detail-card__label">Agendamento</span>
                   <strong className="detail-card__value">{formatDateTime(selectedAppointment.startAt)}</strong>
                   <div className="detail-card__meta">
                     <span>Profissional: <strong>{selectedAppointment.professional?.name ?? "-"}</strong></span>
-                    <span className={`badge ${statusBadgeClass[selectedAppointment.status] ?? ""}`}>
-                      {statusLabels[selectedAppointment.status] ?? selectedAppointment.status}
-                    </span>
+                    <span className={`badge ${statusBadgeClass[selectedAppointment.status] ?? ""}`}>{statusLabels[selectedAppointment.status] ?? selectedAppointment.status}</span>
                   </div>
                 </div>
               </div>
             </div>
 
+            {(selectedAppointment.appointmentServices ?? []).length > 0 ? (
+              <div style={{ marginTop: 16 }}>
+                <strong style={{ display: "block", marginBottom: 8, fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Serviços ({selectedAppointment.appointmentServices.length})</strong>
+                <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+                  {(selectedAppointment.appointmentServices as AnyRecord[]).map((as_item: AnyRecord, i: number) => (
+                    <div key={as_item.id ?? i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: i < selectedAppointment.appointmentServices.length - 1 ? "1px solid var(--border)" : "none", fontSize: 13 }}>
+                      <span style={{ fontWeight: 600 }}>{as_item.serviceNameSnapshot ?? as_item.service?.name ?? "-"}</span>
+                      <span style={{ color: "var(--primary)", fontWeight: 700 }}>{formatMoney(as_item.unitPrice)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : selectedAppointment.service ? (
+              <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>{selectedAppointment.service.name}</span>
+                <span style={{ color: "var(--primary)", fontWeight: 700 }}>{formatMoney(selectedAppointment.service.basePrice)}</span>
+              </div>
+            ) : null}
+
+            {(selectedAppointment.totalValue || selectedAppointment.partsValue || selectedAppointment.laborValue) ? (
+              <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--surface-muted)", borderRadius: "var(--radius)", fontSize: 13 }}>
+                <strong style={{ display: "block", marginBottom: 8, fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Valores</strong>
+                {selectedAppointment.partsValue ? <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><span>Peças</span><span>{formatMoney(selectedAppointment.partsValue)}</span></div> : null}
+                {selectedAppointment.laborValue ? <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><span>Mão de obra</span><span>{formatMoney(selectedAppointment.laborValue)}</span></div> : null}
+                {selectedAppointment.totalValue ? <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}><span>Total</span><span style={{ color: "var(--primary)" }}>{formatMoney(selectedAppointment.totalValue)}</span></div> : null}
+              </div>
+            ) : null}
+
+            {selectedAppointment.paymentStatus ? (
+              <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+                <span style={{ color: "var(--muted)" }}>Pagamento:</span>
+                <span className={`badge ${selectedAppointment.paymentStatus === "PAID" ? "success" : "warning"}`}>
+                  {({ PENDING: "Pendente", PAID: "Pago", PARTIALLY_PAID: "Parcial", CANCELLED: "Cancelado", REFUNDED: "Reembolsado" } as Record<string, string>)[selectedAppointment.paymentStatus] ?? selectedAppointment.paymentStatus}
+                </span>
+              </div>
+            ) : null}
+
             {selectedAppointment.notes ? (
-              <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--surface-muted)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--text-secondary)" }}>
+              <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--surface-muted)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--text-secondary)" }}>
                 <strong style={{ display: "block", marginBottom: 4, fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Observações</strong>
                 {selectedAppointment.notes}
               </div>
             ) : null}
 
-            <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}>
-              <Link className="button" href="/agenda">
-                <Edit2 size={16} />
-                Ir para agenda
-              </Link>
-            </div>
+            <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}><Link className="button" href="/agenda"><Edit2 size={16} /> Ir para agenda</Link></div>
           </div>
         </div>
       ) : null}
+
+      {/* ─── Bottom Grid ──────────────────────────────── */}
+      <div className="grid cols-2" style={{ marginTop: 16 }}>
+        <section className="panel">
+          <h2 className="section-title">Serviços mais agendados</h2>
+          {(data?.topServices ?? []).length === 0 ? <div className="empty">Nenhum dado ainda.</div> : (
+            <div className="hbar" style={{ marginTop: 12 }}>
+              {(data?.topServices ?? []).map((svc: AnyRecord) => (
+                <div key={svc.serviceId} className="hbar__item">
+                  <span className="hbar__label">{svc.serviceName}</span>
+                  <div className="hbar__track">
+                    <div className="hbar__fill" style={{ width: `${Math.max((svc.count / topServicesMax) * 100, 8)}%` }}>{svc.count}x</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="panel">
+          <h2 className="section-title">Profissionais com agenda hoje</h2>
+          {(data?.todayProfessionals ?? []).length === 0 ? (
+            <div className="empty-state"><div className="empty-state__icon"><Users size={24} /></div><h3>Nenhum profissional com agenda hoje</h3></div>
+          ) : (
+            <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+              {(data?.todayProfessionals ?? []).map((prof: AnyRecord) => (
+                <div key={prof.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
+                  <div className="avatar avatar--sm">{prof.name?.[0] ?? "?"}</div>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{prof.name}</span>
+                  <span className="status-dot status-dot--active" style={{ marginLeft: "auto" }} />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </>
   );
 }

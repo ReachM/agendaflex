@@ -4,13 +4,20 @@ export const PERMISSIONS = [
   "companies:manage",
   "users:manage",
   "customers:manage",
+  "customers:view",
   "services:manage",
   "professionals:manage",
   "appointments:manage",
   "custom_fields:manage",
   "reports:view",
+  "reports:advanced",
   "logs:view",
-  "settings:manage"
+  "settings:manage",
+  "financial:view",
+  "financial:manage",
+  "invoices:manage",
+  "checklists:manage",
+  "public_booking:manage"
 ] as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[number];
@@ -20,26 +27,92 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
   COMPANY_ADMIN: [
     "users:manage",
     "customers:manage",
+    "customers:view",
     "services:manage",
     "professionals:manage",
     "appointments:manage",
     "custom_fields:manage",
     "reports:view",
+    "reports:advanced",
     "logs:view",
-    "settings:manage"
+    "settings:manage",
+    "financial:view",
+    "financial:manage",
+    "invoices:manage",
+    "checklists:manage",
+    "public_booking:manage"
   ],
   MANAGER: [
     "customers:manage",
-    "services:manage",
+    "customers:view",
     "professionals:manage",
     "appointments:manage",
     "reports:view",
-    "logs:view"
+    "logs:view",
+    "settings:manage",
+    "financial:view",
+    "checklists:manage"
   ],
-  STAFF: ["customers:manage", "appointments:manage"],
-  USER: []
+  STAFF: [
+    "customers:view",
+    "customers:manage",
+    "appointments:manage"
+  ],
+  USER: [
+    "customers:view"
+  ]
 };
+
+// Menu items visible per role
+export type MenuItem = {
+  href: string;
+  label: string;
+  icon: string;
+  permission?: PermissionKey;
+  planFeature?: string;
+};
+
+export const TENANT_MENU_ITEMS: MenuItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
+  { href: "/agenda", label: "Agenda", icon: "CalendarDays", permission: "appointments:manage" },
+  { href: "/clientes", label: "Clientes", icon: "Users", permission: "customers:view" },
+  { href: "/servicos", label: "Serviços", icon: "ClipboardList", permission: "services:manage" },
+  { href: "/profissionais", label: "Profissionais", icon: "Briefcase", permission: "professionals:manage" },
+  { href: "/campos-personalizados", label: "Campos Personalizados", icon: "SlidersHorizontal", permission: "custom_fields:manage" },
+  { href: "/usuarios", label: "Usuários", icon: "UserCog", permission: "users:manage" },
+  { href: "/financeiro", label: "Financeiro", icon: "DollarSign", permission: "financial:view", planFeature: "allowFinancialControl" },
+  { href: "/notas-fiscais", label: "Notas Fiscais", icon: "FileText", permission: "invoices:manage", planFeature: "allowInvoiceRequest" },
+  { href: "/checklists", label: "Checklists", icon: "CheckSquare", permission: "checklists:manage", planFeature: "allowCustomerChecklist" },
+  { href: "/relatorios", label: "Relatórios", icon: "Activity", permission: "reports:view" },
+  { href: "/logs", label: "Logs", icon: "FileClock", permission: "logs:view" },
+  { href: "/configuracoes", label: "Configurações", icon: "Settings", permission: "settings:manage" }
+];
+
+export const MASTER_MENU_ITEMS: MenuItem[] = [
+  { href: "/master", label: "Dashboard Master", icon: "LayoutDashboard" },
+  { href: "/master/empresas", label: "Empresas", icon: "Building2" },
+  { href: "/master/planos", label: "Planos", icon: "CreditCard" },
+  { href: "/master/campos", label: "Campos", icon: "SlidersHorizontal" },
+  { href: "/logs", label: "Logs Globais", icon: "FileClock" }
+];
 
 export function hasPermission(roleName: RoleName, permission: PermissionKey) {
   return ROLE_PERMISSIONS[roleName].includes(permission);
+}
+
+export function getVisibleMenuItems(
+  roleName: RoleName,
+  planFeatures?: Record<string, boolean>
+): MenuItem[] {
+  return TENANT_MENU_ITEMS.filter((item) => {
+    // Dashboard always visible
+    if (!item.permission) return true;
+    // Check role permission
+    if (!hasPermission(roleName, item.permission)) return false;
+    // Check plan feature if required
+    if (item.planFeature && planFeatures) {
+      return planFeatures[item.planFeature] === true;
+    }
+    return true;
+  });
 }

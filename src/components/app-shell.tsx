@@ -5,14 +5,20 @@ import {
   Briefcase,
   Building2,
   CalendarDays,
+  CheckSquare,
   ClipboardList,
+  CreditCard,
+  DollarSign,
   FileClock,
+  FileText,
   LayoutDashboard,
   LogOut,
+  Menu,
   Settings,
   SlidersHorizontal,
   UserCog,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -22,33 +28,37 @@ type Session = {
   kind: "super_admin" | "tenant";
   user: { id: string; name: string; email: string };
   role: string;
-  company: null | { id: string; name: string; segment: string; status: string; plan: string };
+  company: null | { id: string; name: string; segment: string; status: string; plan: string; slug?: string; publicBookingEnabled?: boolean };
+  planFeatures?: Record<string, boolean>;
+  menuItems?: { href: string; label: string; icon: string }[];
 };
 
-const tenantLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/agenda", label: "Agenda", icon: CalendarDays },
-  { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/servicos", label: "Serviços", icon: ClipboardList },
-  { href: "/profissionais", label: "Profissionais", icon: Briefcase },
-  { href: "/usuarios", label: "Usuários", icon: UserCog },
-  { href: "/relatorios", label: "Relatórios", icon: Activity },
-  { href: "/logs", label: "Logs", icon: FileClock },
-  { href: "/configuracoes", label: "Configurações", icon: Settings }
-];
+const iconMap: Record<string, any> = {
+  LayoutDashboard, CalendarDays, Users, ClipboardList, Briefcase,
+  SlidersHorizontal, UserCog, DollarSign, FileText, CheckSquare,
+  Activity, FileClock, Settings, Building2, CreditCard
+};
 
-const masterLinks = [
-  { href: "/master", label: "Master", icon: LayoutDashboard },
-  { href: "/master/empresas", label: "Empresas", icon: Building2 },
-  { href: "/master/campos", label: "Campos", icon: SlidersHorizontal },
-  { href: "/logs", label: "Logs", icon: FileClock }
-];
+const roleLabels: Record<string, string> = {
+  SUPER_ADMIN: "Super Admin",
+  COMPANY_ADMIN: "Administrador",
+  MANAGER: "Gerente",
+  STAFF: "Atendente",
+  USER: "Usuário"
+};
+
+const planBadgeColors: Record<string, string> = {
+  starter: "plan-badge--starter",
+  pro: "plan-badge--pro",
+  max: "plan-badge--max"
+};
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -57,22 +67,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         if (!response.ok) throw new Error("unauthorized");
         return response.json();
       })
-      .then((data) => {
-        if (active) setSession(data);
-      })
+      .then((data) => { if (active) setSession(data); })
       .catch(() => router.push("/login"))
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [router]);
 
   const links = useMemo(() => {
-    if (session?.kind === "super_admin") return masterLinks;
-    return tenantLinks;
+    if (!session) return [];
+    return (session.menuItems ?? []).map((item) => ({
+      ...item,
+      icon: iconMap[item.icon] ?? LayoutDashboard
+    }));
   }, [session]);
 
   async function logout() {
@@ -82,12 +88,28 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   if (loading) {
-    return <main className="content">Carregando...</main>;
+    return (
+      <main className="content" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div className="loading-spinner" />
+      </main>
+    );
   }
+
+  const planSlug = session?.company?.plan ?? "starter";
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {/* Mobile toggle */}
+      <button
+        className="mobile-menu-toggle"
+        onClick={() => setMobileOpen(!mobileOpen)}
+        type="button"
+        aria-label="Menu"
+      >
+        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      <aside className={`sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="sidebar-header">
           <div className="brand-mark">AF</div>
           <div>
@@ -96,12 +118,23 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
+        {session?.company && (
+          <div className={`plan-badge ${planBadgeColors[planSlug] ?? ""}`}>
+            Plano {planSlug.charAt(0).toUpperCase() + planSlug.slice(1)}
+          </div>
+        )}
+
         <nav className="nav-list" aria-label="Principal">
           {links.map((item) => {
             const Icon = item.icon;
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const active = pathname === item.href || (item.href !== "/dashboard" && item.href !== "/master" && pathname.startsWith(`${item.href}/`));
             return (
-              <Link className={`nav-link ${active ? "active" : ""}`} href={item.href} key={item.href}>
+              <Link
+                className={`nav-link ${active ? "active" : ""}`}
+                href={item.href}
+                key={item.href}
+                onClick={() => setMobileOpen(false)}
+              >
                 <Icon size={18} />
                 <span>{item.label}</span>
               </Link>
@@ -112,7 +145,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="sidebar-footer">
           <div className="sidebar-user">
             <strong>{session?.user.name}</strong>
-            <span>{session?.role}</span>
+            <span>{roleLabels[session?.role ?? ""] ?? session?.role}</span>
           </div>
           <button className="button secondary" onClick={logout} type="button">
             <LogOut size={18} />
@@ -120,6 +153,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
       </aside>
+
+      {mobileOpen && <div className="sidebar-backdrop" onClick={() => setMobileOpen(false)} />}
+
       <main className="content">{children}</main>
     </div>
   );
