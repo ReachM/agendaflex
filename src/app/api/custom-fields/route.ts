@@ -9,7 +9,7 @@ import { requireTenant } from "@/lib/security/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const context = await requireTenant(request, "custom_fields:manage");
+    const context = await requireTenant(request, "custom_fields:view");
     const entityType = request.nextUrl.searchParams.get("entityType");
     const customFields = await prisma.customField.findMany({
       where: {

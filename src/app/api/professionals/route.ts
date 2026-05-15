@@ -10,7 +10,7 @@ import { listQuerySchema, professionalCreateSchema } from "@/lib/validation/sche
 
 export async function GET(request: NextRequest) {
   try {
-    const context = await requireTenant(request, "professionals:manage");
+    const context = await requireTenant(request, "professionals:view");
     const query = listQuerySchema.parse(Object.fromEntries(request.nextUrl.searchParams));
     const professionals = await prisma.professional.findMany({
       where: {

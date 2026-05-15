@@ -415,6 +415,11 @@ model Appointment {
   paymentStatus     PaymentStatus?
   paymentMethod     PaymentMethod?
   paidAt            DateTime?
+  // Status lifecycle tracking
+  startedAt         DateTime?
+  completedAt       DateTime?
+  canceledAt        DateTime?
+  cancellationReason String?
   // Source tracking
   bookedByClient    Boolean           @default(false)
   createdById       String?

@@ -113,6 +113,27 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const discountPercent = typeof cv._discountPercent === "number" ? cv._discountPercent : undefined;
     const grandTotal = typeof cv._grandTotal === "number" ? cv._grandTotal : undefined;
 
+    // Calculate lifecycle timestamps based on status transitions
+    const lifecycleData: Record<string, unknown> = {};
+    if (body.status && body.status !== oldAppointment.status) {
+      if (body.status === "IN_PROGRESS" && !oldAppointment.startedAt) {
+        lifecycleData.startedAt = new Date();
+      }
+      if (body.status === "COMPLETED" && !oldAppointment.completedAt) {
+        lifecycleData.completedAt = new Date();
+        if (!oldAppointment.startedAt) {
+          lifecycleData.startedAt = new Date();
+        }
+      }
+      if (body.status === "CANCELLED") {
+        lifecycleData.canceledAt = new Date();
+        const rawBody = (body as Record<string, unknown>);
+        if (typeof rawBody.cancellationReason === "string") {
+          lifecycleData.cancellationReason = rawBody.cancellationReason;
+        }
+      }
+    }
+
     const appointment = await prisma.appointment.update({
       where: { id: oldAppointment.id },
       data: {
@@ -128,6 +149,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         ...(laborValue !== undefined ? { laborValue } : {}),
         ...(discountPercent !== undefined ? { discountPercent } : {}),
         ...(grandTotal !== undefined ? { totalValue: grandTotal } : {}),
+        ...lifecycleData,
         updatedById: auth.user.id
       },
       include: {

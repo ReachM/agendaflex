@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
       monthlyAppointments,
       nextAppointments,
       todayProfessionals,
-      topServices
+      topServices,
+      todayFullAppointments
     ] = await Promise.all([
       prisma.customer.count({ where: { companyId: cid, deletedAt: null } }),
       prisma.service.count({ where: { companyId: cid, isActive: true } }),
@@ -92,8 +93,31 @@ export async function GET(request: NextRequest) {
         _count: { id: true },
         orderBy: { _count: { id: "desc" } },
         take: 5
+      }),
+      // Today's appointments with full details for "Agendamentos de Hoje"
+      prisma.appointment.findMany({
+        where: {
+          companyId: cid,
+          startAt: { gte: startOfDay, lt: endOfDay }
+        },
+        include: {
+          customer: true,
+          service: true,
+          professional: true,
+          appointmentServices: {
+            include: { service: true },
+            orderBy: { createdAt: "asc" }
+          },
+          checklists: {
+            select: { id: true, status: true, _count: { select: { items: true } } }
+          }
+        },
+        orderBy: { startAt: "asc" }
       })
     ]);
+
+    // Attach custom values to today's appointments
+    const todayAppointmentsWithValues = await attachCustomValues(cid, "APPOINTMENT", todayFullAppointments);
 
     // Resolve service names for top services
     const topServiceIds = topServices.map(s => s.serviceId).filter(Boolean) as string[];
@@ -125,6 +149,7 @@ export async function GET(request: NextRequest) {
         monthlyAppointments
       },
       nextAppointments: nextAppointmentsWithValues,
+      todayAppointmentsList: todayAppointmentsWithValues,
       todayProfessionals: todayProfessionals.map(p => ({
         id: p.professionalId,
         name: p.professional.name

@@ -9,7 +9,7 @@ import { listQuerySchema, serviceCreateSchema } from "@/lib/validation/schemas";
 
 export async function GET(request: NextRequest) {
   try {
-    const context = await requireTenant(request, "services:manage");
+    const context = await requireTenant(request, "services:view");
     const query = listQuerySchema.parse(Object.fromEntries(request.nextUrl.searchParams));
     const services = await prisma.service.findMany({
       where: {

@@ -153,34 +153,49 @@ async function main() {
   // ─── Plans ──────────────────────────────────────────
   const starterPlan = await prisma.plan.upsert({
     where: { slug: "starter" },
-    update: {},
-    create: {
-      name: "Starter", slug: "starter", description: "Plano básico para pequenas empresas",
-      price: 0, maxUsers: 3, maxProfessionals: 5, maxCustomers: 100, maxAppointmentsPerMonth: 200,
+    update: {
+      maxUsers: 3, maxProfessionals: 3, maxCustomers: 500, maxAppointmentsPerMonth: 300,
       allowClientSelfScheduling: false, allowAdvancedReports: false, allowFinancialControl: false,
-      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
+      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
+      allowCustomFields: true, allowMultipleServicesPerAppointment: true
+    },
+    create: {
+      name: "Starter", slug: "starter", description: "Plano básico com dashboard, agenda, clientes, serviços, profissionais, checklist básico e relatórios simples.",
+      price: 0, maxUsers: 3, maxProfessionals: 3, maxCustomers: 500, maxAppointmentsPerMonth: 300,
+      allowClientSelfScheduling: false, allowAdvancedReports: false, allowFinancialControl: false,
+      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true, sortOrder: 1
     }
   });
 
   const proPlan = await prisma.plan.upsert({
     where: { slug: "pro" },
-    update: {},
-    create: {
-      name: "Pro", slug: "pro", description: "Plano intermediário com agendamento público e relatórios avançados",
-      price: 99.90, maxUsers: 10, maxProfessionals: 15, maxCustomers: 500, maxAppointmentsPerMonth: 1000,
+    update: {
+      maxUsers: 10, maxProfessionals: 10, maxCustomers: 5000, maxAppointmentsPerMonth: 2000,
       allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: false,
-      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
+      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
+      allowCustomFields: true, allowMultipleServicesPerAppointment: true
+    },
+    create: {
+      name: "Pro", slug: "pro", description: "Tudo do Starter + agendamento público, relatórios intermediários, checklist completo, mais usuários e profissionais.",
+      price: 99.90, maxUsers: 10, maxProfessionals: 10, maxCustomers: 5000, maxAppointmentsPerMonth: 2000,
+      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: false,
+      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true, sortOrder: 2
     }
   });
 
   const maxPlan = await prisma.plan.upsert({
     where: { slug: "max" },
-    update: {},
+    update: {
+      maxUsers: 100, maxProfessionals: 100, maxCustomers: 50000, maxAppointmentsPerMonth: 50000,
+      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
+      allowInvoiceRequest: true, allowCustomerChecklist: true, allowAuditLogs: true,
+      allowCustomFields: true, allowMultipleServicesPerAppointment: true
+    },
     create: {
-      name: "Max", slug: "max", description: "Plano completo com controle financeiro, checklist e nota fiscal",
-      price: 199.90, maxUsers: 50, maxProfessionals: 50, maxCustomers: 5000, maxAppointmentsPerMonth: 10000,
+      name: "Max", slug: "max", description: "Tudo do Pro + controle financeiro, relatórios avançados, gráficos, nota fiscal, via do cliente, logs avançados, limites altos.",
+      price: 199.90, maxUsers: 100, maxProfessionals: 100, maxCustomers: 50000, maxAppointmentsPerMonth: 50000,
       allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
       allowInvoiceRequest: true, allowCustomerChecklist: true, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true, sortOrder: 3
