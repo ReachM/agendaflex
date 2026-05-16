@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { DynamicFields, type CustomValues } from "@/components/dynamic-fields";
+import { AppointmentPreviewModal, TodayAppointments } from "@/components/appointment-preview";
 import { PageHeader, StatCard } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";
 
@@ -141,10 +142,30 @@ export function TenantDashboard() {
   const [data, setData] = useState<AnyRecord | null>(null);
   const [error, setError] = useState("");
   const [selectedAppointment, setSelectedAppointment] = useState<AnyRecord | null>(null);
+  const [session, setSession] = useState<AnyRecord | null>(null);
 
-  useEffect(() => {
-    apiFetch<AnyRecord>("/api/dashboard").then(setData).catch((err) => setError(err.message));
-  }, []);
+  async function loadData() {
+    setError("");
+    try {
+      const [dashData, sessionData] = await Promise.all([
+        apiFetch<AnyRecord>("/api/dashboard"),
+        apiFetch<AnyRecord>("/api/auth/me")
+      ]);
+      setData(dashData);
+      setSession(sessionData);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  useEffect(() => { loadData(); }, []);
+
+  async function handleStatusChange(id: string, status: string, reason?: string) {
+    await apiFetch(`/api/appointments/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, ...(reason ? { cancellationReason: reason } : {}) })
+    });
+  }
 
   const planUsagePercent = data?.plan
     ? Math.min(100, Math.round((data.plan.usedAppointmentsThisMonth / Math.max(data.plan.maxAppointmentsPerMonth, 1)) * 100))
@@ -241,6 +262,15 @@ export function TenantDashboard() {
         </section>
       ) : null}
 
+      {/* ─── Today's Appointments (NEW) ────────────────── */}
+      <TodayAppointments
+        appointments={data?.todayAppointmentsList ?? []}
+        onStatusChange={handleStatusChange}
+        onRefresh={loadData}
+        role={session?.role}
+        planFeatures={session?.planFeatures}
+      />
+
       {/* ─── Next Appointments ────────────────────────── */}
       <div className="section-divider"><h2>Próximos agendamentos</h2></div>
       <section className="panel">
@@ -251,86 +281,16 @@ export function TenantDashboard() {
         />
       </section>
 
-      {/* ─── Appointment Detail Modal ─────────────────── */}
+      {/* ─── Enhanced Appointment Detail Modal ─────────── */}
       {selectedAppointment ? (
-        <div className="modal-overlay" onClick={() => setSelectedAppointment(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 600 }}>
-            <div className="toolbar" style={{ marginBottom: 20 }}>
-              <h2 className="section-title">Detalhes do agendamento</h2>
-              <button className="icon-button secondary" onClick={() => setSelectedAppointment(null)} type="button" title="Fechar"><X size={16} /></button>
-            </div>
-            <div className="detail-cards">
-              <div className="detail-card detail-card--client">
-                <div className="detail-card__icon"><User size={20} /></div>
-                <div className="detail-card__body">
-                  <span className="detail-card__label">Cliente</span>
-                  <strong className="detail-card__value">{selectedAppointment.customer?.name ?? "-"}</strong>
-                  <div className="detail-card__meta">
-                    {selectedAppointment.customer?.phone ? <span>{selectedAppointment.customer.phone}</span> : null}
-                    {selectedAppointment.customer?.email ? <span>{selectedAppointment.customer.email}</span> : null}
-                  </div>
-                </div>
-              </div>
-              <div className="detail-card detail-card--schedule">
-                <div className="detail-card__icon"><CalendarPlus size={20} /></div>
-                <div className="detail-card__body">
-                  <span className="detail-card__label">Agendamento</span>
-                  <strong className="detail-card__value">{formatDateTime(selectedAppointment.startAt)}</strong>
-                  <div className="detail-card__meta">
-                    <span>Profissional: <strong>{selectedAppointment.professional?.name ?? "-"}</strong></span>
-                    <span className={`badge ${statusBadgeClass[selectedAppointment.status] ?? ""}`}>{statusLabels[selectedAppointment.status] ?? selectedAppointment.status}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {(selectedAppointment.appointmentServices ?? []).length > 0 ? (
-              <div style={{ marginTop: 16 }}>
-                <strong style={{ display: "block", marginBottom: 8, fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Serviços ({selectedAppointment.appointmentServices.length})</strong>
-                <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-                  {(selectedAppointment.appointmentServices as AnyRecord[]).map((as_item: AnyRecord, i: number) => (
-                    <div key={as_item.id ?? i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: i < selectedAppointment.appointmentServices.length - 1 ? "1px solid var(--border)" : "none", fontSize: 13 }}>
-                      <span style={{ fontWeight: 600 }}>{as_item.serviceNameSnapshot ?? as_item.service?.name ?? "-"}</span>
-                      <span style={{ color: "var(--primary)", fontWeight: 700 }}>{formatMoney(as_item.unitPrice)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : selectedAppointment.service ? (
-              <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                <span style={{ fontWeight: 600 }}>{selectedAppointment.service.name}</span>
-                <span style={{ color: "var(--primary)", fontWeight: 700 }}>{formatMoney(selectedAppointment.service.basePrice)}</span>
-              </div>
-            ) : null}
-
-            {(selectedAppointment.totalValue || selectedAppointment.partsValue || selectedAppointment.laborValue) ? (
-              <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--surface-muted)", borderRadius: "var(--radius)", fontSize: 13 }}>
-                <strong style={{ display: "block", marginBottom: 8, fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Valores</strong>
-                {selectedAppointment.partsValue ? <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><span>Peças</span><span>{formatMoney(selectedAppointment.partsValue)}</span></div> : null}
-                {selectedAppointment.laborValue ? <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><span>Mão de obra</span><span>{formatMoney(selectedAppointment.laborValue)}</span></div> : null}
-                {selectedAppointment.totalValue ? <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}><span>Total</span><span style={{ color: "var(--primary)" }}>{formatMoney(selectedAppointment.totalValue)}</span></div> : null}
-              </div>
-            ) : null}
-
-            {selectedAppointment.paymentStatus ? (
-              <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
-                <span style={{ color: "var(--muted)" }}>Pagamento:</span>
-                <span className={`badge ${selectedAppointment.paymentStatus === "PAID" ? "success" : "warning"}`}>
-                  {({ PENDING: "Pendente", PAID: "Pago", PARTIALLY_PAID: "Parcial", CANCELLED: "Cancelado", REFUNDED: "Reembolsado" } as Record<string, string>)[selectedAppointment.paymentStatus] ?? selectedAppointment.paymentStatus}
-                </span>
-              </div>
-            ) : null}
-
-            {selectedAppointment.notes ? (
-              <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--surface-muted)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--text-secondary)" }}>
-                <strong style={{ display: "block", marginBottom: 4, fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Observações</strong>
-                {selectedAppointment.notes}
-              </div>
-            ) : null}
-
-            <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}><Link className="button" href="/agenda"><Edit2 size={16} /> Ir para agenda</Link></div>
-          </div>
-        </div>
+        <AppointmentPreviewModal
+          appointment={selectedAppointment}
+          onClose={() => setSelectedAppointment(null)}
+          onStatusChange={handleStatusChange}
+          onRefresh={() => { loadData(); setSelectedAppointment(null); }}
+          role={session?.role}
+          planFeatures={session?.planFeatures}
+        />
       ) : null}
 
       {/* ─── Bottom Grid ──────────────────────────────── */}

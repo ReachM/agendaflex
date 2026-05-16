@@ -83,6 +83,7 @@ export function MasterDashboard() {
 
 export function CompanyManager() {
   const [companies, setCompanies] = useState<AnyRecord[]>([]);
+  const [plans, setPlans] = useState<AnyRecord[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -101,8 +102,12 @@ export function CompanyManager() {
 
   async function load() {
     setError("");
-    const data = await apiFetch<{ companies: AnyRecord[] }>("/api/companies");
-    setCompanies(data.companies);
+    const [companyData, planData] = await Promise.all([
+      apiFetch<{ companies: AnyRecord[] }>("/api/companies"),
+      apiFetch<{ plans: AnyRecord[] }>("/api/plans").catch(() => ({ plans: [] }))
+    ]);
+    setCompanies(companyData.companies);
+    setPlans(planData.plans.filter((p: AnyRecord) => p.isActive));
   }
 
   useEffect(() => {
@@ -147,6 +152,14 @@ export function CompanyManager() {
     await load();
   }
 
+  async function updatePlan(company: AnyRecord, plan: string) {
+    await apiFetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ plan })
+    });
+    await load();
+  }
+
   return (
     <>
       <PageHeader
@@ -179,13 +192,27 @@ export function CompanyManager() {
               ))}
             </select>
           </div>
+          <div className="field">
+            <label>Plano</label>
+            <select value={form.plan} onChange={(event) => setForm({ ...form, plan: event.target.value })}>
+              {plans.length > 0 ? (
+                plans.map((plan) => (
+                  <option key={plan.id} value={plan.slug}>
+                    {plan.name} — {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(plan.price ?? 0))}/mês
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="starter">Starter</option>
+                  <option value="pro">Profissional</option>
+                  <option value="max">Max</option>
+                </>
+              )}
+            </select>
+          </div>
           <Input label="Admin nome" value={form.adminName} onChange={(adminName) => setForm({ ...form, adminName })} />
           <Input label="Admin e-mail" type="email" value={form.adminEmail} onChange={(adminEmail) => setForm({ ...form, adminEmail })} />
           <Input label="Admin senha" value={form.adminPassword} onChange={(adminPassword) => setForm({ ...form, adminPassword })} />
-          <div className="field">
-            <label>Plano</label>
-            <input value={form.plan} onChange={(event) => setForm({ ...form, plan: event.target.value })} />
-          </div>
           <div className="field full">
             <button className="button" disabled={loading} type="submit">
               <Plus size={16} />
@@ -201,6 +228,7 @@ export function CompanyManager() {
             <tr>
               <th>Empresa</th>
               <th>Segmento</th>
+              <th>Plano</th>
               <th>Status</th>
               <th>Uso</th>
               <th>Ações</th>
@@ -215,6 +243,25 @@ export function CompanyManager() {
                   <span className="muted">{company.email}</span>
                 </td>
                 <td>{company.segment}</td>
+                <td>
+                  <select
+                    className="badge-select"
+                    value={company.plan ?? "starter"}
+                    onChange={(e) => updatePlan(company, e.target.value)}
+                  >
+                    {plans.length > 0 ? (
+                      plans.map((plan) => (
+                        <option key={plan.id} value={plan.slug}>{plan.name}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="starter">Starter</option>
+                        <option value="pro">Profissional</option>
+                        <option value="max">Max</option>
+                      </>
+                    )}
+                  </select>
+                </td>
                 <td>
                   <span className={`badge ${company.status === "ACTIVE" ? "status-active" : company.status === "SUSPENDED" ? "status-suspended" : "status-inactive"}`}>{company.status === "ACTIVE" ? "Ativa" : company.status === "SUSPENDED" ? "Suspensa" : "Inativa"}</span>
                 </td>

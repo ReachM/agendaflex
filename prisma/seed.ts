@@ -19,9 +19,13 @@ const permissions = [
   ["customers:manage", "Gerenciar clientes e pacientes"],
   ["customers:view", "Visualizar clientes"],
   ["services:manage", "Gerenciar servicos"],
+  ["services:view", "Visualizar servicos"],
   ["professionals:manage", "Gerenciar profissionais"],
+  ["professionals:view", "Visualizar profissionais"],
   ["appointments:manage", "Gerenciar agenda"],
+  ["appointments:view", "Visualizar agendamentos"],
   ["custom_fields:manage", "Gerenciar campos personalizados"],
+  ["custom_fields:view", "Visualizar campos personalizados"],
   ["reports:view", "Visualizar relatorios"],
   ["reports:advanced", "Relatorios avancados"],
   ["logs:view", "Visualizar logs de auditoria"],
@@ -30,19 +34,30 @@ const permissions = [
   ["financial:manage", "Gerenciar financeiro"],
   ["invoices:manage", "Gerenciar notas fiscais"],
   ["checklists:manage", "Gerenciar checklists"],
+  ["checklists:view", "Visualizar checklists"],
   ["public_booking:manage", "Gerenciar agendamento publico"]
 ] as const;
 
 const rolePermissions: Record<RoleName, string[]> = {
   SUPER_ADMIN: permissions.map(p => p[0]),
   COMPANY_ADMIN: [
-    "users:manage","customers:manage","customers:view","services:manage","professionals:manage",
-    "appointments:manage","custom_fields:manage","reports:view","reports:advanced","logs:view",
-    "settings:manage","financial:view","financial:manage","invoices:manage","checklists:manage","public_booking:manage"
+    "users:manage","customers:manage","customers:view","services:manage","services:view",
+    "professionals:manage","professionals:view","appointments:manage","appointments:view",
+    "custom_fields:manage","custom_fields:view","reports:view","reports:advanced","logs:view",
+    "settings:manage","financial:view","financial:manage","invoices:manage",
+    "checklists:manage","checklists:view","public_booking:manage"
   ],
-  MANAGER: ["customers:manage","customers:view","professionals:manage","appointments:manage","reports:view","logs:view","settings:manage","financial:view","checklists:manage"],
-  STAFF: ["customers:view","customers:manage","appointments:manage"],
-  USER: ["customers:view"]
+  MANAGER: [
+    "customers:manage","customers:view","services:manage","services:view",
+    "professionals:manage","professionals:view","appointments:manage","appointments:view",
+    "custom_fields:view","reports:view","logs:view","settings:manage","financial:view",
+    "checklists:manage","checklists:view"
+  ],
+  STAFF: [
+    "customers:view","customers:manage","services:view","professionals:view",
+    "appointments:manage","appointments:view","custom_fields:view","checklists:view"
+  ],
+  USER: ["customers:view","appointments:view"]
 };
 
 async function upsertRole(name: RoleName, scope: RoleScope, description: string) {
@@ -58,12 +73,12 @@ async function upsertUser(email: string, name: string, systemRoleId?: string | n
   });
 }
 
-async function upsertCompany(input: { name: string; tradeName: string; email: string; phone: string; segment: BusinessSegment; slug: string; plan?: string }) {
+async function upsertCompany(input: { name: string; tradeName: string; email: string; phone: string; segment: BusinessSegment; slug: string; plan?: string; publicBookingEnabled?: boolean }) {
   const existing = await prisma.company.findFirst({ where: { name: input.name } });
   if (existing) {
     return prisma.company.update({
       where: { id: existing.id },
-      data: { tradeName: input.tradeName, email: input.email, phone: input.phone, segment: input.segment, status: "ACTIVE", plan: input.plan ?? "starter", slug: input.slug }
+      data: { tradeName: input.tradeName, email: input.email, phone: input.phone, segment: input.segment, status: "ACTIVE", plan: input.plan ?? "starter", slug: input.slug, publicBookingEnabled: input.publicBookingEnabled ?? false }
     });
   }
   return prisma.company.create({ data: { ...input, status: "ACTIVE", plan: input.plan ?? "starter" } });
@@ -206,8 +221,8 @@ async function main() {
   const superAdmin = await upsertUser("admin@agendaflex.com", "Super Admin", roles.SUPER_ADMIN.id);
 
   // ─── Companies ──────────────────────────────────────
-  const clinic = await upsertCompany({ name: "Clínica Vida", tradeName: "Clínica Vida", email: "contato@clinicavida.com", phone: "(11) 4000-1000", segment: "CLINICA_MEDICA", slug: "clinica-vida", plan: "pro" });
-  const workshop = await upsertCompany({ name: "Oficina Central", tradeName: "Oficina Central", email: "contato@oficinacentral.com", phone: "(11) 4000-2000", segment: "OFICINA_MECANICA", slug: "oficina-central", plan: "max" });
+  const clinic = await upsertCompany({ name: "Clínica Vida", tradeName: "Clínica Vida", email: "contato@clinicavida.com", phone: "(11) 4000-1000", segment: "CLINICA_MEDICA", slug: "clinica-vida", plan: "pro", publicBookingEnabled: true });
+  const workshop = await upsertCompany({ name: "Oficina Central", tradeName: "Oficina Central", email: "contato@oficinacentral.com", phone: "(11) 4000-2000", segment: "OFICINA_MECANICA", slug: "oficina-central", plan: "max", publicBookingEnabled: true });
   const salon = await upsertCompany({ name: "Salão Bella", tradeName: "Salão Bella", email: "contato@salaobella.com", phone: "(11) 4000-3000", segment: "SALAO_BELEZA", slug: "salao-bella", plan: "starter" });
 
   // Subscriptions
@@ -237,19 +252,39 @@ async function main() {
   const workshopStaff = await upsertUser("mecanico@oficinacentral.com", "Mecânico Oficina Central");
   await linkCompanyUser(workshop.id, workshopStaff.id, roles.STAFF.id);
 
-  // ─── Custom Fields ──────────────────────────────────
+  // ─── Custom Fields: CLÍNICA (medical only, no automotive) ──
   const allergy = await upsertCustomField({ companyId: clinic.id, entityType: "CUSTOMER", label: "Alergias", fieldKey: "alergias", fieldType: "LONG_TEXT", sortOrder: 1, helpText: "Registre alergias conhecidas." });
   await upsertCustomField({ companyId: clinic.id, entityType: "CUSTOMER", label: "Convênio", fieldKey: "convenio", fieldType: "SHORT_TEXT", sortOrder: 2 });
-  await upsertCustomField({ companyId: clinic.id, entityType: "CUSTOMER", label: "Tipo sanguíneo", fieldKey: "tipo_sanguineo", fieldType: "SINGLE_SELECT", sortOrder: 3, options: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] });
+  await upsertCustomField({ companyId: clinic.id, entityType: "CUSTOMER", label: "Nº Carteirinha", fieldKey: "numero_carteirinha", fieldType: "SHORT_TEXT", sortOrder: 3 });
+  await upsertCustomField({ companyId: clinic.id, entityType: "CUSTOMER", label: "Tipo sanguíneo", fieldKey: "tipo_sanguineo", fieldType: "SINGLE_SELECT", sortOrder: 4, options: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] });
+  await upsertCustomField({ companyId: clinic.id, entityType: "CUSTOMER", label: "Medicamentos em uso", fieldKey: "medicamentos_em_uso", fieldType: "LONG_TEXT", sortOrder: 5 });
+  await upsertCustomField({ companyId: clinic.id, entityType: "CUSTOMER", label: "Cuidados necessários", fieldKey: "cuidados_necessarios", fieldType: "LONG_TEXT", sortOrder: 6 });
   const clinicalNote = await upsertCustomField({ companyId: clinic.id, entityType: "APPOINTMENT", label: "Motivo da consulta", fieldKey: "motivo_da_consulta", fieldType: "LONG_TEXT", sortOrder: 1, isRequired: true });
+  await upsertCustomField({ companyId: clinic.id, entityType: "APPOINTMENT", label: "Tipo de consulta", fieldKey: "tipo_de_consulta", fieldType: "SINGLE_SELECT", sortOrder: 2, options: ["Primeira consulta", "Retorno", "Urgência", "Exame"] });
+  await upsertCustomField({ companyId: clinic.id, entityType: "APPOINTMENT", label: "Convênio utilizado", fieldKey: "convenio_utilizado", fieldType: "SHORT_TEXT", sortOrder: 3 });
+  await upsertCustomField({ companyId: clinic.id, entityType: "APPOINTMENT", label: "Retorno recomendado", fieldKey: "retorno_recomendado", fieldType: "DATE", sortOrder: 4 });
+  await upsertCustomField({ companyId: clinic.id, entityType: "APPOINTMENT", label: "Observação do atendimento", fieldKey: "observacao_atendimento", fieldType: "LONG_TEXT", sortOrder: 5 });
 
+  // ─── Custom Fields: OFICINA MECÂNICA (automotive) ──────
   const plate = await upsertCustomField({ companyId: workshop.id, entityType: "CUSTOMER", label: "Placa do veículo", fieldKey: "placa_do_veiculo", fieldType: "SHORT_TEXT", sortOrder: 1, isRequired: true });
   await upsertCustomField({ companyId: workshop.id, entityType: "CUSTOMER", label: "Modelo do veículo", fieldKey: "modelo_do_veiculo", fieldType: "SHORT_TEXT", sortOrder: 2 });
+  await upsertCustomField({ companyId: workshop.id, entityType: "CUSTOMER", label: "Marca", fieldKey: "marca_veiculo", fieldType: "SHORT_TEXT", sortOrder: 3 });
+  await upsertCustomField({ companyId: workshop.id, entityType: "CUSTOMER", label: "Ano", fieldKey: "ano_veiculo", fieldType: "NUMBER", sortOrder: 4 });
+  await upsertCustomField({ companyId: workshop.id, entityType: "CUSTOMER", label: "Quilometragem", fieldKey: "quilometragem", fieldType: "NUMBER", sortOrder: 5 });
+  await upsertCustomField({ companyId: workshop.id, entityType: "CUSTOMER", label: "Cor do veículo", fieldKey: "cor_veiculo", fieldType: "SHORT_TEXT", sortOrder: 6 });
   await upsertCustomField({ companyId: workshop.id, entityType: "APPOINTMENT", label: "Problema relatado", fieldKey: "problema_relatado", fieldType: "LONG_TEXT", sortOrder: 1 });
   await upsertCustomField({ companyId: workshop.id, entityType: "APPOINTMENT", label: "Diagnóstico", fieldKey: "diagnostico", fieldType: "LONG_TEXT", sortOrder: 2 });
+  await upsertCustomField({ companyId: workshop.id, entityType: "APPOINTMENT", label: "Peças utilizadas", fieldKey: "pecas_utilizadas", fieldType: "LONG_TEXT", sortOrder: 3 });
+  await upsertCustomField({ companyId: workshop.id, entityType: "APPOINTMENT", label: "Garantia do serviço", fieldKey: "garantia_servico", fieldType: "SHORT_TEXT", sortOrder: 4 });
+  await upsertCustomField({ companyId: workshop.id, entityType: "APPOINTMENT", label: "Observações do mecânico", fieldKey: "observacoes_mecanico", fieldType: "LONG_TEXT", sortOrder: 5 });
 
+  // ─── Custom Fields: SALÃO DE BELEZA ────────────────────
   await upsertCustomField({ companyId: salon.id, entityType: "CUSTOMER", label: "Preferência de atendimento", fieldKey: "preferencia_de_atendimento", fieldType: "LONG_TEXT", sortOrder: 1 });
-  await upsertCustomField({ companyId: salon.id, entityType: "APPOINTMENT", label: "Tipo de procedimento", fieldKey: "tipo_de_procedimento", fieldType: "SHORT_TEXT", sortOrder: 1 });
+  await upsertCustomField({ companyId: salon.id, entityType: "CUSTOMER", label: "Alergias a produtos", fieldKey: "alergias_produtos", fieldType: "LONG_TEXT", sortOrder: 2 });
+  await upsertCustomField({ companyId: salon.id, entityType: "CUSTOMER", label: "Histórico de procedimentos", fieldKey: "historico_procedimentos", fieldType: "LONG_TEXT", sortOrder: 3 });
+  await upsertCustomField({ companyId: salon.id, entityType: "APPOINTMENT", label: "Procedimento", fieldKey: "tipo_de_procedimento", fieldType: "SHORT_TEXT", sortOrder: 1 });
+  await upsertCustomField({ companyId: salon.id, entityType: "APPOINTMENT", label: "Produto utilizado", fieldKey: "produto_utilizado", fieldType: "SHORT_TEXT", sortOrder: 2 });
+  await upsertCustomField({ companyId: salon.id, entityType: "APPOINTMENT", label: "Recomendações pós-procedimento", fieldKey: "recomendacoes_pos", fieldType: "LONG_TEXT", sortOrder: 3 });
 
   // ─── Customers / Services / Professionals ───────────
   const clinicCustomer = await firstOrCreateCustomer(clinic.id, { name: "Maria Fernanda", email: "maria.fernanda@example.com", phone: "(11) 98888-1000", cpf: "111.222.333-44" });

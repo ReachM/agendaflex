@@ -54,6 +54,19 @@ export async function POST(request: NextRequest) {
         }
       });
 
+      // Create subscription record for the plan
+      const planSlug = body.plan ?? "starter";
+      const plan = await tx.plan.findUnique({ where: { slug: planSlug } });
+      if (plan) {
+        await tx.companySubscription.create({
+          data: {
+            companyId: company.id,
+            planId: plan.id,
+            status: "ACTIVE"
+          }
+        });
+      }
+
       let adminUser = null;
       if (body.adminEmail && body.adminName && body.adminPassword) {
         const companyAdminRole = await tx.role.findUniqueOrThrow({

@@ -39,7 +39,7 @@ const AUTO_CALC_RULES: {
 ];
 
 function applyAutoCalc(updatedValues: CustomValues, fieldKeys: Set<string>): CustomValues {
-  let result = { ...updatedValues };
+  const result = { ...updatedValues };
   for (const rule of AUTO_CALC_RULES) {
     // Only apply if both source fields AND target field exist in this form
     const hasSourceFields = rule.sourceKeys.some((key) => fieldKeys.has(key));

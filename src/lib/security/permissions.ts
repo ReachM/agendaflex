@@ -10,6 +10,7 @@ export const PERMISSIONS = [
   "professionals:manage",
   "professionals:view",
   "appointments:manage",
+  "appointments:view",
   "custom_fields:manage",
   "custom_fields:view",
   "reports:view",
@@ -20,6 +21,7 @@ export const PERMISSIONS = [
   "financial:manage",
   "invoices:manage",
   "checklists:manage",
+  "checklists:view",
   "public_booking:manage"
 ] as const;
 
@@ -51,16 +53,19 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
   MANAGER: [
     "customers:manage",
     "customers:view",
+    "services:manage",
     "services:view",
     "professionals:manage",
     "professionals:view",
     "appointments:manage",
+    "appointments:view",
     "custom_fields:view",
     "reports:view",
     "logs:view",
     "settings:manage",
     "financial:view",
-    "checklists:manage"
+    "checklists:manage",
+    "checklists:view"
   ],
   STAFF: [
     "customers:view",
@@ -68,11 +73,13 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
     "services:view",
     "professionals:view",
     "appointments:manage",
+    "appointments:view",
     "custom_fields:view",
-    "checklists:manage"
+    "checklists:view"
   ],
   USER: [
-    "customers:view"
+    "customers:view",
+    "appointments:view"
   ]
 };
 
