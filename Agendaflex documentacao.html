@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgendaFlex — Documentação Completa</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --purple: #534AB7;
+    --purple-light: #EEEDFE;
+    --purple-mid: #AFA9EC;
+    --teal: #0F6E56;
+    --teal-light: #E1F5EE;
+    --teal-mid: #5DCAA5;
+    --amber: #BA7517;
+    --amber-light: #FAEEDA;
+    --blue: #185FA5;
+    --blue-light: #E6F1FB;
+    --red: #A32D2D;
+    --red-light: #FCEBEB;
+    --green: #3B6D11;
+    --green-light: #EAF3DE;
+    --gray: #5F5E5A;
+    --gray-light: #F1EFE8;
+    --gray-border: #D3D1C7;
+    --text: #2C2C2A;
+    --text-muted: #5F5E5A;
+    --bg: #FAFAF8;
+    --white: #ffffff;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Sora', sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  /* ── SIDEBAR ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  nav {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--white);
+    border-right: 1px solid var(--gray-border);
+    padding: 28px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .nav-logo {
+    padding: 0 24px 24px;
+    border-bottom: 1px solid var(--gray-border);
+    margin-bottom: 16px;
+  }
+
+  .nav-logo h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--purple);
+    letter-spacing: -0.5px;
+  }
+
+  .nav-logo p {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .nav-section {
+    padding: 6px 24px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 12px;
+  }
+
+  nav a {
+    display: block;
+    padding: 7px 24px;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+  }
+
+  nav a:hover { color: var(--purple); background: var(--purple-light); border-left-color: var(--purple-mid); }
+  nav a.active { color: var(--purple); background: var(--purple-light); border-left-color: var(--purple); font-weight: 500; }
+
+  /* ── MAIN ── */
+  main { flex: 1; max-width: 860px; padding: 48px 56px; }
+
+  /* ── HERO ── */
+  .hero {
+    background: linear-gradient(135deg, var(--purple) 0%, #7F77DD 100%);
+    border-radius: var(--radius);
+    padding: 48px;
+    margin-bottom: 48px;
+    color: white;
+  }
+
+  .hero .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .hero h1 { font-size: 36px; font-weight: 700; letter-spacing: -1px; line-height: 1.2; margin-bottom: 16px; }
+  .hero p { font-size: 16px; opacity: .85; max-width: 560px; line-height: 1.7; }
+
+  .hero-plans {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .plan-pill {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .plan-pill span { display: block; font-size: 11px; opacity: .7; font-weight: 400; margin-top: 2px; }
+
+  /* ── SECTIONS ── */
+  section { margin-bottom: 56px; scroll-margin-top: 32px; }
+
+  h2 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    margin-bottom: 6px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--purple-light);
+  }
+
+  h2 .section-num {
+    display: inline-block;
+    background: var(--purple);
+    color: white;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--purple);
+    margin: 24px 0 10px;
+  }
+
+  p { margin-bottom: 14px; color: var(--text); }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--white);
+    border: 1px solid var(--gray-border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .icon-purple { background: var(--purple-light); }
+  .icon-teal   { background: var(--teal-light); }
+  .icon-amber  { background: var(--amber-light); }
+  .icon-blue   { background: var(--blue-light); }
+  .icon-green  { background: var(--green-light); }
+  .icon-red    { background: var(--red-light); }
+
+  /* ── STEPS ── */
+  .steps { list-style: none; padding: 0; }
+
+  .steps li {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    width: 28px;
+    height: 28px;
+    background: var(--purple);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .step-body strong { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .step-body p { font-size: 13px; color: var(--text-muted); margin: 0; }
+
+  /* ── TABLE ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 16px 0 24px;
+  }
+
+  th {
+    background: var(--purple);
+    color: white;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child  { border-radius: 0 8px 0 0; }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--gray-border);
+    color: var(--text);
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: var(--gray-light); }
+
+  /* ── BADGES ── */
+  .badge-yes { display: inline-block; background: var(--green-light); color: var(--green); border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .badge-no  { display: inline-block; background: var(--red-light);   color: var(--red);   border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .badge-plan { display: inline-block; background: var(--purple-light); color: var(--purple); border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .badge-max  { display: inline-block; background: var(--teal-light);   color: var(--teal);   border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+
+  /* ── CODE / CMD ── */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--gray-light);
+    border: 1px solid var(--gray-border);
+    border-radius: 5px;
+    padding: 2px 7px;
+    color: var(--purple);
+  }
+
+  .code-block {
+    background: #1e1e2e;
+    border-radius: var(--radius-sm);
+    padding: 20px 24px;
+    margin: 12px 0 20px;
+    overflow-x: auto;
+  }
+
+  .code-block code {
+    background: none;
+    border: none;
+    color: #cdd6f4;
+    font-size: 13px;
+    line-height: 1.8;
+    padding: 0;
+    display: block;
+    white-space: pre;
+  }
+
+  .code-block .cm { color: #6c7086; }
+  .code-block .ck { color: #89b4fa; }
+  .code-block .cv { color: #a6e3a1; }
+
+  /* ── INFO BOXES ── */
+  .info-box {
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 13px;
+    line-height: 1.65;
+    border-left: 4px solid;
+  }
+
+  .info-box.tip    { background: var(--blue-light);  border-color: var(--blue);   color: #0C447C; }
+  .info-box.warn   { background: var(--amber-light); border-color: var(--amber);  color: #633806; }
+  .info-box.danger { background: var(--red-light);   border-color: var(--red);    color: #791F1F; }
+  .info-box.ok     { background: var(--green-light); border-color: var(--green);  color: #27500A; }
+
+  .info-box strong { font-weight: 700; }
+
+  /* ── GRID 2 ── */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+
+  /* ── FLOW VISUAL ── */
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 20px 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-step {
+    flex: 1;
+    min-width: 110px;
+    background: var(--purple-light);
+    border: 1px solid var(--purple-mid);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #3C3489;
+    text-align: center;
+    position: relative;
+  }
+
+  .flow-step + .flow-step::before {
+    content: '→';
+    position: absolute;
+    left: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--purple-mid);
+    font-size: 16px;
+  }
+
+  /* ── CREDENTIAL CARDS ── */
+  .cred-card {
+    background: var(--white);
+    border: 1px solid var(--gray-border);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cred-label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+  .cred-val   { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--purple); background: var(--purple-light); padding: 3px 10px; border-radius: 5px; }
+
+  /* ── GLOSSARY ── */
+  .gloss-item { margin-bottom: 16px; }
+  .gloss-term { font-weight: 700; color: var(--purple); font-size: 14px; }
+  .gloss-def  { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+
+  /* ── ENTITY CARD ── */
+  .entity-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
+  .entity-card {
+    border: 1px solid var(--gray-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .entity-card .entity-head {
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .entity-card .entity-body { padding: 10px 14px; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+  .entity-card .entity-body span { display: block; }
+
+  /* scroll */
+  html { scroll-behavior: smooth; }
+
+  /* print */
+  @media print {
+    nav { display: none; }
+    main { max-width: 100%; padding: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<nav>
+  <div class="nav-logo">
+    <h1>AgendaFlex</h1>
+    <p>Documentação para usuários</p>
+  </div>
+
+  <div class="nav-section">Introdução</div>
+  <a href="#oque-e">O que é o AgendaFlex?</a>
+  <a href="#para-quem">Para quem é?</a>
+  <a href="#planos">Planos disponíveis</a>
+
+  <div class="nav-section">Primeiros Passos</div>
+  <a href="#instalacao">Como instalar</a>
+  <a href="#primeiro-acesso">Primeiro acesso</a>
+  <a href="#contas-teste">Contas de teste</a>
+
+  <div class="nav-section">Funcionalidades</div>
+  <a href="#agendamentos">Agendamentos</a>
+  <a href="#clientes">Clientes</a>
+  <a href="#servicos">Serviços</a>
+  <a href="#profissionais">Profissionais</a>
+  <a href="#pagina-publica">Página pública</a>
+  <a href="#financeiro">Módulo financeiro</a>
+  <a href="#checklists">Checklists</a>
+  <a href="#notas-fiscais">Notas fiscais</a>
+  <a href="#campos-customizados">Campos personalizados</a>
+
+  <div class="nav-section">Segurança</div>
+  <a href="#seguranca">Como seus dados são protegidos</a>
+  <a href="#auditoria">Auditoria</a>
+  <a href="#papeis">Papéis de usuário</a>
+
+  <div class="nav-section">Referência</div>
+  <a href="#entidades">Entidades do sistema</a>
+  <a href="#glossario">Glossário</a>
+</nav>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<main>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="badge">Documentação oficial · v0.1</div>
+    <h1>AgendaFlex</h1>
+    <p>Plataforma completa de agendamento e gestão para clínicas, salões, oficinas e profissionais autônomos. Tudo em um só lugar, seguro e fácil de usar.</p>
+    <div class="hero-plans">
+      <div class="plan-pill">Starter <span>até 100 agend./mês</span></div>
+      <div class="plan-pill">Pro <span>até 500 · página pública</span></div>
+      <div class="plan-pill">Max <span>ilimitado · DRE · NF</span></div>
+    </div>
+  </div>
+
+  <!-- ═══ 1. O QUE É ═══ -->
+  <section id="oque-e">
+    <h2><span class="section-num">1</span> O que é o AgendaFlex?</h2>
+
+    <p>O AgendaFlex é um <strong>sistema de agendamento online</strong> voltado para negócios de serviços. Imagine uma agenda inteligente que substitui aquele caderno de papel, o WhatsApp bagunçado e a planilha de Excel — tudo em um único sistema acessado pelo navegador.</p>
+
+    <p>Ele é um <strong>SaaS multi-empresa</strong>, o que significa que várias empresas diferentes podem usá-lo ao mesmo tempo, cada uma com seus próprios dados completamente separados e protegidos, como se cada empresa tivesse seu próprio sistema exclusivo.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title"><div class="icon icon-purple">📅</div> Agendamentos inteligentes</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0">Crie, edite e cancele agendamentos com detecção automática de conflitos de horário. Nunca mais dois clientes no mesmo horário.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><div class="icon icon-teal">🌐</div> Link público de agendamento</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0">Seus clientes agendam sozinhos pelo celular ou computador, sem precisar ligar ou mandar mensagem para você.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><div class="icon icon-amber">💰</div> Controle financeiro</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0">Veja quanto entrou, quanto saiu, qual serviço dá mais lucro e quais são seus clientes mais fiéis.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><div class="icon icon-blue">✅</div> Checklists de atendimento</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0">Monte listas de etapas para cada tipo de atendimento. Ideal para oficinas e clínicas que precisam documentar o serviço realizado.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 2. PARA QUEM ═══ -->
+  <section id="para-quem">
+    <h2><span class="section-num">2</span> Para quem é?</h2>
+
+    <p>O AgendaFlex foi pensado para qualquer negócio que trabalha com <strong>serviços agendados</strong>:</p>
+
+    <div class="card">
+      <table style="margin:0">
+        <thead><tr><th>Tipo de negócio</th><th>Como usa o AgendaFlex</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Clínica de saúde</strong></td><td>Agendar consultas, documentar o atendimento com checklists, emitir nota fiscal, acompanhar receita por médico</td></tr>
+          <tr><td><strong>Salão de beleza</strong></td><td>Agendar cortes e serviços, permitir que clientes agendem online, ver quais serviços mais rendem</td></tr>
+          <tr><td><strong>Oficina mecânica</strong></td><td>Registrar entrada de veículos, criar checklist de revisão, documentar cada etapa do serviço</td></tr>
+          <tr><td><strong>Profissional autônomo</strong></td><td>Gerenciar agenda pessoal, receber agendamentos pelo link público sem precisar de recepcionista</td></tr>
+          <tr><td><strong>Pet shop / Veterinária</strong></td><td>Agendar banhos e consultas, registrar histórico de cada pet, controlar financeiro</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ 3. PLANOS ═══ -->
+  <section id="planos">
+    <h2><span class="section-num">3</span> Planos disponíveis</h2>
+
+    <p>O sistema oferece três planos. Você começa com o que faz sentido para o seu tamanho e pode crescer conforme a necessidade.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Funcionalidade</th>
+          <th>Starter</th>
+          <th>Pro</th>
+          <th>Max</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Agendamentos por mês</td><td>até 100</td><td>até 500</td><td>Ilimitado</td></tr>
+        <tr><td>Cadastro de clientes e serviços</td><td><span class="badge-yes">Sim</span></td><td><span class="badge-yes">Sim</span></td><td><span class="badge-yes">Sim</span></td></tr>
+        <tr><td>Página pública de agendamento</td><td><span class="badge-no">Não</span></td><td><span class="badge-yes">Sim</span></td><td><span class="badge-yes">Sim</span></td></tr>
+        <tr><td>Vários serviços por agendamento</td><td><span class="badge-no">Não</span></td><td><span class="badge-yes">Sim</span></td><td><span class="badge-yes">Sim</span></td></tr>
+        <tr><td>Relatórios</td><td>Básico</td><td>Avançado</td><td>Completo</td></tr>
+        <tr><td>Módulo financeiro (DRE)</td><td><span class="badge-no">Não</span></td><td><span class="badge-no">Não</span></td><td><span class="badge-max">Só Max</span></td></tr>
+        <tr><td>Checklists de atendimento</td><td><span class="badge-no">Não</span></td><td><span class="badge-no">Não</span></td><td><span class="badge-max">Só Max</span></td></tr>
+        <tr><td>Emissão de notas fiscais</td><td><span class="badge-no">Não</span></td><td><span class="badge-no">Não</span></td><td><span class="badge-max">Só Max</span></td></tr>
+        <tr><td>Campos personalizados</td><td><span class="badge-yes">Sim</span></td><td><span class="badge-yes">Sim</span></td><td><span class="badge-yes">Sim</span></td></tr>
+        <tr><td>Auditoria e LGPD</td><td><span class="badge-yes">Sim</span></td><td><span class="badge-yes">Sim</span></td><td><span class="badge-yes">Sim</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box tip"><strong>Dica:</strong> Se você tem um negócio pequeno e quer começar a testar o sistema, o plano Starter já é suficiente para o dia a dia. O plano Pro é ideal para quem quer que os clientes agendem pelo link. O Max é para quem precisa de controle financeiro completo e documentação de atendimento.</div>
+  </section>
+
+  <!-- ═══ 4. INSTALAÇÃO ═══ -->
+  <section id="instalacao">
+    <h2><span class="section-num">4</span> Como instalar o sistema</h2>
+
+    <p>Esta seção é para a pessoa técnica (desenvolvedor) que vai configurar o sistema. Se você é o usuário final, pule para a seção "Primeiro acesso".</p>
+
+    <h3>O que você precisa ter instalado no computador</h3>
+    <ul style="padding-left:20px;margin-bottom:16px;font-size:14px;line-height:2">
+      <li><strong>Node.js versão 18 ou mais novo</strong> — é o motor que roda o sistema</li>
+      <li><strong>PostgreSQL</strong> — o banco de dados (ou Docker para subir automaticamente)</li>
+      <li><strong>Git</strong> — para baixar o código</li>
+    </ul>
+
+    <h3>Passo a passo da instalação</h3>
+
+    <ul class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Baixe o código do projeto</strong>
+          <p>Abra o terminal e execute os comandos abaixo:</p>
+        </div>
+      </li>
+    </ul>
+    <div class="code-block"><code><span class="cm"># Baixa o projeto para seu computador</span>
+git clone https://github.com/ReachM/agendaflex
+cd agendaflex
+
+<span class="cm"># Instala todas as dependências necessárias</span>
+npm install</code></div>
+
+    <ul class="steps">
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Configure as variáveis de ambiente</strong>
+          <p>Crie o arquivo de configuração copiando o exemplo:</p>
+        </div>
+      </li>
+    </ul>
+    <div class="code-block"><code>cp .env.example .env</code></div>
+    <p style="font-size:13px">Abra o arquivo <code>.env</code> e ajuste as três variáveis:</p>
+    <div class="code-block"><code><span class="cm"># Endereço do banco de dados</span>
+<span class="ck">DATABASE_URL</span>=<span class="cv">"postgresql://agendaflex:agendaflex@localhost:5432/agendaflex?schema=public"</span>
+
+<span class="cm"># Chave secreta para gerar tokens de login (troque por algo longo e aleatório!)</span>
+<span class="ck">AUTH_SECRET</span>=<span class="cv">"coloque-aqui-uma-senha-longa-e-aleatoria-com-32-ou-mais-caracteres"</span>
+
+<span class="cm"># URL onde o sistema vai rodar</span>
+<span class="ck">NEXT_PUBLIC_APP_URL</span>=<span class="cv">"http://localhost:3000"</span></code></div>
+
+    <ul class="steps">
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Suba o banco de dados com Docker (opcional, mas recomendado)</strong>
+          <p>Se tiver Docker instalado, isso sobe o PostgreSQL automaticamente:</p>
+        </div>
+      </li>
+    </ul>
+    <div class="code-block"><code>docker compose up -d</code></div>
+
+    <ul class="steps">
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <strong>Crie as tabelas e os dados iniciais</strong>
+          <p>Esses comandos preparam o banco de dados com a estrutura e os dados de teste:</p>
+        </div>
+      </li>
+    </ul>
+    <div class="code-block"><code><span class="cm"># Cria todas as tabelas no banco</span>
+npm run db:migrate
+
+<span class="cm"># Insere os dados iniciais (planos, empresas de teste, usuários)</span>
+npm run db:seed</code></div>
+
+    <ul class="steps">
+      <li>
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <strong>Inicie o sistema</strong>
+          <p>Depois de tudo pronto, inicie o servidor de desenvolvimento:</p>
+        </div>
+      </li>
+    </ul>
+    <div class="code-block"><code>npm run dev</code></div>
+
+    <div class="info-box ok"><strong>Sistema rodando!</strong> Acesse <code>http://localhost:3000</code> no seu navegador. O sistema estará disponível.</div>
+    <div class="info-box warn"><strong>Atenção:</strong> Após instalar e colocar em produção, troque imediatamente o <code>AUTH_SECRET</code> por uma senha forte e mude as senhas das contas de teste. As senhas padrão são públicas.</div>
+  </section>
+
+  <!-- ═══ 5. PRIMEIRO ACESSO ═══ -->
+  <section id="primeiro-acesso">
+    <h2><span class="section-num">5</span> Primeiro acesso</h2>
+
+    <p>Ao abrir o sistema no navegador, você verá a tela de login. Digite seu e-mail e senha e clique em entrar.</p>
+
+    <div class="flow">
+      <div class="flow-step">Abrir o sistema no navegador</div>
+      <div class="flow-step">Digitar e-mail e senha</div>
+      <div class="flow-step">Clicar em Entrar</div>
+      <div class="flow-step">Ver o painel da sua empresa</div>
+    </div>
+
+    <p>Após o login, você é direcionado ao <strong>painel principal</strong> da sua empresa. Ali você vê um resumo dos agendamentos do dia, acesso rápido ao cadastro de clientes, serviços e ao menu lateral com todas as funcionalidades.</p>
+
+    <div class="info-box tip"><strong>Dica:</strong> O sistema salva sua sessão por um tempo. Você não precisa fazer login toda vez que abrir o navegador, a não ser que saia manualmente ou o token expire.</div>
+  </section>
+
+  <!-- ═══ 6. CONTAS DE TESTE ═══ -->
+  <section id="contas-teste">
+    <h2><span class="section-num">6</span> Contas de teste (geradas automaticamente)</h2>
+
+    <p>Após rodar o <code>npm run db:seed</code>, o sistema cria automaticamente quatro contas de teste para você explorar cada plano:</p>
+
+    <div class="cred-card">
+      <div><div class="cred-label">Super Administrador (acesso total)</div><div style="font-size:12px;color:var(--text-muted);margin-top:3px">Gerencia todas as empresas do sistema</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="cred-val">admin@agendaflex.com</span>
+        <span class="cred-val">Admin@123456</span>
+      </div>
+    </div>
+
+    <div class="cred-card">
+      <div><div class="cred-label">Plano Starter — Clínica Vida</div><div style="font-size:12px;color:var(--text-muted);margin-top:3px">Empresa no plano básico</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="cred-val">admin@clinicavida.com</span>
+        <span class="cred-val">Admin@123456</span>
+      </div>
+    </div>
+
+    <div class="cred-card">
+      <div><div class="cred-label">Plano Pro — Salão Bella</div><div style="font-size:12px;color:var(--text-muted);margin-top:3px">Empresa com página pública de agendamento</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="cred-val">admin@salaobella.com</span>
+        <span class="cred-val">Admin@123456</span>
+      </div>
+    </div>
+
+    <div class="cred-card">
+      <div><div class="cred-label">Plano Max — Oficina Central</div><div style="font-size:12px;color:var(--text-muted);margin-top:3px">Empresa com acesso total a todas as funcionalidades</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="cred-val">admin@oficinacentral.com</span>
+        <span class="cred-val">Admin@123456</span>
+      </div>
+    </div>
+
+    <div class="info-box danger"><strong>Importante:</strong> Estas senhas são públicas e conhecidas por qualquer pessoa que leu este repositório. Troque-as imediatamente antes de usar em produção real.</div>
+  </section>
+
+  <!-- ═══ 7. AGENDAMENTOS ═══ -->
+  <section id="agendamentos">
+    <h2><span class="section-num">7</span> Agendamentos</h2>
+
+    <p>O agendamento é o coração do sistema. É aqui que você registra quando um cliente vai ser atendido, por qual profissional, e quais serviços serão realizados.</p>
+
+    <h3>Como criar um agendamento</h3>
+    <ul class="steps">
+      <li><div class="step-num">1</div><div class="step-body"><strong>Acesse "Agendamentos" no menu</strong><p>Clique no botão "Novo agendamento".</p></div></li>
+      <li><div class="step-num">2</div><div class="step-body"><strong>Escolha o cliente</strong><p>Selecione um cliente já cadastrado ou crie um novo na hora.</p></div></li>
+      <li><div class="step-num">3</div><div class="step-body"><strong>Escolha o profissional e o horário</strong><p>Selecione quem vai atender e defina a data e hora. O sistema avisa automaticamente se há conflito de horário.</p></div></li>
+      <li><div class="step-num">4</div><div class="step-body"><strong>Adicione os serviços</strong><p>Escolha um ou mais serviços que serão realizados. O preço de cada serviço é registrado no momento do agendamento — mesmo que você altere o preço depois, o histórico fica preservado.</p></div></li>
+      <li><div class="step-num">5</div><div class="step-body"><strong>Salve</strong><p>O agendamento aparece na agenda e fica disponível para o profissional responsável.</p></div></li>
+    </ul>
+
+    <div class="info-box tip"><strong>O que é "snapshot de preço"?</strong> Quando você salva um agendamento, o sistema guarda o preço dos serviços naquele exato momento. Assim, se você aumentar o preço de um serviço depois, os relatórios financeiros de meses anteriores continuam corretos e não são afetados.</div>
+
+    <h3>Status de um agendamento</h3>
+    <table>
+      <thead><tr><th>Status</th><th>Significa</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge-plan">Agendado</span></td><td>Cliente confirmado, aguardando a data</td></tr>
+        <tr><td><span class="badge-yes">Concluído</span></td><td>Atendimento realizado com sucesso</td></tr>
+        <tr><td><span class="badge-no">Cancelado</span></td><td>Agendamento cancelado pelo cliente ou pela empresa</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══ 8. CLIENTES ═══ -->
+  <section id="clientes">
+    <h2><span class="section-num">8</span> Clientes</h2>
+
+    <p>O cadastro de clientes guarda todas as informações de quem usa seus serviços. Cada cliente é vinculado à sua empresa — outra empresa no sistema não tem acesso aos seus clientes.</p>
+
+    <h3>O que é possível cadastrar</h3>
+    <div class="card">
+      <table style="margin:0">
+        <thead><tr><th>Campo</th><th>O que é</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Nome</strong></td><td>Nome completo do cliente</td></tr>
+          <tr><td><strong>Telefone</strong></td><td>Número para contato e lembretes</td></tr>
+          <tr><td><strong>E-mail</strong></td><td>Endereço de e-mail do cliente</td></tr>
+          <tr><td><strong>Campos personalizados</strong></td><td>Qualquer informação extra que sua empresa precise (ex: número do CPF, nome do pet, placa do veículo)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Histórico do cliente</h3>
+    <p>Ao abrir o cadastro de um cliente, você vê todo o histórico de agendamentos dele na sua empresa: quais serviços realizou, quando, com qual profissional e quanto pagou. Isso ajuda a identificar clientes fiéis e frequência de retorno.</p>
+  </section>
+
+  <!-- ═══ 9. SERVIÇOS ═══ -->
+  <section id="servicos">
+    <h2><span class="section-num">9</span> Serviços</h2>
+
+    <p>Os serviços são o que sua empresa oferece: corte de cabelo, consulta médica, troca de óleo, banho e tosa, etc. Cada serviço tem um preço e uma duração estimada.</p>
+
+    <h3>Como cadastrar um serviço</h3>
+    <ul class="steps">
+      <li><div class="step-num">1</div><div class="step-body"><strong>Acesse "Serviços" no menu</strong><p>Clique em "Novo serviço".</p></div></li>
+      <li><div class="step-num">2</div><div class="step-body"><strong>Preencha nome e preço</strong><p>Dê um nome claro para o serviço e defina o valor cobrado.</p></div></li>
+      <li><div class="step-num">3</div><div class="step-body"><strong>Defina a duração estimada</strong><p>Em minutos. Isso ajuda na organização da agenda.</p></div></li>
+      <li><div class="step-num">4</div><div class="step-body"><strong>Adicione campos personalizados se precisar</strong><p>Por exemplo, uma clínica pode querer registrar se o serviço é "presencial" ou "telemedicina".</p></div></li>
+    </ul>
+
+    <div class="info-box tip"><strong>Dica:</strong> Você pode alterar o preço de um serviço a qualquer momento. Os agendamentos já realizados continuam com o preço original registrado — o histórico financeiro não é afetado.</div>
+  </section>
+
+  <!-- ═══ 10. PROFISSIONAIS ═══ -->
+  <section id="profissionais">
+    <h2><span class="section-num">10</span> Profissionais</h2>
+
+    <p>Os profissionais são as pessoas da sua equipe que realizam os atendimentos: médicos, cabeleireiros, mecânicos, etc. Cada agendamento é vinculado a um profissional específico.</p>
+
+    <h3>O que você pode gerenciar</h3>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title"><div class="icon icon-purple">👤</div> Cadastro</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0">Nome, informações de contato e campos personalizados (especialidade, CRM, etc.)</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><div class="icon icon-teal">📋</div> Agenda</div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0">Veja todos os agendamentos de um profissional específico e gerencie a disponibilidade</p>
+      </div>
+    </div>
+
+    <p>Quando um agendamento é criado, o sistema verifica automaticamente se aquele profissional já tem um atendimento no mesmo horário — se tiver, alerta antes de confirmar.</p>
+  </section>
+
+  <!-- ═══ 11. PÁGINA PÚBLICA ═══ -->
+  <section id="pagina-publica">
+    <h2><span class="section-num">11</span> Página pública de agendamento <span class="badge-plan">Plano Pro e Max</span></h2>
+
+    <p>Com o plano Pro ou Max, sua empresa ganha uma <strong>página própria na internet</strong> onde seus clientes podem agendar serviços sozinhos, sem precisar ligar ou mandar mensagem.</p>
+
+    <h3>Como funciona para o cliente</h3>
+    <ul class="steps">
+      <li><div class="step-num">1</div><div class="step-body"><strong>Cliente acessa o link da sua empresa</strong><p>A URL segue o formato: <code>seu-dominio.com/book/nome-da-sua-empresa</code></p></div></li>
+      <li><div class="step-num">2</div><div class="step-body"><strong>Escolhe o serviço desejado</strong><p>Vê a lista de serviços disponíveis com preços e duração.</p></div></li>
+      <li><div class="step-num">3</div><div class="step-body"><strong>Escolhe data e horário</strong><p>Só aparece horários que estão realmente disponíveis — o sistema verifica em tempo real.</p></div></li>
+      <li><div class="step-num">4</div><div class="step-body"><strong>Preenche os dados e confirma</strong><p>Nome, telefone e qualquer campo extra que você tiver configurado.</p></div></li>
+      <li><div class="step-num">5</div><div class="step-body"><strong>Agendamento aparece no seu painel</strong><p>Você recebe o novo agendamento automaticamente, sem precisar fazer nada.</p></div></li>
+    </ul>
+
+    <div class="info-box ok"><strong>Benefício:</strong> Clientes podem agendar a qualquer hora do dia, inclusive fora do seu horário de trabalho. Isso reduz o trabalho de recepção e aumenta o número de agendamentos.</div>
+  </section>
+
+  <!-- ═══ 12. FINANCEIRO ═══ -->
+  <section id="financeiro">
+    <h2><span class="section-num">12</span> Módulo financeiro <span class="badge-max">Plano Max</span></h2>
+
+    <p>O módulo financeiro é o centro de controle do dinheiro da sua empresa. Ele mostra para onde vai cada centavo e ajuda a tomar decisões melhores.</p>
+
+    <h3>O que você vê no módulo financeiro</h3>
+    <div class="card">
+      <table style="margin:0">
+        <thead><tr><th>Relatório</th><th>O que mostra</th></tr></thead>
+        <tbody>
+          <tr><td><strong>DRE (Demonstração de Resultado)</strong></td><td>Receita total menos despesas = lucro real do período</td></tr>
+          <tr><td><strong>Receita por mês</strong></td><td>Quanto sua empresa faturou em cada mês, em gráfico</td></tr>
+          <tr><td><strong>Receita por serviço</strong></td><td>Quais serviços geram mais dinheiro</td></tr>
+          <tr><td><strong>Ticket médio</strong></td><td>Valor médio gasto por atendimento</td></tr>
+          <tr><td><strong>Clientes fiéis</strong></td><td>Lista de clientes que mais retornam e quanto gastam</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Como registrar uma receita ou despesa</h3>
+    <ul class="steps">
+      <li><div class="step-num">1</div><div class="step-body"><strong>Acesse "Financeiro" no menu</strong><p>Disponível apenas no plano Max.</p></div></li>
+      <li><div class="step-num">2</div><div class="step-body"><strong>Clique em "Nova entrada"</strong><p>Escolha se é uma <strong>receita</strong> (dinheiro que entrou) ou <strong>despesa</strong> (dinheiro que saiu).</p></div></li>
+      <li><div class="step-num">3</div><div class="step-body"><strong>Preencha o valor e a descrição</strong><p>Ex: "Aluguel do espaço" como despesa, ou o sistema pode registrar automaticamente a partir dos agendamentos concluídos.</p></div></li>
+    </ul>
+
+    <div class="info-box tip"><strong>Automatismo:</strong> Quando um agendamento é marcado como "Concluído", o valor dos serviços já pode ser contabilizado automaticamente como receita, sem precisar registrar manualmente.</div>
+  </section>
+
+  <!-- ═══ 13. CHECKLISTS ═══ -->
+  <section id="checklists">
+    <h2><span class="section-num">13</span> Checklists de atendimento <span class="badge-max">Plano Max</span></h2>
+
+    <p>Os checklists permitem criar listas de etapas que devem ser seguidas durante um atendimento. É como um roteiro de serviço que garante qualidade e rastreabilidade.</p>
+
+    <h3>Exemplo de uso: Oficina mecânica</h3>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">Checklist: Revisão de 10.000 km</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="color:var(--green);font-size:16px">☑</span> Troca de óleo do motor</div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="color:var(--green);font-size:16px">☑</span> Verificação de filtros</div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="color:var(--green);font-size:16px">☑</span> Calibragem dos pneus</div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="color:var(--gray);font-size:16px">☐</span> Teste de freios</div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="color:var(--gray);font-size:16px">☐</span> Verificação de fluidos</div>
+      </div>
+    </div>
+
+    <h3>Como criar um checklist</h3>
+    <ul class="steps">
+      <li><div class="step-num">1</div><div class="step-body"><strong>Acesse "Checklists" no menu</strong><p>Clique em "Novo checklist".</p></div></li>
+      <li><div class="step-num">2</div><div class="step-body"><strong>Dê um título ao checklist</strong><p>Ex: "Revisão completa" ou "Consulta de retorno".</p></div></li>
+      <li><div class="step-num">3</div><div class="step-body"><strong>Adicione os itens</strong><p>Cada item é uma etapa do atendimento que precisa ser realizada e confirmada.</p></div></li>
+      <li><div class="step-num">4</div><div class="step-body"><strong>Vincule ao agendamento</strong><p>Quando o profissional abre um agendamento, ele vê o checklist e vai marcando cada etapa concluída.</p></div></li>
+    </ul>
+
+    <div class="info-box ok"><strong>Benefício:</strong> O histórico do checklist fica salvo junto ao agendamento. Você pode ver depois exatamente o que foi feito em cada atendimento, quando e por quem.</div>
+  </section>
+
+  <!-- ═══ 14. NOTAS FISCAIS ═══ -->
+  <section id="notas-fiscais">
+    <h2><span class="section-num">14</span> Notas fiscais <span class="badge-max">Plano Max</span></h2>
+
+    <p>O módulo de notas fiscais gerencia o fluxo de solicitação e emissão de NFs vinculadas aos atendimentos.</p>
+
+    <h3>Como funciona o fluxo</h3>
+    <div class="flow" style="flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="flow-step" style="min-width:auto;flex:none;padding:10px 16px">1. Cliente solicita NF</div>
+        <span style="color:var(--purple-mid);font-size:20px">→</span>
+        <div class="flow-step" style="min-width:auto;flex:none;padding:10px 16px">2. Nota criada como "Pendente"</div>
+        <span style="color:var(--purple-mid);font-size:20px">→</span>
+        <div class="flow-step" style="min-width:auto;flex:none;padding:10px 16px">3. Admin revisa e aprova</div>
+        <span style="color:var(--purple-mid);font-size:20px">→</span>
+        <div class="flow-step" style="min-width:auto;flex:none;padding:10px 16px">4. NF emitida</div>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Status da NF</th><th>Significa</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge-plan">Pendente</span></td><td>Solicitação recebida, aguardando revisão do administrador</td></tr>
+        <tr><td><span class="badge-yes">Emitida</span></td><td>Nota aprovada e emitida com sucesso</td></tr>
+        <tr><td><span class="badge-no">Rejeitada</span></td><td>Administrador recusou a emissão (com justificativa)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box tip"><strong>Auditoria:</strong> Toda ação sobre uma nota fiscal (aprovação, rejeição, emissão) é registrada automaticamente com data, hora, IP e o usuário responsável. Isso garante rastreabilidade total.</div>
+  </section>
+
+  <!-- ═══ 15. CAMPOS PERSONALIZADOS ═══ -->
+  <section id="campos-customizados">
+    <h2><span class="section-num">15</span> Campos personalizados</h2>
+
+    <p>Cada negócio tem informações únicas que precisa registrar. Os campos personalizados permitem adicionar novos campos em qualquer cadastro do sistema — sem precisar de um programador.</p>
+
+    <h3>Onde é possível adicionar campos</h3>
+    <div class="grid2">
+      <div class="card"><div class="card-title"><div class="icon icon-purple">👤</div> Clientes</div><p style="font-size:13px;color:var(--text-muted);margin:0">Ex: CPF, data de nascimento, convênio médico, nome do pet, placa do carro</p></div>
+      <div class="card"><div class="card-title"><div class="icon icon-teal">🛠</div> Serviços</div><p style="font-size:13px;color:var(--text-muted);margin:0">Ex: categoria do serviço, se é presencial ou online, equipamento utilizado</p></div>
+      <div class="card"><div class="card-title"><div class="icon icon-blue">📅</div> Agendamentos</div><p style="font-size:13px;color:var(--text-muted);margin:0">Ex: forma de pagamento, observações do atendimento, número do pedido</p></div>
+      <div class="card"><div class="card-title"><div class="icon icon-amber">👥</div> Profissionais</div><p style="font-size:13px;color:var(--text-muted);margin:0">Ex: especialidade, número do CRM/CREA, turno de trabalho</p></div>
+    </div>
+
+    <h3>Tipos de campo disponíveis</h3>
+    <table>
+      <thead><tr><th>Tipo</th><th>Quando usar</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Texto</strong></td><td>Para qualquer informação em formato livre (observações, nomes, etc.)</td></tr>
+        <tr><td><strong>Número</strong></td><td>Para valores numéricos (idade, quantidade, etc.)</td></tr>
+        <tr><td><strong>Data</strong></td><td>Para datas (nascimento, validade, etc.)</td></tr>
+        <tr><td><strong>Sim/Não</strong></td><td>Para perguntas com resposta binária (tem convênio? É retorno?)</td></tr>
+        <tr><td><strong>Lista de opções</strong></td><td>Para escolher entre opções fixas (tipo sanguíneo, marca do carro, etc.)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══ 16. SEGURANÇA ═══ -->
+  <section id="seguranca">
+    <h2><span class="section-num">16</span> Como seus dados são protegidos</h2>
+
+    <p>O AgendaFlex foi construído com segurança como prioridade desde o início. Aqui está, de forma simples, como cada camada de proteção funciona:</p>
+
+    <div class="card">
+      <div class="card-title"><div class="icon icon-purple">🔐</div> Isolamento de dados por empresa</div>
+      <p style="font-size:13px;color:var(--text-muted);margin:0">Cada empresa tem seus próprios dados completamente separados. É como se cada negócio tivesse um cofre próprio — uma empresa jamais consegue ver os dados de outra, mesmo estando no mesmo sistema.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="icon icon-teal">🎫</div> Login seguro com token</div>
+      <p style="font-size:13px;color:var(--text-muted);margin:0">Quando você faz login, o sistema emite um token criptografado (JWT). Esse token carrega sua identidade e os dados da sua empresa de forma segura. Sua senha nunca é enviada em nenhuma requisição após o login.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="icon icon-blue">🛡</div> Senhas criptografadas</div>
+      <p style="font-size:13px;color:var(--text-muted);margin:0">As senhas nunca são armazenadas em texto claro. O sistema usa bcrypt, que transforma sua senha em um código irreversível. Nem os próprios desenvolvedores conseguem saber sua senha.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><div class="icon icon-amber">⚡</div> Proteção contra ataques</div>
+      <p style="font-size:13px;color:var(--text-muted);margin:0">O sistema tem proteções contra CSRF (tentativas de ação forçada) e Rate Limiting (bloqueio de tentativas repetidas de invasão).</p>
+    </div>
+
+    <div class="info-box ok"><strong>Conformidade com LGPD:</strong> O AgendaFlex foi construído respeitando a Lei Geral de Proteção de Dados. Os dados dos seus clientes pertencem à sua empresa e são tratados com sigilo.</div>
+  </section>
+
+  <!-- ═══ 17. AUDITORIA ═══ -->
+  <section id="auditoria">
+    <h2><span class="section-num">17</span> Auditoria — quem fez o quê</h2>
+
+    <p>O sistema registra automaticamente um log detalhado de todas as ações importantes realizadas no sistema. Isso serve para rastrear, investigar e garantir responsabilidade.</p>
+
+    <h3>O que é registrado em cada ação</h3>
+    <div class="card">
+      <table style="margin:0">
+        <thead><tr><th>Informação</th><th>O que é</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Quem</strong></td><td>Qual usuário realizou a ação</td></tr>
+          <tr><td><strong>O quê</strong></td><td>Qual ação foi realizada (criou, editou, excluiu, aprovou, etc.)</td></tr>
+          <tr><td><strong>Quando</strong></td><td>Data e hora exata da ação</td></tr>
+          <tr><td><strong>De onde</strong></td><td>Endereço de IP e navegador usado</td></tr>
+          <tr><td><strong>Em qual empresa</strong></td><td>Qual empresa (tenant) originou a ação</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Esse histórico não pode ser apagado por usuários comuns, garantindo que ações maliciosas ou erros possam ser investigados.</p>
+  </section>
+
+  <!-- ═══ 18. PAPÉIS ═══ -->
+  <section id="papeis">
+    <h2><span class="section-num">18</span> Papéis de usuário</h2>
+
+    <p>O sistema distingue entre diferentes tipos de usuário, cada um com permissões diferentes:</p>
+
+    <table>
+      <thead><tr><th>Papel</th><th>Quem é</th><th>O que pode fazer</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge-no">Super Admin</span></td>
+          <td>Administrador da plataforma AgendaFlex</td>
+          <td>Acessa e gerencia todas as empresas cadastradas. Usado pela equipe de suporte do sistema.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-plan">Admin</span></td>
+          <td>Dono ou gerente da empresa</td>
+          <td>Gerencia tudo dentro da sua própria empresa: clientes, serviços, profissionais, agendamentos, financeiro e configurações.</td>
+        </tr>
+        <tr>
+          <td><span class="badge-yes">Profissional</span></td>
+          <td>Membro da equipe que realiza atendimentos</td>
+          <td>Vê os próprios agendamentos, marca etapas de checklists e registra observações. Não acessa configurações nem financeiro.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══ 19. ENTIDADES ═══ -->
+  <section id="entidades">
+    <h2><span class="section-num">19</span> Entidades do sistema</h2>
+
+    <p>Estas são as peças que compõem o banco de dados do AgendaFlex. Cada "entidade" é uma tabela que guarda um tipo de informação:</p>
+
+    <div class="entity-grid">
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--purple-light);color:var(--purple)">Plan</div>
+        <div class="entity-body"><span>Define os planos SaaS</span><span>Starter, Pro ou Max</span><span>Controla quais features cada empresa pode usar</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--teal-light);color:var(--teal)">Company</div>
+        <div class="entity-body"><span>Representa uma empresa</span><span>Tem um slug único (URL pública)</span><span>Vinculada a um plano</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--blue-light);color:var(--blue)">User</div>
+        <div class="entity-body"><span>Usuário do sistema</span><span>Tem e-mail, senha e papel</span><span>Sempre vinculado a uma empresa</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--purple-light);color:var(--purple)">Customer</div>
+        <div class="entity-body"><span>Cliente da empresa</span><span>Nome, telefone, e-mail</span><span>Histórico de agendamentos</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--teal-light);color:var(--teal)">Service</div>
+        <div class="entity-body"><span>Serviço oferecido</span><span>Nome, preço, duração</span><span>Pode ter campos personalizados</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--blue-light);color:var(--blue)">Professional</div>
+        <div class="entity-body"><span>Membro da equipe</span><span>Vinculado a agendamentos</span><span>Pode ter campos personalizados</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--amber-light);color:var(--amber)">Appointment</div>
+        <div class="entity-body"><span>O agendamento em si</span><span>Data, hora, status</span><span>Liga cliente + profissional</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--amber-light);color:var(--amber)">AppointmentService</div>
+        <div class="entity-body"><span>Serviços de um agendamento</span><span>Guarda o preço snapshot</span><span>Preserva histórico financeiro</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--green-light);color:var(--green)">Checklist</div>
+        <div class="entity-body"><span>Lista de etapas</span><span>Definida pelo admin</span><span>Vinculada a agendamentos</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--green-light);color:var(--green)">ChecklistItem</div>
+        <div class="entity-body"><span>Cada etapa do checklist</span><span>Pode ser marcada como feita</span><span>Vinculada ao agendamento</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--blue-light);color:var(--blue)">Invoice</div>
+        <div class="entity-body"><span>Nota fiscal</span><span>Status: pendente/emitida</span><span>Vinculada a agendamento</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--amber-light);color:var(--amber)">CashEntry</div>
+        <div class="entity-body"><span>Entrada ou saída financeira</span><span>Usado no módulo DRE</span><span>Vinculada à empresa</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--purple-light);color:var(--purple)">CustomField</div>
+        <div class="entity-body"><span>Campo personalizado</span><span>Configurado pelo admin</span><span>Aplicável a qualquer entidade</span></div>
+      </div>
+      <div class="entity-card">
+        <div class="entity-head" style="background:var(--red-light);color:var(--red)">AuditLog</div>
+        <div class="entity-body"><span>Registro de auditoria</span><span>Quem fez, o quê, quando</span><span>IP e User-Agent incluídos</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 20. GLOSSÁRIO ═══ -->
+  <section id="glossario">
+    <h2><span class="section-num">20</span> Glossário — termos do sistema explicados</h2>
+
+    <div class="gloss-item">
+      <div class="gloss-term">SaaS (Software como Serviço)</div>
+      <div class="gloss-def">Um sistema que roda na internet e é usado por várias empresas ao mesmo tempo, como se cada uma tivesse seu próprio espaço separado. Você acessa pelo navegador, sem instalar nada.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">Multi-tenant</div>
+      <div class="gloss-def">Significa que várias empresas (tenants = inquilinos) usam o mesmo sistema, mas cada uma vê apenas seus próprios dados. É como um prédio de apartamentos: cada morador tem sua chave e vê só o seu apartamento.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">Tenant</div>
+      <div class="gloss-def">Cada empresa cadastrada no sistema. O Salão Bella é um tenant. A Clínica Vida é outro tenant. Cada um tem seus dados completamente isolados.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">JWT (Token de sessão)</div>
+      <div class="gloss-def">Um código criptografado que o sistema emite após o login. Ele funciona como um crachá digital — prova quem você é e a qual empresa pertence em cada requisição feita ao sistema.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">Plan Guard</div>
+      <div class="gloss-def">O "porteiro" do sistema. Antes de deixar você usar uma funcionalidade, ele verifica se o plano da sua empresa inclui aquele recurso. Se não incluir, bloqueia com uma mensagem clara.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">Snapshot de preço</div>
+      <div class="gloss-def">Cópia do preço de um serviço no momento em que o agendamento foi criado. Isso garante que, se você mudar o preço depois, os agendamentos antigos continuem com o valor correto nos relatórios.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">RBAC (Controle de acesso por papel)</div>
+      <div class="gloss-def">Sistema de permissões onde cada usuário tem um papel (Admin, Profissional, Super Admin) e cada papel tem acesso a um conjunto específico de funcionalidades.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">DRE (Demonstração de Resultado do Exercício)</div>
+      <div class="gloss-def">Relatório financeiro que mostra o resultado do negócio: quanto entrou de receita, quanto saiu de despesa e qual foi o lucro em um período.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">LGPD (Lei Geral de Proteção de Dados)</div>
+      <div class="gloss-def">Lei brasileira que regula como os dados pessoais de clientes podem ser coletados, armazenados e usados. O AgendaFlex foi construído para respeitar essa lei.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">Slug</div>
+      <div class="gloss-def">A parte do endereço (URL) que identifica sua empresa na página pública de agendamento. Ex: <code>/book/salao-bella</code> — "salao-bella" é o slug.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">Seed</div>
+      <div class="gloss-def">Processo que popula o banco de dados com dados iniciais de exemplo (planos, empresas de teste, usuários). Roda com o comando <code>npm run db:seed</code>.</div>
+    </div>
+    <div class="gloss-item">
+      <div class="gloss-term">ORM (Mapeador de Objeto-Relacional)</div>
+      <div class="gloss-def">Ferramenta (Prisma, neste caso) que permite ao código conversar com o banco de dados de forma segura e organizada, sem escrever comandos SQL diretamente.</div>
+    </div>
+
+    <div style="margin-top:40px;padding:24px;border-radius:var(--radius);background:var(--gray-light);border:1px solid var(--gray-border);text-align:center">
+      <p style="font-size:13px;color:var(--text-muted);margin:0">Documentação gerada com base no repositório <strong>github.com/ReachM/agendaflex</strong> · v0.1.0</p>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<script>
+  const links = document.querySelectorAll('nav a');
+  const sections = document.querySelectorAll('section[id], .hero');
+
+  function setActive() {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 80) current = s.id || 'hero';
+    });
+    links.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  }
+
+  window.addEventListener('scroll', setActive);
+  setActive();
+</script>
+
+</body>
+</html>
