@@ -2,10 +2,13 @@ import { AppointmentStatus } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ApiError, created, handleApiError, ok } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { buildAppointmentInfo, notifyCustomerAboutAppointment } from "@/lib/services/notifications";
+import crypto from "crypto";
 
 /**
  * Public booking page — no authentication required.
- * GET: Returns company info, services, professionals, available slots.
+ * GET: Returns company info, services, professionals, available slots, booking settings.
  * POST: Creates a booking request from the client.
  */
 
@@ -32,6 +35,13 @@ export async function GET(
       throw new ApiError(404, "Página de agendamento não encontrada ou desativada.");
     }
 
+    // Load booking settings
+    const settings = await prisma.publicBookingSettings.findUnique({
+      where: { companyId: company.id }
+    });
+
+    const isHealthSegment = ["CLINICA_MEDICA", "CONSULTORIO"].includes(company.segment);
+
     const [services, professionals, publicFields] = await Promise.all([
       prisma.service.findMany({
         where: { companyId: company.id, isActive: true, isPublic: true },
@@ -39,7 +49,7 @@ export async function GET(
         orderBy: { name: "asc" }
       }),
       prisma.professional.findMany({
-        where: { companyId: company.id, isActive: true },
+        where: { companyId: company.id, isActive: true, isPublic: true },
         select: { id: true, name: true, specialty: true },
         orderBy: { name: "asc" }
       }),
@@ -54,11 +64,21 @@ export async function GET(
       company: {
         name: company.name,
         tradeName: company.tradeName,
-        segment: company.segment
+        segment: company.segment,
+        isHealthSegment
       },
       services,
       professionals,
-      publicFields
+      publicFields,
+      settings: {
+        allowChooseProfessional: settings?.allowChooseProfessional ?? true,
+        minNoticeHours: settings?.minNoticeHours ?? 1,
+        maxDaysAhead: settings?.maxDaysAhead ?? 30,
+        slotIntervalMinutes: settings?.slotIntervalMinutes ?? 30,
+        instructions: settings?.instructions ?? null,
+        confirmationMessage: settings?.confirmationMessage ?? null,
+        requireManualApproval: settings?.requireManualApproval ?? false
+      }
     });
   } catch (error) {
     return handleApiError(error);
@@ -71,9 +91,14 @@ export async function POST(
 ) {
   try {
     const { slug } = await params;
+
+    // Rate limit by IP
+    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown";
+    rateLimit(`public_booking:${ip}`, 10, 60 * 1000); // 10 bookings per minute per IP
+
     const company = await prisma.company.findUnique({
       where: { slug },
-      select: { id: true, status: true, publicBookingEnabled: true, autoConfirmBooking: true }
+      select: { id: true, name: true, tradeName: true, segment: true, status: true, publicBookingEnabled: true, autoConfirmBooking: true }
     });
 
     if (!company || company.status !== "ACTIVE" || !company.publicBookingEnabled) {
@@ -81,14 +106,33 @@ export async function POST(
     }
 
     const body = await request.json();
-    if (!body.name || !body.phone || !body.serviceId || !body.professionalId || !body.startAt || !body.endAt) {
+
+    // Sanitize inputs
+    const name = typeof body.name === "string" ? body.name.trim().slice(0, 200) : "";
+    const phone = typeof body.phone === "string" ? body.phone.trim().slice(0, 30) : "";
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 255) : "";
+    const notes = typeof body.notes === "string" ? body.notes.trim().slice(0, 2000) : "";
+    const cpf = typeof body.cpf === "string" ? body.cpf.trim().slice(0, 20) : "";
+    const lgpdAccepted = body.lgpdAccepted === true;
+
+    // Health-specific fields
+    const healthInsurance = typeof body.healthInsurance === "string" ? body.healthInsurance.trim().slice(0, 200) : "";
+    const healthInsuranceNumber = typeof body.healthInsuranceNumber === "string" ? body.healthInsuranceNumber.trim().slice(0, 100) : "";
+    const allergies = typeof body.allergies === "string" ? body.allergies.trim().slice(0, 1000) : "";
+    const requiredCare = typeof body.requiredCare === "string" ? body.requiredCare.trim().slice(0, 1000) : "";
+
+    if (!name || !phone || !body.serviceId || !body.professionalId || !body.startAt || !body.endAt) {
       throw new ApiError(422, "Campos obrigatórios: nome, telefone, serviço, profissional, data/horário.");
+    }
+
+    if (!lgpdAccepted) {
+      throw new ApiError(422, "Você precisa aceitar a política de privacidade para continuar.");
     }
 
     // Validate service and professional belong to this company
     const [service, professional] = await Promise.all([
       prisma.service.findFirst({ where: { id: body.serviceId, companyId: company.id, isActive: true, isPublic: true } }),
-      prisma.professional.findFirst({ where: { id: body.professionalId, companyId: company.id, isActive: true } })
+      prisma.professional.findFirst({ where: { id: body.professionalId, companyId: company.id, isActive: true, isPublic: true } })
     ]);
 
     if (!service) throw new ApiError(422, "Serviço indisponível.");
@@ -96,93 +140,175 @@ export async function POST(
 
     const startAt = new Date(body.startAt);
     const endAt = new Date(body.endAt);
+    const now = new Date();
 
-    // Check for scheduling conflicts
-    const conflict = await prisma.appointment.findFirst({
-      where: {
-        companyId: company.id,
-        professionalId: body.professionalId,
-        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
-        startAt: { lt: endAt },
-        endAt: { gt: startAt }
-      }
+    // Validate minimum notice
+    const settings = await prisma.publicBookingSettings.findUnique({
+      where: { companyId: company.id }
     });
-
-    if (conflict) {
-      throw new ApiError(409, "Horário indisponível. Por favor, escolha outro horário.");
+    const minNoticeMs = (settings?.minNoticeHours ?? 1) * 60 * 60 * 1000;
+    if (startAt.getTime() < now.getTime() + minNoticeMs) {
+      throw new ApiError(422, "O horário selecionado não respeita a antecedência mínima.");
     }
 
-    // Find or create customer
-    let customer = await prisma.customer.findFirst({
-      where: {
-        companyId: company.id,
-        OR: [
-          { phone: body.phone },
-          ...(body.email ? [{ email: body.email }] : [])
-        ],
-        deletedAt: null
-      }
-    });
+    // Validate max days ahead
+    const maxDaysMs = (settings?.maxDaysAhead ?? 30) * 24 * 60 * 60 * 1000;
+    if (startAt.getTime() > now.getTime() + maxDaysMs) {
+      throw new ApiError(422, "A data selecionada ultrapassa o limite de dias futuros.");
+    }
 
-    if (!customer) {
-      customer = await prisma.customer.create({
-        data: {
+    // Use a transactional approach to avoid race conditions
+    const result = await prisma.$transaction(async (tx) => {
+      // Check for scheduling conflicts inside transaction
+      const conflict = await tx.appointment.findFirst({
+        where: {
           companyId: company.id,
-          name: body.name,
-          phone: body.phone,
-          email: body.email || null,
-          notes: body.notes || null
+          professionalId: body.professionalId,
+          status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+          startAt: { lt: endAt },
+          endAt: { gt: startAt }
         }
       });
-    }
 
-    const status = company.autoConfirmBooking ? AppointmentStatus.CONFIRMED : AppointmentStatus.SCHEDULED;
+      if (conflict) {
+        throw new ApiError(409, "Esse horário acabou de ficar indisponível. Escolha outro horário.");
+      }
 
-    const appointment = await prisma.appointment.create({
-      data: {
-        companyId: company.id,
-        customerId: customer.id,
-        serviceId: service.id,
-        professionalId: professional.id,
-        startAt,
-        endAt,
-        status,
-        notes: body.notes || null,
-        bookedByClient: true,
-        appointmentServices: {
-          create: {
+      // Find or create customer
+      let customer = await tx.customer.findFirst({
+        where: {
+          companyId: company.id,
+          OR: [
+            { phone },
+            ...(email ? [{ email }] : [])
+          ],
+          deletedAt: null
+        }
+      });
+
+      const isHealthSegment = ["CLINICA_MEDICA", "CONSULTORIO"].includes(company.segment);
+
+      if (!customer) {
+        customer = await tx.customer.create({
+          data: {
             companyId: company.id,
-            serviceId: service.id,
-            serviceNameSnapshot: service.name,
-            unitPrice: service.basePrice,
-            totalPrice: service.basePrice
+            name,
+            phone,
+            whatsapp: phone,
+            email: email || null,
+            cpf: cpf || null,
+            notes: notes || null,
+            origin: "OUTRO",
+            ...(isHealthSegment ? {
+              healthInsurance: healthInsurance || null,
+              healthInsuranceNumber: healthInsuranceNumber || null,
+              allergies: allergies || null,
+              requiredCare: requiredCare || null
+            } : {})
+          }
+        });
+      } else {
+        // Update customer info if provided
+        await tx.customer.update({
+          where: { id: customer.id },
+          data: {
+            name,
+            ...(email ? { email } : {}),
+            ...(phone ? { whatsapp: phone } : {}),
+            ...(isHealthSegment && healthInsurance ? { healthInsurance } : {}),
+            ...(isHealthSegment && healthInsuranceNumber ? { healthInsuranceNumber } : {}),
+            ...(isHealthSegment && allergies ? { allergies } : {}),
+            ...(isHealthSegment && requiredCare ? { requiredCare } : {})
+          }
+        });
+      }
+
+      const useManualApproval = settings?.requireManualApproval ?? !company.autoConfirmBooking;
+      const appointmentStatus = useManualApproval ? AppointmentStatus.SCHEDULED : AppointmentStatus.CONFIRMED;
+      const approvalStatus = useManualApproval ? "PENDING" : "APPROVED";
+      const publicBookingToken = crypto.randomBytes(16).toString("hex");
+
+      const appointment = await tx.appointment.create({
+        data: {
+          companyId: company.id,
+          customerId: customer.id,
+          serviceId: service.id,
+          professionalId: professional.id,
+          startAt,
+          endAt,
+          status: appointmentStatus,
+          notes: notes || null,
+          bookedByClient: true,
+          source: "PUBLIC_LINK",
+          approvalStatus: approvalStatus as any,
+          publicBookingToken,
+          appointmentServices: {
+            create: {
+              companyId: company.id,
+              serviceId: service.id,
+              serviceNameSnapshot: service.name,
+              unitPrice: service.basePrice,
+              totalPrice: service.basePrice
+            }
           }
         }
-      }
+      });
+
+      return { appointment, customer, appointmentStatus };
     });
 
+    // Audit log (outside transaction)
     await prisma.auditLog.create({
       data: {
         companyId: company.id,
         action: "appointment.public_booking",
         entityType: "appointment",
-        entityId: appointment.id,
+        entityId: result.appointment.id,
         newValues: {
-          customerName: body.name,
+          customerName: name,
           service: service.name,
           professional: professional.name,
-          startAt: startAt.toISOString()
+          startAt: startAt.toISOString(),
+          source: "PUBLIC_LINK",
+          lgpdAccepted: true
         },
-        ipAddress: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null
+        ipAddress: ip
       }
     });
 
-    return created({
-      message: company.autoConfirmBooking
+    // Send notification (fire and forget)
+    const shouldNotify = settings?.sendEmailNotifications !== false;
+    if (shouldNotify && (email || result.customer.email)) {
+      const info = buildAppointmentInfo({
+        companyName: company.tradeName ?? company.name,
+        customerName: name,
+        serviceName: service.name,
+        professionalName: professional.name,
+        startAt,
+        status: result.appointmentStatus === "CONFIRMED" ? "Confirmado" : "Pendente"
+      });
+
+      notifyCustomerAboutAppointment({
+        companyId: company.id,
+        appointmentId: result.appointment.id,
+        customerId: result.customer.id,
+        customerEmail: email || result.customer.email,
+        type: "APPOINTMENT_CREATED",
+        info
+      });
+    }
+
+    const confirmationMessage = settings?.confirmationMessage ?? (
+      company.autoConfirmBooking
         ? "Agendamento confirmado com sucesso!"
-        : "Solicitação de agendamento enviada. Aguarde a confirmação.",
-      appointmentId: appointment.id,
-      status
+        : "Solicitação de agendamento enviada. Aguarde a confirmação."
+    );
+
+    return created({
+      message: confirmationMessage,
+      appointmentId: result.appointment.id,
+      status: result.appointmentStatus,
+      publicToken: result.appointment.publicBookingToken
     });
   } catch (error) {
     return handleApiError(error);

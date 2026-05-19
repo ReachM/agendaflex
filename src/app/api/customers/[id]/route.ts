@@ -33,6 +33,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 }
 
+/** Sensitive health fields that require audit logging when changed */
+const SENSITIVE_FIELDS = [
+  "healthInsurance", "healthInsuranceNumber", "bloodType", "allergies",
+  "medications", "preExistingConditions", "requiredCare", "clinicalNotes",
+  "emergencyContact", "emergencyPhone", "legalGuardian", "legalGuardianCpf"
+];
+
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     assertSameOrigin(request);
@@ -49,10 +56,37 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         name: body.name,
         email: body.email?.toLowerCase(),
         phone: body.phone,
+        whatsapp: body.whatsapp,
         cpf: body.cpf,
+        rg: body.rg,
         birthDate: body.birthDate === undefined ? undefined : birthDate(body.birthDate),
+        gender: body.gender,
         notes: body.notes,
-        status: body.status
+        status: body.status,
+        // Address
+        zipCode: body.zipCode,
+        address: body.address,
+        addressNumber: body.addressNumber,
+        neighborhood: body.neighborhood,
+        city: body.city,
+        state: body.state,
+        complement: body.complement,
+        // Health/Clinic
+        healthInsurance: body.healthInsurance,
+        healthInsuranceNumber: body.healthInsuranceNumber,
+        bloodType: body.bloodType,
+        allergies: body.allergies,
+        medications: body.medications,
+        preExistingConditions: body.preExistingConditions,
+        requiredCare: body.requiredCare,
+        clinicalNotes: body.clinicalNotes,
+        emergencyContact: body.emergencyContact,
+        emergencyPhone: body.emergencyPhone,
+        legalGuardian: body.legalGuardian,
+        legalGuardianCpf: body.legalGuardianCpf,
+        // Administrative
+        origin: body.origin,
+        internalNotes: body.internalNotes
       }
     });
 
@@ -64,12 +98,27 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       partial: true
     });
 
+    // Detect sensitive field changes for LGPD audit
+    const sensitiveChanges: string[] = [];
+    for (const field of SENSITIVE_FIELDS) {
+      const oldVal = (oldCustomer as Record<string, unknown>)[field];
+      const newVal = (body as Record<string, unknown>)[field];
+      if (newVal !== undefined && newVal !== oldVal) {
+        sensitiveChanges.push(field);
+      }
+    }
+
     await audit(request, auth, {
-      action: "customer.update",
+      action: sensitiveChanges.length > 0 ? "customer.update_sensitive" : "customer.update",
       entityType: "customer",
       entityId: customer.id,
-      oldValues: oldCustomer,
-      newValues: { ...customer, customValues: body.customValues ?? {} }
+      oldValues: { name: oldCustomer.name, email: oldCustomer.email },
+      newValues: {
+        name: customer.name,
+        email: customer.email,
+        ...(sensitiveChanges.length > 0 ? { sensitiveFieldsChanged: sensitiveChanges } : {}),
+        customValues: body.customValues ?? {}
+      }
     });
 
     const [withValues] = await attachCustomValues(auth.companyId, "CUSTOMER", [customer]);

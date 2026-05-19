@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { attachCustomValues, saveCustomFieldValues } from "@/lib/services/custom-field-values";
+import { buildAppointmentInfo, notifyCustomerAboutAppointment } from "@/lib/services/notifications";
 import { appointmentUpdateSchema } from "@/lib/validation/schemas";
 
 type RouteContext = {
@@ -211,6 +212,39 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       oldValues: oldAppointment,
       newValues: { ...appointment, customValues: body.customValues ?? {} }
     });
+
+    // Send notifications on status changes
+    if (body.status && body.status !== oldAppointment.status && appointment.customer?.email) {
+      const statusNotificationMap: Record<string, Parameters<typeof notifyCustomerAboutAppointment>[0]["type"]> = {
+        CONFIRMED: "APPOINTMENT_CONFIRMED",
+        IN_PROGRESS: "APPOINTMENT_STARTED",
+        COMPLETED: "APPOINTMENT_COMPLETED",
+        CANCELLED: "APPOINTMENT_CANCELED"
+      };
+      const notifType = statusNotificationMap[body.status];
+      if (notifType) {
+        const statusLabels: Record<string, string> = {
+          CONFIRMED: "Confirmado", IN_PROGRESS: "Em andamento",
+          COMPLETED: "Concluído", CANCELLED: "Cancelado"
+        };
+        const info = buildAppointmentInfo({
+          companyName: auth.company.tradeName ?? auth.company.name,
+          customerName: appointment.customer.name,
+          serviceName: appointment.service?.name ?? "Serviço",
+          professionalName: appointment.professional.name,
+          startAt: appointment.startAt,
+          status: statusLabels[body.status] ?? body.status
+        });
+        notifyCustomerAboutAppointment({
+          companyId: auth.companyId,
+          appointmentId: appointment.id,
+          customerId: appointment.customerId,
+          customerEmail: appointment.customer.email,
+          type: notifType,
+          info
+        });
+      }
+    }
 
     // Re-fetch with full includes
     const full = await prisma.appointment.findUnique({

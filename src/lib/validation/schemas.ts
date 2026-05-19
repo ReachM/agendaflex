@@ -58,10 +58,37 @@ export const customerCreateSchema = z.object({
   name: requiredString(180),
   email: optionalString(255),
   phone: optionalString(30),
+  whatsapp: optionalString(30),
   cpf: optionalString(30),
+  rg: optionalString(30),
   birthDate: optionalString(20),
+  gender: optionalString(30),
   notes: optionalString(5000),
   status: optionalString(50),
+  // Address
+  zipCode: optionalString(20),
+  address: optionalString(255),
+  addressNumber: optionalString(20),
+  neighborhood: optionalString(120),
+  city: optionalString(120),
+  state: optionalString(5),
+  complement: optionalString(255),
+  // Health/Clinic fields (LGPD-sensitive)
+  healthInsurance: optionalString(200),
+  healthInsuranceNumber: optionalString(100),
+  bloodType: optionalString(10),
+  allergies: optionalString(2000),
+  medications: optionalString(2000),
+  preExistingConditions: optionalString(2000),
+  requiredCare: optionalString(2000),
+  clinicalNotes: optionalString(5000),
+  emergencyContact: optionalString(180),
+  emergencyPhone: optionalString(30),
+  legalGuardian: optionalString(180),
+  legalGuardianCpf: optionalString(30),
+  // Administrative
+  origin: optionalString(50),
+  internalNotes: optionalString(5000),
   customValues
 });
 

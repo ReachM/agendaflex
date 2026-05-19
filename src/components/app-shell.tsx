@@ -12,6 +12,7 @@ import {
   FileClock,
   FileText,
   LayoutDashboard,
+  Link2,
   LogOut,
   Menu,
   Settings,
@@ -36,7 +37,7 @@ type Session = {
 const iconMap: Record<string, any> = {
   LayoutDashboard, CalendarDays, Users, ClipboardList, Briefcase,
   SlidersHorizontal, UserCog, DollarSign, FileText, CheckSquare,
-  Activity, FileClock, Settings, Building2, CreditCard
+  Activity, FileClock, Settings, Building2, CreditCard, Link2
 };
 
 const roleLabels: Record<string, string> = {

@@ -336,22 +336,46 @@ export function CustomerManager() {
   const [fields, setFields] = useState<CustomField[]>([]);
   const [customValues, setCustomValues] = useState<CustomValues>({});
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", phone: "", cpf: "", birthDate: "", notes: "" });
+  const [segment, setSegment] = useState<string>("");
+  const [formTab, setFormTab] = useState<"basic" | "address" | "health" | "notes">("basic");
+  const [form, setForm] = useState({
+    name: "", email: "", phone: "", whatsapp: "", cpf: "", rg: "",
+    birthDate: "", gender: "", notes: "",
+    zipCode: "", address: "", addressNumber: "", neighborhood: "", city: "", state: "", complement: "",
+    healthInsurance: "", healthInsuranceNumber: "", bloodType: "", allergies: "",
+    medications: "", preExistingConditions: "", requiredCare: "", clinicalNotes: "",
+    emergencyContact: "", emergencyPhone: "", legalGuardian: "", legalGuardianCpf: "",
+    origin: "", internalNotes: ""
+  });
 
   // ─── Editing state ─────────────────────────────────────────
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", cpf: "", birthDate: "", notes: "" });
+  const [editForm, setEditForm] = useState({ ...form });
   const [editCustomValues, setEditCustomValues] = useState<CustomValues>({});
   const [editError, setEditError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editTab, setEditTab] = useState<"basic" | "address" | "health" | "notes">("basic");
+
+  const isHealthSegment = ["CLINICA_MEDICA", "CONSULTORIO"].includes(segment);
+
+  function calculateAge(birthDate: string): string {
+    if (!birthDate) return "";
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return `${age} anos`;
+  }
 
   async function load() {
     const [customerData, fieldData] = await Promise.all([
-      apiFetch<{ customers: AnyRecord[] }>("/api/customers"),
+      apiFetch<{ customers: AnyRecord[]; segment?: string }>("/api/customers"),
       apiFetch<{ customFields: CustomField[] }>("/api/custom-fields?entityType=CUSTOMER")
     ]);
     setCustomers(customerData.customers);
     setFields(fieldData.customFields.filter((field) => field.isActive));
+    if (customerData.segment) setSegment(customerData.segment);
   }
 
   useEffect(() => {
@@ -366,8 +390,17 @@ export function CustomerManager() {
         method: "POST",
         body: JSON.stringify({ ...form, customValues })
       });
-      setForm({ name: "", email: "", phone: "", cpf: "", birthDate: "", notes: "" });
+      setForm({
+        name: "", email: "", phone: "", whatsapp: "", cpf: "", rg: "",
+        birthDate: "", gender: "", notes: "",
+        zipCode: "", address: "", addressNumber: "", neighborhood: "", city: "", state: "", complement: "",
+        healthInsurance: "", healthInsuranceNumber: "", bloodType: "", allergies: "",
+        medications: "", preExistingConditions: "", requiredCare: "", clinicalNotes: "",
+        emergencyContact: "", emergencyPhone: "", legalGuardian: "", legalGuardianCpf: "",
+        origin: "", internalNotes: ""
+      });
       setCustomValues({});
+      setFormTab("basic");
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -377,13 +410,38 @@ export function CustomerManager() {
   function openEdit(customer: AnyRecord) {
     setEditingId(customer.id);
     setEditError("");
+    setEditTab("basic");
     setEditForm({
       name: customer.name ?? "",
       email: customer.email ?? "",
       phone: customer.phone ?? "",
+      whatsapp: customer.whatsapp ?? "",
       cpf: customer.cpf ?? "",
+      rg: customer.rg ?? "",
       birthDate: customer.birthDate ? customer.birthDate.slice(0, 10) : "",
-      notes: customer.notes ?? ""
+      gender: customer.gender ?? "",
+      notes: customer.notes ?? "",
+      zipCode: customer.zipCode ?? "",
+      address: customer.address ?? "",
+      addressNumber: customer.addressNumber ?? "",
+      neighborhood: customer.neighborhood ?? "",
+      city: customer.city ?? "",
+      state: customer.state ?? "",
+      complement: customer.complement ?? "",
+      healthInsurance: customer.healthInsurance ?? "",
+      healthInsuranceNumber: customer.healthInsuranceNumber ?? "",
+      bloodType: customer.bloodType ?? "",
+      allergies: customer.allergies ?? "",
+      medications: customer.medications ?? "",
+      preExistingConditions: customer.preExistingConditions ?? "",
+      requiredCare: customer.requiredCare ?? "",
+      clinicalNotes: customer.clinicalNotes ?? "",
+      emergencyContact: customer.emergencyContact ?? "",
+      emergencyPhone: customer.emergencyPhone ?? "",
+      legalGuardian: customer.legalGuardian ?? "",
+      legalGuardianCpf: customer.legalGuardianCpf ?? "",
+      origin: customer.origin ?? "",
+      internalNotes: customer.internalNotes ?? ""
     });
     const cv: CustomValues = {};
     if (customer.customValues && typeof customer.customValues === "object") {
@@ -423,30 +481,126 @@ export function CustomerManager() {
     await load();
   }
 
+  const tabs: { key: string; label: string }[] = [
+    { key: "basic", label: "Dados básicos" },
+    { key: "address", label: "Endereço" },
+    ...(isHealthSegment ? [{ key: "health", label: "🩺 Saúde" }] : []),
+    { key: "notes", label: "Observações" }
+  ];
+
+  function renderFormFields(f: typeof form, setter: (v: typeof form) => void, currentTab: string) {
+    switch (currentTab) {
+      case "basic":
+        return (
+          <>
+            <Input label="Nome completo *" value={f.name} onChange={(name) => setter({ ...f, name })} required />
+            <Input label="E-mail" type="email" value={f.email} onChange={(email) => setter({ ...f, email })} />
+            <Input label="Telefone" value={f.phone} onChange={(phone) => setter({ ...f, phone })} />
+            <Input label="WhatsApp" value={f.whatsapp} onChange={(whatsapp) => setter({ ...f, whatsapp })} />
+            <Input label="CPF" value={f.cpf} onChange={(cpf) => setter({ ...f, cpf })} />
+            <Input label="RG" value={f.rg} onChange={(rg) => setter({ ...f, rg })} />
+            <Input label="Data de nascimento" type="date" value={f.birthDate} onChange={(birthDate) => setter({ ...f, birthDate })} />
+            {f.birthDate && <div className="field"><label>Idade</label><input readOnly value={calculateAge(f.birthDate)} tabIndex={-1} style={{ background: "var(--surface-alt)" }} /></div>}
+            <div className="field">
+              <label>Sexo</label>
+              <select value={f.gender} onChange={(e) => setter({ ...f, gender: e.target.value })}>
+                <option value="">Selecione</option>
+                <option value="M">Masculino</option>
+                <option value="F">Feminino</option>
+                <option value="O">Outro</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Origem</label>
+              <select value={f.origin} onChange={(e) => setter({ ...f, origin: e.target.value })}>
+                <option value="">Selecione</option>
+                <option value="INDICACAO">Indicação</option>
+                <option value="INSTAGRAM">Instagram</option>
+                <option value="GOOGLE">Google</option>
+                <option value="WHATSAPP">WhatsApp</option>
+                <option value="PRESENCIAL">Presencial</option>
+                <option value="OUTRO">Outro</option>
+              </select>
+            </div>
+          </>
+        );
+      case "address":
+        return (
+          <>
+            <Input label="CEP" value={f.zipCode} onChange={(zipCode) => setter({ ...f, zipCode })} />
+            <Input label="Endereço" value={f.address} onChange={(address) => setter({ ...f, address })} />
+            <Input label="Número" value={f.addressNumber} onChange={(addressNumber) => setter({ ...f, addressNumber })} />
+            <Input label="Bairro" value={f.neighborhood} onChange={(neighborhood) => setter({ ...f, neighborhood })} />
+            <Input label="Cidade" value={f.city} onChange={(city) => setter({ ...f, city })} />
+            <Input label="Estado" value={f.state} onChange={(state) => setter({ ...f, state })} />
+            <Input label="Complemento" value={f.complement} onChange={(complement) => setter({ ...f, complement })} />
+          </>
+        );
+      case "health":
+        return (
+          <>
+            <div className="field full" style={{ marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#fef3c7", color: "#92400e", borderRadius: "var(--radius)", fontSize: 13 }}>
+                🔒 Dados protegidos pela LGPD — acesso restrito.
+              </div>
+            </div>
+            <Input label="Convênio" value={f.healthInsurance} onChange={(healthInsurance) => setter({ ...f, healthInsurance })} />
+            <Input label="Nº Carteirinha" value={f.healthInsuranceNumber} onChange={(healthInsuranceNumber) => setter({ ...f, healthInsuranceNumber })} />
+            <div className="field">
+              <label>Tipo sanguíneo</label>
+              <select value={f.bloodType} onChange={(e) => setter({ ...f, bloodType: e.target.value })}>
+                <option value="">Selecione</option>
+                {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <TextArea label="Alergias" value={f.allergies} onChange={(allergies) => setter({ ...f, allergies })} />
+            <TextArea label="Medicamentos em uso" value={f.medications} onChange={(medications) => setter({ ...f, medications })} />
+            <TextArea label="Condições pré-existentes" value={f.preExistingConditions} onChange={(preExistingConditions) => setter({ ...f, preExistingConditions })} />
+            <TextArea label="Cuidados necessários" value={f.requiredCare} onChange={(requiredCare) => setter({ ...f, requiredCare })} />
+            <Input label="Contato de emergência" value={f.emergencyContact} onChange={(emergencyContact) => setter({ ...f, emergencyContact })} />
+            <Input label="Telefone de emergência" value={f.emergencyPhone} onChange={(emergencyPhone) => setter({ ...f, emergencyPhone })} />
+            <Input label="Responsável legal" value={f.legalGuardian} onChange={(legalGuardian) => setter({ ...f, legalGuardian })} />
+            <Input label="CPF do responsável" value={f.legalGuardianCpf} onChange={(legalGuardianCpf) => setter({ ...f, legalGuardianCpf })} />
+          </>
+        );
+      case "notes":
+        return (
+          <>
+            <TextArea label="Observações gerais" value={f.notes} onChange={(notes) => setter({ ...f, notes })} />
+            {isHealthSegment && <TextArea label="Observações clínicas" value={f.clinicalNotes} onChange={(clinicalNotes) => setter({ ...f, clinicalNotes })} />}
+            <TextArea label="Observações internas" value={f.internalNotes} onChange={(internalNotes) => setter({ ...f, internalNotes })} />
+          </>
+        );
+      default: return null;
+    }
+  }
+
   return (
     <>
-      <PageHeader title="Clientes" subtitle="Clientes finais, pacientes ou consumidores" />
+      <PageHeader title={isHealthSegment ? "Pacientes" : "Clientes"} subtitle={isHealthSegment ? "Cadastro de pacientes da clínica" : "Clientes finais, pacientes ou consumidores"} />
       <ErrorBox error={error} />
 
       {/* ─── Edit Modal ───────────────────────────────────── */}
       {editingId ? (
         <div className="modal-overlay" onClick={closeEdit}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
             <div className="toolbar" style={{ marginBottom: 16 }}>
-              <h2 className="section-title">Editar cliente</h2>
+              <h2 className="section-title">Editar {isHealthSegment ? "paciente" : "cliente"}</h2>
               <button className="icon-button secondary" onClick={closeEdit} type="button" title="Fechar">
                 <X size={16} />
               </button>
             </div>
             <ErrorBox error={editError} />
+            <div className="tabs" style={{ marginBottom: 16 }}>
+              {tabs.map((tab) => (
+                <button key={tab.key} className={`tab ${editTab === tab.key ? "active" : ""}`} type="button" onClick={() => setEditTab(tab.key as any)}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
             <form className="form-grid" onSubmit={submitEdit}>
-              <Input label="Nome" value={editForm.name} onChange={(name) => setEditForm({ ...editForm, name })} required />
-              <Input label="E-mail" type="email" value={editForm.email} onChange={(email) => setEditForm({ ...editForm, email })} />
-              <Input label="Telefone" value={editForm.phone} onChange={(phone) => setEditForm({ ...editForm, phone })} />
-              <Input label="CPF" value={editForm.cpf} onChange={(cpf) => setEditForm({ ...editForm, cpf })} />
-              <Input label="Nascimento" type="date" value={editForm.birthDate} onChange={(birthDate) => setEditForm({ ...editForm, birthDate })} />
-              <TextArea label="Observações" value={editForm.notes} onChange={(notes) => setEditForm({ ...editForm, notes })} />
-              <DynamicFields fields={fields} values={editCustomValues} onChange={setEditCustomValues} />
+              {renderFormFields(editForm, setEditForm, editTab)}
+              {editTab === "notes" && <DynamicFields fields={fields} values={editCustomValues} onChange={setEditCustomValues} />}
               <div className="field full" style={{ display: "flex", gap: 12 }}>
                 <button className="button" type="submit" disabled={saving}>
                   <Save size={16} />
@@ -462,19 +616,21 @@ export function CustomerManager() {
       ) : null}
 
       <section className="form-panel grid">
-        <h2 className="section-title">Novo cliente</h2>
+        <h2 className="section-title">Novo {isHealthSegment ? "paciente" : "cliente"}</h2>
+        <div className="tabs" style={{ marginBottom: 12 }}>
+          {tabs.map((tab) => (
+            <button key={tab.key} className={`tab ${formTab === tab.key ? "active" : ""}`} type="button" onClick={() => setFormTab(tab.key as any)}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
         <form className="form-grid" onSubmit={submit}>
-          <Input label="Nome" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
-          <Input label="E-mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} />
-          <Input label="Telefone" value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
-          <Input label="CPF" value={form.cpf} onChange={(cpf) => setForm({ ...form, cpf })} />
-          <Input label="Nascimento" type="date" value={form.birthDate} onChange={(birthDate) => setForm({ ...form, birthDate })} />
-          <TextArea label="Observações" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} />
-          <DynamicFields fields={fields} values={customValues} onChange={setCustomValues} />
+          {renderFormFields(form, setForm, formTab)}
+          {formTab === "notes" && <DynamicFields fields={fields} values={customValues} onChange={setCustomValues} />}
           <div className="field full">
             <button className="button" type="submit">
               <Save size={16} />
-              Salvar cliente
+              Salvar {isHealthSegment ? "paciente" : "cliente"}
             </button>
           </div>
         </form>
@@ -483,8 +639,9 @@ export function CustomerManager() {
         <table>
           <thead>
             <tr>
-              <th>Cliente</th>
+              <th>{isHealthSegment ? "Paciente" : "Cliente"}</th>
               <th>Contato</th>
+              {isHealthSegment && <th>Convênio</th>}
               <th>Status</th>
               <th>Campos</th>
               <th>Ações</th>
@@ -497,12 +654,14 @@ export function CustomerManager() {
                   <strong>{customer.name}</strong>
                   <br />
                   <span className="muted">{customer.cpf ?? "-"}</span>
+                  {customer.birthDate && <><br /><span className="muted" style={{ fontSize: 12 }}>{calculateAge(customer.birthDate.slice(0, 10))}</span></>}
                 </td>
                 <td>
                   {customer.email ?? "-"}
                   <br />
                   <span className="muted">{customer.phone ?? "-"}</span>
                 </td>
+                {isHealthSegment && <td><span className="muted">{customer.healthInsurance ?? "-"}</span></td>}
                 <td><span className={`badge ${customer.status === "active" ? "status-active" : "status-inactive"}`}>{customer.status === "active" ? "Ativo" : customer.status}</span></td>
                 <td>{summarizeCustomValues(customer.customValues)}</td>
                 <td>
@@ -1683,6 +1842,334 @@ export function SettingsView() {
           <StatCard label="Status" value={session?.company?.status ?? "-"} />
           <StatCard label="Segmento" value={session?.company?.segment ?? "-"} />
           <StatCard label="Plano" value={session?.company?.plan ?? "-"} />
+        </div>
+      </section>
+    </>
+  );
+}
+
+export function BookingSettingsManager() {
+  const [settings, setSettings] = useState<AnyRecord | null>(null);
+  const [services, setServices] = useState<AnyRecord[]>([]);
+  const [professionals, setProfessionals] = useState<AnyRecord[]>([]);
+  const [company, setCompany] = useState<AnyRecord | null>(null);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [session, setSession] = useState<AnyRecord | null>(null);
+
+  async function load() {
+    setError("");
+    try {
+      const [data, sessionData] = await Promise.all([
+        apiFetch<AnyRecord>("/api/booking-settings"),
+        apiFetch<AnyRecord>("/api/auth/me")
+      ]);
+      setSettings(data.settings);
+      setServices(data.services);
+      setProfessionals(data.professionals);
+      setCompany(data.company);
+      setSession(sessionData);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  const planSlug = session?.company?.plan ?? company?.plan ?? "starter";
+  const isStarter = planSlug === "starter";
+  const publicLink = settings?.publicSlug
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/agendar/${settings.publicSlug}`
+    : "";
+
+  async function save(updates: AnyRecord) {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await apiFetch<AnyRecord>("/api/booking-settings", {
+        method: "PATCH",
+        body: JSON.stringify(updates)
+      });
+      setSettings(res.settings);
+      setSuccess("Configurações salvas com sucesso!");
+      setTimeout(() => setSuccess(""), 3000);
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function copyLink() {
+    if (publicLink) {
+      navigator.clipboard.writeText(publicLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  if (isStarter) {
+    return (
+      <>
+        <PageHeader title="Link de Agenda" subtitle="Agendamento online para clientes" />
+        <section className="panel" style={{ textAlign: "center", padding: "60px 32px" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg, #818cf8, #6366f1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <CalendarPlus size={28} color="#fff" />
+          </div>
+          <h2 style={{ marginBottom: 8 }}>Agendamento online</h2>
+          <p style={{ color: "var(--muted)", marginBottom: 24, maxWidth: 440, margin: "0 auto 24px" }}>
+            Crie um link público para seus clientes agendarem online. Disponível nos planos Pro e Max.
+          </p>
+          <div style={{ padding: "12px 20px", background: "var(--surface-alt)", borderRadius: "var(--radius)", display: "inline-block", fontSize: 14, color: "var(--warning)" }}>
+            ⚡ Faça upgrade para o plano Pro ou Max para liberar essa funcionalidade.
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <PageHeader title="Link de Agenda" subtitle="Configure o agendamento online da sua empresa" />
+      <ErrorBox error={error} />
+      {success && <div className="success-box" style={{ padding: "12px 16px", background: "#dcfce7", color: "#166534", borderRadius: "var(--radius)", marginBottom: 16, fontSize: 14 }}>{success}</div>}
+
+      {/* Status & Link Card */}
+      <section className="panel" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 10, height: 10, borderRadius: "50%", background: settings?.enabled ? "#22c55e" : "#ef4444" }} />
+            <span style={{ fontWeight: 600 }}>
+              Agendamento online {settings?.enabled ? "ativo" : "inativo"}
+            </span>
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={settings?.enabled ?? false}
+              onChange={(e) => save({ enabled: e.target.checked })}
+              style={{ width: 18, height: 18 }}
+            />
+            {settings?.enabled ? "Desativar" : "Ativar"}
+          </label>
+        </div>
+
+        {settings?.enabled && (
+          <div style={{ background: "var(--surface-alt)", padding: "14px 16px", borderRadius: "var(--radius)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <input
+              type="text"
+              readOnly
+              value={publicLink}
+              style={{ flex: 1, minWidth: 200, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "8px 12px", fontSize: 13 }}
+            />
+            <button className="button" type="button" onClick={copyLink} style={{ minWidth: 120 }}>
+              {copied ? "✓ Copiado!" : "Copiar link"}
+            </button>
+            <a className="button secondary" href={publicLink} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+              Abrir ↗
+            </a>
+          </div>
+        )}
+      </section>
+
+      {/* Configuration Grid */}
+      <div className="grid cols-2" style={{ gap: 16 }}>
+        {/* Slug Configuration */}
+        <section className="panel">
+          <h2 className="section-title">Link personalizado</h2>
+          <div className="form-grid">
+            <div className="field full">
+              <label>Slug da empresa</label>
+              <input
+                type="text"
+                value={settings?.publicSlug ?? ""}
+                onChange={(e) => setSettings({ ...settings, publicSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                placeholder="sua-empresa"
+              />
+              <small style={{ color: "var(--muted)", marginTop: 4, display: "block" }}>
+                URL: /agendar/{settings?.publicSlug ?? "sua-empresa"}
+              </small>
+            </div>
+            <div className="field full">
+              <button className="button" type="button" onClick={() => save({ publicSlug: settings?.publicSlug })} disabled={saving}>
+                <Save size={16} /> Salvar slug
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Approval Settings */}
+        <section className="panel">
+          <h2 className="section-title">Aprovação</h2>
+          <div className="form-grid">
+            <div className="field full">
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={settings?.requireManualApproval ?? false}
+                  onChange={(e) => save({ requireManualApproval: e.target.checked })}
+                  style={{ width: 18, height: 18 }}
+                />
+                Exigir aprovação manual
+              </label>
+              <small style={{ color: "var(--muted)", marginTop: 4, display: "block" }}>
+                {settings?.requireManualApproval
+                  ? "Novos agendamentos ficam como pendentes até aprovação."
+                  : "Agendamentos são confirmados automaticamente."}
+              </small>
+            </div>
+            <div className="field full">
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={settings?.allowChooseProfessional ?? true}
+                  onChange={(e) => save({ allowChooseProfessional: e.target.checked })}
+                  style={{ width: 18, height: 18 }}
+                />
+                Cliente pode escolher o profissional
+              </label>
+            </div>
+            <div className="field full">
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={settings?.sendEmailNotifications ?? true}
+                  onChange={(e) => save({ sendEmailNotifications: e.target.checked })}
+                  style={{ width: 18, height: 18 }}
+                />
+                Enviar notificações por e-mail
+              </label>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Scheduling Rules */}
+      <section className="panel" style={{ marginTop: 16 }}>
+        <h2 className="section-title">Regras de horários</h2>
+        <div className="form-grid">
+          <div className="field">
+            <label>Intervalo entre horários (minutos)</label>
+            <select
+              value={settings?.slotIntervalMinutes ?? 30}
+              onChange={(e) => save({ slotIntervalMinutes: Number(e.target.value) })}
+            >
+              <option value={15}>15 minutos</option>
+              <option value={20}>20 minutos</option>
+              <option value={30}>30 minutos</option>
+              <option value={45}>45 minutos</option>
+              <option value={60}>60 minutos</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>Antecedência mínima (horas)</label>
+            <input
+              type="number"
+              min={0}
+              max={72}
+              value={settings?.minNoticeHours ?? 1}
+              onChange={(e) => save({ minNoticeHours: Number(e.target.value) })}
+            />
+          </div>
+          <div className="field">
+            <label>Limite de dias futuros</label>
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={settings?.maxDaysAhead ?? 30}
+              onChange={(e) => save({ maxDaysAhead: Number(e.target.value) })}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Services & Professionals */}
+      <div className="grid cols-2" style={{ marginTop: 16, gap: 16 }}>
+        <section className="panel">
+          <h2 className="section-title">Serviços no agendamento online</h2>
+          {services.length === 0 ? (
+            <div className="empty">Nenhum serviço cadastrado.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+              {services.map((svc) => (
+                <label key={svc.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", background: svc.isPublic ? "var(--surface-alt)" : "var(--surface)" }}>
+                  <input
+                    type="checkbox"
+                    checked={svc.isPublic}
+                    onChange={(e) => {
+                      const updated = services.map(s => s.id === svc.id ? { ...s, isPublic: e.target.checked } : s);
+                      setServices(updated);
+                      save({ publicServiceIds: updated.filter(s => s.isPublic).map(s => s.id) });
+                    }}
+                    style={{ width: 16, height: 16 }}
+                  />
+                  <span style={{ fontWeight: 500 }}>{svc.name}</span>
+                  {svc.basePrice && <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 13 }}>R$ {Number(svc.basePrice).toFixed(2)}</span>}
+                </label>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="panel">
+          <h2 className="section-title">Profissionais no agendamento online</h2>
+          {professionals.length === 0 ? (
+            <div className="empty">Nenhum profissional cadastrado.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+              {professionals.map((prof) => (
+                <label key={prof.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", background: prof.isPublic ? "var(--surface-alt)" : "var(--surface)" }}>
+                  <input
+                    type="checkbox"
+                    checked={prof.isPublic}
+                    onChange={(e) => {
+                      const updated = professionals.map(p => p.id === prof.id ? { ...p, isPublic: e.target.checked } : p);
+                      setProfessionals(updated);
+                      save({ publicProfessionalIds: updated.filter(p => p.isPublic).map(p => p.id) });
+                    }}
+                    style={{ width: 16, height: 16 }}
+                  />
+                  <span style={{ fontWeight: 500 }}>{prof.name}</span>
+                  {prof.specialty && <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 13 }}>{prof.specialty}</span>}
+                </label>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Instructions */}
+      <section className="panel" style={{ marginTop: 16 }}>
+        <h2 className="section-title">Mensagens</h2>
+        <div className="form-grid">
+          <div className="field full">
+            <label>Instruções para o cliente</label>
+            <textarea
+              value={settings?.instructions ?? ""}
+              onChange={(e) => setSettings({ ...settings, instructions: e.target.value })}
+              placeholder="Ex: Chegue 10 minutos antes do horário agendado."
+              rows={3}
+            />
+          </div>
+          <div className="field full">
+            <label>Mensagem de confirmação</label>
+            <textarea
+              value={settings?.confirmationMessage ?? ""}
+              onChange={(e) => setSettings({ ...settings, confirmationMessage: e.target.value })}
+              placeholder="Ex: Agendamento confirmado! Entraremos em contato se necessário."
+              rows={3}
+            />
+          </div>
+          <div className="field full">
+            <button className="button" type="button" onClick={() => save({ instructions: settings?.instructions, confirmationMessage: settings?.confirmationMessage })} disabled={saving}>
+              <Save size={16} /> Salvar mensagens
+            </button>
+          </div>
         </div>
       </section>
     </>

@@ -22,7 +22,8 @@ export const PERMISSIONS = [
   "invoices:manage",
   "checklists:manage",
   "checklists:view",
-  "public_booking:manage"
+  "public_booking:manage",
+  "clinical_notes:view"
 ] as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[number];
@@ -48,7 +49,8 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
     "financial:manage",
     "invoices:manage",
     "checklists:manage",
-    "public_booking:manage"
+    "public_booking:manage",
+    "clinical_notes:view"
   ],
   MANAGER: [
     "customers:manage",
@@ -103,6 +105,7 @@ export const TENANT_MENU_ITEMS: MenuItem[] = [
   { href: "/financeiro", label: "Financeiro", icon: "DollarSign", permission: "financial:view", planFeature: "allowFinancialControl" },
   { href: "/notas-fiscais", label: "Notas Fiscais", icon: "FileText", permission: "invoices:manage", planFeature: "allowInvoiceRequest" },
   { href: "/checklists", label: "Checklists", icon: "CheckSquare", permission: "checklists:manage", planFeature: "allowCustomerChecklist" },
+  { href: "/link-agenda", label: "Link de Agenda", icon: "Link2", permission: "public_booking:manage", planFeature: "allowClientSelfScheduling" },
   { href: "/relatorios", label: "Relatórios", icon: "Activity", permission: "reports:view" },
   { href: "/logs", label: "Logs", icon: "FileClock", permission: "logs:view" },
   { href: "/configuracoes", label: "Configurações", icon: "Settings", permission: "settings:manage" }

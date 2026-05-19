@@ -35,7 +35,8 @@ const permissions = [
   ["invoices:manage", "Gerenciar notas fiscais"],
   ["checklists:manage", "Gerenciar checklists"],
   ["checklists:view", "Visualizar checklists"],
-  ["public_booking:manage", "Gerenciar agendamento publico"]
+  ["public_booking:manage", "Gerenciar agendamento publico"],
+  ["clinical_notes:view", "Visualizar dados clínicos sensíveis"]
 ] as const;
 
 const rolePermissions: Record<RoleName, string[]> = {
@@ -45,7 +46,7 @@ const rolePermissions: Record<RoleName, string[]> = {
     "professionals:manage","professionals:view","appointments:manage","appointments:view",
     "custom_fields:manage","custom_fields:view","reports:view","reports:advanced","logs:view",
     "settings:manage","financial:view","financial:manage","invoices:manage",
-    "checklists:manage","checklists:view","public_booking:manage"
+    "checklists:manage","checklists:view","public_booking:manage","clinical_notes:view"
   ],
   MANAGER: [
     "customers:manage","customers:view","services:manage","services:view",

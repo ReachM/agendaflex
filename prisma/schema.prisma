@@ -118,6 +118,53 @@ enum FinancialRecordType {
   ADJUSTMENT
 }
 
+enum AppointmentSource {
+  INTERNAL
+  PUBLIC_LINK
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+  SMS
+}
+
+enum NotificationType {
+  APPOINTMENT_CREATED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_CANCELED
+  APPOINTMENT_STARTED
+  APPOINTMENT_COMPLETED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum PatientOrigin {
+  INDICACAO
+  INSTAGRAM
+  GOOGLE
+  WHATSAPP
+  PRESENCIAL
+  OUTRO
+}
+
 // ═══════════════════════════════════════════════════
 // PLANS & SUBSCRIPTIONS
 // ═══════════════════════════════════════════════════
@@ -223,6 +270,8 @@ model Company {
   checklists          Checklist[]
   checklistItems      ChecklistItem[]
   customerCopies      CustomerCopy[]
+  bookingSettings     PublicBookingSettings?
+  notificationLogs    NotificationLog[]
 
   @@index([status])
   @@index([segment])
@@ -312,33 +361,62 @@ model RolePermission {
 }
 
 // ═══════════════════════════════════════════════════
-// CUSTOMER
+// CUSTOMER (expanded for clinic/health segments)
 // ═══════════════════════════════════════════════════
 
 model Customer {
-  id             String    @id @default(cuid())
+  id             String         @id @default(cuid())
   companyId      String
   name           String
   email          String?
   phone          String?
+  whatsapp       String?
   cpf            String?
+  rg             String?
   birthDate      DateTime?
+  gender         String?
   notes          String?
-  status         String    @default("active")
+  status         String         @default("active")
+  // Address fields
+  zipCode        String?
+  address        String?
+  addressNumber  String?
+  neighborhood   String?
+  city           String?
+  state          String?
+  complement     String?
+  // Health/Clinic fields (LGPD-sensitive)
+  healthInsurance      String?
+  healthInsuranceNumber String?
+  bloodType            String?
+  allergies            String?
+  medications          String?
+  preExistingConditions String?
+  requiredCare         String?
+  clinicalNotes        String?
+  emergencyContact     String?
+  emergencyPhone       String?
+  legalGuardian        String?
+  legalGuardianCpf     String?
+  // Administrative
+  origin         String?
+  internalNotes  String?
   anonymizedAt   DateTime?
   deletedAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  appointments   Appointment[]
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointments     Appointment[]
   financialRecords FinancialRecord[]
   invoiceRequests  InvoiceRequest[]
+  notificationLogs NotificationLog[]
 
   @@index([companyId])
   @@index([companyId, status])
   @@index([companyId, name])
   @@index([companyId, email])
+  @@index([companyId, cpf])
 }
 
 // ═══════════════════════════════════════════════════
@@ -379,6 +457,7 @@ model Professional {
   phone          String?
   specialty      String?
   isActive       Boolean   @default(true)
+  isPublic       Boolean   @default(true)
   workingHours   Json?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -389,10 +468,11 @@ model Professional {
   @@index([companyId])
   @@index([companyId, isActive])
   @@index([companyId, name])
+  @@index([companyId, isPublic])
 }
 
 // ═══════════════════════════════════════════════════
-// APPOINTMENT (evolved with multi-service + financial)
+// APPOINTMENT (evolved with source tracking + approval)
 // ═══════════════════════════════════════════════════
 
 model Appointment {
@@ -422,6 +502,10 @@ model Appointment {
   cancellationReason String?
   // Source tracking
   bookedByClient    Boolean           @default(false)
+  source            AppointmentSource @default(INTERNAL)
+  approvalStatus    ApprovalStatus    @default(APPROVED)
+  publicBookingToken String?          @unique
+  // Creator tracking
   createdById       String?
   updatedById       String?
   createdAt         DateTime          @default(now())
@@ -437,6 +521,7 @@ model Appointment {
   financialRecords  FinancialRecord[]
   invoiceRequests   InvoiceRequest[]
   checklists        Checklist[]
+  notificationLogs  NotificationLog[]
 
   @@index([companyId])
   @@index([companyId, startAt])
@@ -446,6 +531,9 @@ model Appointment {
   @@index([serviceId])
   @@index([professionalId])
   @@index([companyId, paymentStatus])
+  @@index([companyId, source])
+  @@index([companyId, approvalStatus])
+  @@index([publicBookingToken])
 }
 
 // ═══════════════════════════════════════════════════
@@ -656,6 +744,65 @@ model CustomFieldValue {
   @@index([companyId])
   @@index([companyId, entityType, entityId])
   @@index([customFieldId])
+}
+
+// ═══════════════════════════════════════════════════
+// PUBLIC BOOKING SETTINGS
+// ═══════════════════════════════════════════════════
+
+model PublicBookingSettings {
+  id                      String    @id @default(cuid())
+  companyId               String    @unique
+  enabled                 Boolean   @default(false)
+  publicSlug              String?   @unique
+  requireManualApproval   Boolean   @default(false)
+  allowChooseProfessional Boolean   @default(true)
+  minNoticeHours          Int       @default(1)
+  maxDaysAhead            Int       @default(30)
+  slotIntervalMinutes     Int       @default(30)
+  instructions            String?
+  confirmationMessage     String?
+  sendEmailNotifications  Boolean   @default(true)
+  sendWhatsappNotifications Boolean @default(false)
+  sendSmsNotifications    Boolean   @default(false)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  company                 Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([publicSlug])
+}
+
+// ═══════════════════════════════════════════════════
+// NOTIFICATION LOGS
+// ═══════════════════════════════════════════════════
+
+model NotificationLog {
+  id              String             @id @default(cuid())
+  companyId       String
+  appointmentId   String?
+  customerId      String?
+  channel         NotificationChannel
+  type            NotificationType
+  recipient       String
+  subject         String?
+  body            String?
+  status          NotificationStatus @default(PENDING)
+  errorMessage    String?
+  sentAt          DateTime?
+  createdAt       DateTime           @default(now())
+
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointment     Appointment?       @relation(fields: [appointmentId], references: [id])
+  customer        Customer?          @relation(fields: [customerId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, type])
+  @@index([companyId, status])
+  @@index([appointmentId])
+  @@index([customerId])
+  @@index([createdAt])
 }
 
 // ═══════════════════════════════════════════════════
