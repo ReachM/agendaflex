@@ -17,6 +17,7 @@ export type PlanFeatures = {
   allowAuditLogs: boolean;
   allowCustomFields: boolean;
   allowMultipleServicesPerAppointment: boolean;
+  allowBotIntegration: boolean;
 };
 
 const DEFAULT_FEATURES: PlanFeatures = {
@@ -33,7 +34,8 @@ const DEFAULT_FEATURES: PlanFeatures = {
   allowCustomerChecklist: false,
   allowAuditLogs: true,
   allowCustomFields: true,
-  allowMultipleServicesPerAppointment: true
+  allowMultipleServicesPerAppointment: true,
+  allowBotIntegration: false
 };
 
 /**
@@ -88,6 +90,7 @@ function mapPlanToFeatures(plan: {
   allowAuditLogs: boolean;
   allowCustomFields: boolean;
   allowMultipleServicesPerAppointment: boolean;
+  allowBotIntegration: boolean;
 }): PlanFeatures {
   return {
     planName: plan.name,
@@ -103,7 +106,8 @@ function mapPlanToFeatures(plan: {
     allowCustomerChecklist: plan.allowCustomerChecklist,
     allowAuditLogs: plan.allowAuditLogs,
     allowCustomFields: plan.allowCustomFields,
-    allowMultipleServicesPerAppointment: plan.allowMultipleServicesPerAppointment
+    allowMultipleServicesPerAppointment: plan.allowMultipleServicesPerAppointment,
+    allowBotIntegration: plan.allowBotIntegration
   };
 }
 
@@ -170,6 +174,7 @@ export function featuresToBooleanMap(features: PlanFeatures): Record<string, boo
     allowCustomerChecklist: features.allowCustomerChecklist,
     allowAuditLogs: features.allowAuditLogs,
     allowCustomFields: features.allowCustomFields,
-    allowMultipleServicesPerAppointment: features.allowMultipleServicesPerAppointment
+    allowMultipleServicesPerAppointment: features.allowMultipleServicesPerAppointment,
+    allowBotIntegration: features.allowBotIntegration
   };
 }

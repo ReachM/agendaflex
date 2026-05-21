@@ -2,9 +2,18 @@ import { AppointmentStatus } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ApiError, handleApiError, ok } from "@/lib/api/errors";
 import { audit } from "@/lib/audit";
+import {
+  canAccessAgendaFinancials,
+  canAccessClinicalSensitiveFields,
+  canManageAgendaFinancials,
+  isClinicalSensitiveFieldKey,
+  isFinancialFieldKey
+} from "@/config/agenda-presets";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
+import { hasPermission } from "@/lib/security/permissions";
+import { resolvePlanFeatures } from "@/lib/security/plan-guard";
 import { attachCustomValues, saveCustomFieldValues } from "@/lib/services/custom-field-values";
 import { buildAppointmentInfo, notifyCustomerAboutAppointment } from "@/lib/services/notifications";
 import { appointmentUpdateSchema } from "@/lib/validation/schemas";
@@ -40,9 +49,86 @@ async function ensureNoConflict(input: {
   }
 }
 
+type AgendaAccess = {
+  canSeeFinancial: boolean;
+  canManageFinancial: boolean;
+  canSeeClinicalSensitive: boolean;
+};
+
+async function buildAgendaAccess(companyId: string, roleName: Parameters<typeof hasPermission>[0]): Promise<AgendaAccess> {
+  const planFeatures = await resolvePlanFeatures(companyId);
+  return {
+    canSeeFinancial: canAccessAgendaFinancials(roleName, planFeatures),
+    canManageFinancial: canManageAgendaFinancials(roleName, planFeatures),
+    canSeeClinicalSensitive: canAccessClinicalSensitiveFields(roleName)
+  };
+}
+
+function removeRestrictedCustomValues(values: unknown, access: AgendaAccess) {
+  if (!values || typeof values !== "object" || Array.isArray(values)) return {};
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
+    if (!access.canSeeFinancial && isFinancialFieldKey(key)) continue;
+    if (!access.canSeeClinicalSensitive && isClinicalSensitiveFieldKey(key)) continue;
+    result[key] = value;
+  }
+  return result;
+}
+
+function stripRestrictedInputValues(values: Record<string, unknown>, access: AgendaAccess) {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (!access.canManageFinancial && isFinancialFieldKey(key)) continue;
+    if (!access.canSeeClinicalSensitive && isClinicalSensitiveFieldKey(key)) {
+      throw new ApiError(403, "Permissao insuficiente para alterar dados clinicos sensiveis.");
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+function sanitizeAppointment<T extends Record<string, any>>(appointment: T, access: AgendaAccess) {
+  const sanitized: Record<string, any> = {
+    ...appointment,
+    customValues: removeRestrictedCustomValues(appointment.customValues, access)
+  };
+
+  if (sanitized.customer && !access.canSeeClinicalSensitive) {
+    sanitized.customer = { ...sanitized.customer };
+    delete sanitized.customer.allergies;
+    delete sanitized.customer.medications;
+    delete sanitized.customer.preExistingConditions;
+    delete sanitized.customer.requiredCare;
+    delete sanitized.customer.clinicalNotes;
+    delete sanitized.customer.bloodType;
+  }
+
+  if (!access.canSeeFinancial) {
+    delete sanitized.partsValue;
+    delete sanitized.laborValue;
+    delete sanitized.discountPercent;
+    delete sanitized.discountValue;
+    delete sanitized.totalValue;
+    delete sanitized.paymentStatus;
+    delete sanitized.paymentMethod;
+    delete sanitized.paidAt;
+    if (sanitized.service) delete sanitized.service.basePrice;
+    sanitized.appointmentServices = (sanitized.appointmentServices ?? []).map((item: Record<string, any>) => {
+      const clean = { ...item };
+      delete clean.unitPrice;
+      delete clean.totalPrice;
+      if (clean.service) delete clean.service.basePrice;
+      return clean;
+    });
+  }
+
+  return sanitized;
+}
+
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const auth = await requireTenant(request, "appointments:manage");
+    const access = await buildAgendaAccess(auth.companyId, auth.roleName);
     const { id } = await getParams(context);
     const appointment = await prisma.appointment.findFirstOrThrow({
       where: { id, companyId: auth.companyId },
@@ -63,7 +149,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       }
     });
     const [withValues] = await attachCustomValues(auth.companyId, "APPOINTMENT", [appointment]);
-    return ok({ appointment: withValues });
+    return ok({ appointment: sanitizeAppointment(withValues, access) });
   } catch (error) {
     return handleApiError(error);
   }
@@ -73,8 +159,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     assertSameOrigin(request);
     const auth = await requireTenant(request, "appointments:manage");
+    const access = await buildAgendaAccess(auth.companyId, auth.roleName);
     const { id } = await getParams(context);
     const body = appointmentUpdateSchema.parse(await request.json());
+    if (body.customValues) {
+      (body as Record<string, unknown>).customValues = stripRestrictedInputValues(
+        body.customValues as Record<string, unknown>,
+        access
+      );
+    }
 
     const oldAppointment = await prisma.appointment.findFirstOrThrow({
       where: { id, companyId: auth.companyId }
@@ -109,10 +202,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     });
 
     // Financial fields from custom values
-    const partsValue = typeof cv._partsValue === "number" ? cv._partsValue : undefined;
-    const laborValue = typeof cv._laborValue === "number" ? cv._laborValue : undefined;
-    const discountPercent = typeof cv._discountPercent === "number" ? cv._discountPercent : undefined;
-    const grandTotal = typeof cv._grandTotal === "number" ? cv._grandTotal : undefined;
+    const partsValue = access.canManageFinancial && typeof cv._partsValue === "number" ? cv._partsValue : undefined;
+    const laborValue = access.canManageFinancial && typeof cv._laborValue === "number" ? cv._laborValue : undefined;
+    const discountPercent = access.canManageFinancial && typeof cv._discountPercent === "number" ? cv._discountPercent : undefined;
+    const grandTotal = access.canManageFinancial && typeof cv._grandTotal === "number" ? cv._grandTotal : undefined;
 
     // Calculate lifecycle timestamps based on status transitions
     const lifecycleData: Record<string, unknown> = {};
@@ -258,7 +351,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     });
 
     const [withValues] = await attachCustomValues(auth.companyId, "APPOINTMENT", [full!]);
-    return ok({ appointment: withValues });
+    return ok({ appointment: sanitizeAppointment(withValues, access) });
   } catch (error) {
     return handleApiError(error);
   }

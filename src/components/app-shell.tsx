@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  Bot,
   Briefcase,
   Building2,
   CalendarDays,
@@ -37,7 +38,7 @@ type Session = {
 const iconMap: Record<string, any> = {
   LayoutDashboard, CalendarDays, Users, ClipboardList, Briefcase,
   SlidersHorizontal, UserCog, DollarSign, FileText, CheckSquare,
-  Activity, FileClock, Settings, Building2, CreditCard, Link2
+  Activity, FileClock, Settings, Building2, CreditCard, Link2, Bot
 };
 
 const roleLabels: Record<string, string> = {

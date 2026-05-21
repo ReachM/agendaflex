@@ -121,6 +121,7 @@ enum FinancialRecordType {
 enum AppointmentSource {
   INTERNAL
   PUBLIC_LINK
+  BOT
 }
 
 enum ApprovalStatus {
@@ -187,6 +188,7 @@ model Plan {
   allowAuditLogs                      Boolean   @default(true)
   allowCustomFields                   Boolean   @default(true)
   allowMultipleServicesPerAppointment Boolean   @default(true)
+  allowBotIntegration                 Boolean   @default(false)
   isActive                            Boolean   @default(true)
   sortOrder                           Int       @default(0)
   createdAt                           DateTime  @default(now())
@@ -272,6 +274,13 @@ model Company {
   customerCopies      CustomerCopy[]
   bookingSettings     PublicBookingSettings?
   notificationLogs    NotificationLog[]
+
+  // Integração ChatBot Service
+  botEnabled        Boolean   @default(false)
+  botApiKey         String?   @unique
+  botWebhookSecret  String?
+  botRegisteredAt   DateTime?
+  botConfig         Json?
 
   @@index([status])
   @@index([segment])
@@ -829,5 +838,22 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([entityType])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════
+// BOT WEBHOOK EVENTS (idempotency)
+// ═══════════════════════════════════════════════════
+
+model BotWebhookEvent {
+  id        String   @id @default(cuid())
+  companyId String
+  eventId   String
+  event     String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, eventId])
+  @@index([companyId])
   @@index([createdAt])
 }

@@ -187,7 +187,22 @@ export const listQuerySchema = z.object({
   status: optionalString(50),
   from: optionalString(30),
   to: optionalString(30),
+  date: optionalString(30),
   professionalId: optionalString(80),
   customerId: optionalString(80),
-  serviceId: optionalString(80)
+  serviceId: optionalString(80),
+  healthInsurance: optionalString(120),
+  consultationType: optionalString(120),
+  returns: optionalString(20),
+  today: optionalString(20),
+  plate: optionalString(30),
+  vehicle: optionalString(120),
+  paymentStatus: optionalString(50),
+  inProgress: optionalString(20),
+  completed: optionalString(20),
+  cancelled: optionalString(20),
+  hour: optionalString(20),
+  equipmentType: optionalString(120),
+  serialNumber: optionalString(120),
+  warranty: optionalString(120)
 });

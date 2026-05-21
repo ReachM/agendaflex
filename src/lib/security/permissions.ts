@@ -108,7 +108,8 @@ export const TENANT_MENU_ITEMS: MenuItem[] = [
   { href: "/link-agenda", label: "Link de Agenda", icon: "Link2", permission: "public_booking:manage", planFeature: "allowClientSelfScheduling" },
   { href: "/relatorios", label: "Relatórios", icon: "Activity", permission: "reports:view" },
   { href: "/logs", label: "Logs", icon: "FileClock", permission: "logs:view" },
-  { href: "/configuracoes", label: "Configurações", icon: "Settings", permission: "settings:manage" }
+  { href: "/configuracoes", label: "Configurações", icon: "Settings", permission: "settings:manage" },
+  { href: "/configuracoes/bot", label: "Bot WhatsApp", icon: "Bot", permission: "settings:manage", planFeature: "allowBotIntegration" }
 ];
 
 export const MASTER_MENU_ITEMS: MenuItem[] = [
