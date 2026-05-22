@@ -1070,11 +1070,7 @@ export function AppointmentManager() {
       return;
     }
     try {
-      const parts = pricing.partsValue ? Number(pricing.partsValue) : 0;
-      const labor = pricing.laborValue ? Number(pricing.laborValue) : 0;
-      const discount = pricing.discountPercent ? Number(pricing.discountPercent) : 0;
-      const subtotal = selectedServicesTotal + parts + labor;
-      const grandTotal = subtotal - (subtotal * discount / 100);
+      // TODO [MVP-FUTURE] Reativar pricing financeiro na v2
       await apiFetch("/api/appointments", {
         method: "POST",
         body: JSON.stringify({
@@ -1085,11 +1081,7 @@ export function AppointmentManager() {
           customValues: {
             ...customValues,
             _serviceIds: selectedServiceIds,
-            _servicesTotal: selectedServicesTotal,
-            _partsValue: parts,
-            _laborValue: labor,
-            _discountPercent: discount,
-            _grandTotal: grandTotal
+            _servicesTotal: selectedServicesTotal
           }
         })
       });
@@ -1161,11 +1153,7 @@ export function AppointmentManager() {
     setEditError("");
     setSaving(true);
     try {
-      const parts = editPricing.partsValue ? Number(editPricing.partsValue) : 0;
-      const labor = editPricing.laborValue ? Number(editPricing.laborValue) : 0;
-      const discount = editPricing.discountPercent ? Number(editPricing.discountPercent) : 0;
-      const subtotal = editServicesTotal + parts + labor;
-      const grandTotal = subtotal - (subtotal * discount / 100);
+      // TODO [MVP-FUTURE] Reativar pricing financeiro na v2
       await apiFetch(`/api/appointments/${editingId}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -1176,11 +1164,7 @@ export function AppointmentManager() {
           customValues: {
             ...editCustomValues,
             _serviceIds: editSelectedServiceIds,
-            _servicesTotal: editServicesTotal,
-            _partsValue: parts,
-            _laborValue: labor,
-            _discountPercent: discount,
-            _grandTotal: grandTotal
+            _servicesTotal: editServicesTotal
           }
         })
       });
@@ -1241,7 +1225,8 @@ export function AppointmentManager() {
               <TextArea label="Observações gerais" value={editForm.notes} onChange={(notes) => setEditForm({ ...editForm, notes })} />
               <TextArea label="Observações internas" value={editForm.internalNotes} onChange={(internalNotes) => setEditForm({ ...editForm, internalNotes })} />
               <DynamicFields fields={filteredFields} values={editCustomValues} onChange={setEditCustomValues} />
-              <PricingSummary services={services} selectedIds={editSelectedServiceIds} servicesTotal={editServicesTotal} pricing={editPricing} onPricingChange={setEditPricing} />
+              {/* TODO [MVP-FUTURE] Reativar calculadora financeira na v2 */}
+              {/* <PricingSummary services={services} selectedIds={editSelectedServiceIds} servicesTotal={editServicesTotal} pricing={editPricing} onPricingChange={setEditPricing} /> */}
               <div className="field full" style={{ display: "flex", gap: 12 }}>
                 <button className="button" type="submit" disabled={saving}>
                   <Save size={16} />
@@ -1268,7 +1253,8 @@ export function AppointmentManager() {
           <TextArea label="Observações gerais" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} />
           <TextArea label="Observações internas" value={form.internalNotes} onChange={(internalNotes) => setForm({ ...form, internalNotes })} />
           <DynamicFields fields={filteredFields} values={customValues} onChange={setCustomValues} />
-          <PricingSummary services={services} selectedIds={selectedServiceIds} servicesTotal={selectedServicesTotal} pricing={pricing} onPricingChange={setPricing} />
+          {/* TODO [MVP-FUTURE] Reativar calculadora financeira na v2 */}
+          {/* <PricingSummary services={services} selectedIds={selectedServiceIds} servicesTotal={selectedServicesTotal} pricing={pricing} onPricingChange={setPricing} /> */}
           <div className="field full">
             <button className="button" type="submit">
               <CalendarPlus size={16} />

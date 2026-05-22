@@ -114,75 +114,9 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // ─── Max Reports ──────────────────────────────────
-    if (features.planSlug === "max") {
-      const now = new Date();
-      const monthsAgo6 = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-
-      const [monthlyRevenue, avgTicket, loyalCustomers] = await Promise.all([
-        // Monthly revenue for last 6 months
-        prisma.appointment.findMany({
-          where: {
-            companyId: cid,
-            status: "COMPLETED",
-            totalValue: { not: null },
-            startAt: { gte: monthsAgo6 }
-          },
-          select: { startAt: true, totalValue: true }
-        }),
-        prisma.appointment.aggregate({
-          where: { companyId: cid, status: "COMPLETED", totalValue: { not: null } },
-          _avg: { totalValue: true }
-        }),
-        // Most loyal customers
-        prisma.appointment.groupBy({
-          by: ["customerId"],
-          where: { companyId: cid, status: "COMPLETED" },
-          _count: { id: true },
-          _sum: { totalValue: true },
-          orderBy: { _count: { id: "desc" } },
-          take: 10
-        })
-      ]);
-
-      // Group revenue by month
-      const revenueByMonth: Record<string, number> = {};
-      monthlyRevenue.forEach(a => {
-        const key = `${new Date(a.startAt).getFullYear()}-${String(new Date(a.startAt).getMonth() + 1).padStart(2, "0")}`;
-        revenueByMonth[key] = (revenueByMonth[key] || 0) + Number(a.totalValue ?? 0);
-      });
-
-      const loyalCustomerIds = loyalCustomers.map(c => c.customerId);
-      const loyalCustomerMap = loyalCustomerIds.length > 0
-        ? await prisma.customer.findMany({ where: { id: { in: loyalCustomerIds } }, select: { id: true, name: true } })
-        : [];
-
-      // Last appointment for loyal customers
-      const lastAppointments = loyalCustomerIds.length > 0
-        ? await prisma.appointment.findMany({
-            where: { companyId: cid, customerId: { in: loyalCustomerIds }, status: "COMPLETED" },
-            orderBy: { startAt: "desc" },
-            distinct: ["customerId"],
-            select: { customerId: true, startAt: true }
-          })
-        : [];
-
-      result.max = {
-        revenueByMonth: Object.entries(revenueByMonth).map(([month, total]) => ({ month, total })),
-        avgTicket: avgTicket._avg.totalValue ?? 0,
-        loyalCustomers: loyalCustomers.map(c => {
-          const customer = loyalCustomerMap.find(cu => cu.id === c.customerId);
-          const lastAppt = lastAppointments.find(la => la.customerId === c.customerId);
-          return {
-            customerId: c.customerId,
-            customerName: customer?.name ?? "-",
-            appointmentCount: c._count.id,
-            totalSpent: c._sum.totalValue ?? 0,
-            lastAppointment: lastAppt?.startAt ?? null
-          };
-        })
-      };
-    }
+    // TODO [MVP-FUTURE] Relatórios Max (financeiros) — reativar na v2
+    // Seção desabilitada: Ticket Médio, Receita por Mês, Clientes Fiéis por valor gasto
+    // if (features.planSlug === "max") { ... }
 
     return ok(result);
   } catch (error) {

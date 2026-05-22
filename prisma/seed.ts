@@ -172,15 +172,15 @@ async function main() {
     update: {
       maxUsers: 3, maxProfessionals: 3, maxCustomers: 500, maxAppointmentsPerMonth: 300,
       allowClientSelfScheduling: false, allowAdvancedReports: false, allowFinancialControl: false,
-      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
+      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: false
     },
     create: {
-      name: "Starter", slug: "starter", description: "Plano básico com dashboard, agenda, clientes, serviços, profissionais, checklist básico e relatórios simples.",
+      name: "Starter", slug: "starter", description: "Plano básico com dashboard, agenda, clientes, serviços, profissionais e relatórios simples.",
       price: 0, maxUsers: 3, maxProfessionals: 3, maxCustomers: 500, maxAppointmentsPerMonth: 300,
       allowClientSelfScheduling: false, allowAdvancedReports: false, allowFinancialControl: false,
-      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
+      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: false, sortOrder: 1
     }
@@ -191,15 +191,15 @@ async function main() {
     update: {
       maxUsers: 10, maxProfessionals: 10, maxCustomers: 5000, maxAppointmentsPerMonth: 2000,
       allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: false,
-      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
+      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true
     },
     create: {
-      name: "Pro", slug: "pro", description: "Tudo do Starter + agendamento público, relatórios intermediários, checklist completo, mais usuários e profissionais.",
+      name: "Pro", slug: "pro", description: "Tudo do Starter + agendamento público, relatórios intermediários, bot WhatsApp, mais usuários e profissionais.",
       price: 99.90, maxUsers: 10, maxProfessionals: 10, maxCustomers: 5000, maxAppointmentsPerMonth: 2000,
       allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: false,
-      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
+      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true, sortOrder: 2
     }
@@ -209,16 +209,22 @@ async function main() {
     where: { slug: "max" },
     update: {
       maxUsers: 100, maxProfessionals: 100, maxCustomers: 50000, maxAppointmentsPerMonth: 50000,
-      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
-      allowInvoiceRequest: true, allowCustomerChecklist: true, allowAuditLogs: true,
+      allowClientSelfScheduling: true, allowAdvancedReports: true,
+      allowFinancialControl: false,    // TODO [MVP-FUTURE] Ativar na v2
+      allowInvoiceRequest: false,      // TODO [MVP-FUTURE] Ativar na v2
+      allowCustomerChecklist: false,   // TODO [MVP-FUTURE] Ativar na v2
+      allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true
     },
     create: {
-      name: "Max", slug: "max", description: "Tudo do Pro + controle financeiro, relatórios avançados, gráficos, nota fiscal, via do cliente, logs avançados, limites altos.",
+      name: "Max", slug: "max", description: "Tudo do Pro + limites altos, logs avançados, mais configurações de bot. Financeiro e NF disponíveis em versão futura.",
       price: 199.90, maxUsers: 100, maxProfessionals: 100, maxCustomers: 50000, maxAppointmentsPerMonth: 50000,
-      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
-      allowInvoiceRequest: true, allowCustomerChecklist: true, allowAuditLogs: true,
+      allowClientSelfScheduling: true, allowAdvancedReports: true,
+      allowFinancialControl: false,    // TODO [MVP-FUTURE] Ativar na v2
+      allowInvoiceRequest: false,      // TODO [MVP-FUTURE] Ativar na v2
+      allowCustomerChecklist: false,   // TODO [MVP-FUTURE] Ativar na v2
+      allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true, sortOrder: 3
     }
