@@ -168,8 +168,8 @@ export function AppointmentPreviewModal({
           </div>
         )}
 
-        {/* Financial Summary */}
-        <div className="preview-financial" style={{ marginTop: 12 }}>
+        {/* TODO [MVP-FUTURE] Reativar seção de valores financeiros na v2 */}
+        {/* <div className="preview-financial" style={{ marginTop: 12 }}>
           <strong className="preview-section-label">Valores</strong>
           <div className="preview-financial__grid">
             {servicesTotal > 0 && (
@@ -198,7 +198,7 @@ export function AppointmentPreviewModal({
               <strong>{formatMoney(total)}</strong>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Observations */}
         {appointment.notes && (
@@ -225,8 +225,8 @@ export function AppointmentPreviewModal({
           </div>
         )}
 
-        {/* Checklist Summary */}
-        {checklistAllowed && (appointment.checklists ?? []).length > 0 && (
+        {/* TODO [MVP-FUTURE] Reativar checklist summary na v2 */}
+        {/* {checklistAllowed && (appointment.checklists ?? []).length > 0 && (
           <div className="preview-checklist-summary" style={{ marginTop: 12 }}>
             <strong className="preview-section-label">Checklist</strong>
             {(appointment.checklists as AnyRecord[]).map((cl: AnyRecord) => (
@@ -240,7 +240,7 @@ export function AppointmentPreviewModal({
               </div>
             ))}
           </div>
-        )}
+        )} */}
 
         {/* Action Buttons */}
         <div className="preview-actions" style={{ marginTop: 20 }}>
@@ -270,12 +270,12 @@ export function AppointmentPreviewModal({
             </div>
           )}
 
-          {/* Print checklist button */}
-          {checklistAllowed && (isInProgress || isCompleted) && (appointment.checklists ?? []).length > 0 && (
+          {/* TODO [MVP-FUTURE] Reativar botão de imprimir checklist na v2 */}
+          {/* {checklistAllowed && (isInProgress || isCompleted) && (appointment.checklists ?? []).length > 0 && (
             <button className="button secondary" onClick={() => setShowChecklist(true)} type="button">
               <Printer size={16} /> Imprimir checklist
             </button>
-          )}
+          )} */}
 
           <button className="button secondary" onClick={onClose} type="button">
             <Edit2 size={16} /> Fechar
@@ -483,9 +483,10 @@ export function TodayAppointments({
                     <span className={`badge ${statusBadgeClass[appt.status] ?? ""}`}>
                       {statusLabels[appt.status] ?? appt.status}
                     </span>
-                    {canSeeValues && appt.totalValue && (
+                    {/* TODO [MVP-FUTURE] Reativar totalValue na v2 */}
+                    {/* {canSeeValues && appt.totalValue && (
                       <span className="today-card__value">{formatMoney(appt.totalValue)}</span>
-                    )}
+                    )} */}
                   </div>
                   {/* Quick actions */}
                   {canChangeStatus && !isTerminal && (

@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { created, handleApiError, ok } from "@/lib/api/errors";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
@@ -6,7 +6,14 @@ import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { requirePlanFeature } from "@/lib/security/plan-guard";
 
+// TODO [MVP-FUTURE] Remover bloqueio MVP quando o módulo financeiro for reativado na v2
+const MVP_BLOCK = NextResponse.json(
+  { error: "Funcionalidade em desenvolvimento e indisponível nesta versão." },
+  { status: 403 }
+);
+
 export async function GET(request: NextRequest) {
+  return MVP_BLOCK;
   try {
     const context = await requireTenant(request, "financial:view");
     await requirePlanFeature(context, "allowFinancialControl", "Controle financeiro");
@@ -24,8 +31,8 @@ export async function GET(request: NextRequest) {
 
     // Financial records
     const whereBase = { companyId: cid } as any;
-    if (periodFrom) whereBase.createdAt = { ...whereBase.createdAt, gte: new Date(periodFrom) };
-    if (periodTo) whereBase.createdAt = { ...whereBase.createdAt, lte: new Date(periodTo) };
+    if (typeof periodFrom === "string") whereBase.createdAt = { ...whereBase.createdAt, gte: new Date(periodFrom as string) };
+    if (typeof periodTo === "string") whereBase.createdAt = { ...whereBase.createdAt, lte: new Date(periodTo as string) };
 
     const records = await prisma.financialRecord.findMany({
       where: whereBase,
@@ -119,6 +126,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  return MVP_BLOCK;
   try {
     assertSameOrigin(request);
     const context = await requireTenant(request, "financial:manage");

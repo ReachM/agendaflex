@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { created, handleApiError, ok } from "@/lib/api/errors";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
@@ -6,12 +6,19 @@ import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { requirePlanFeature } from "@/lib/security/plan-guard";
 
+// TODO [MVP-FUTURE] Remover bloqueio MVP quando o módulo de checklists for reativado na v2
+const MVP_BLOCK = NextResponse.json(
+  { error: "Funcionalidade em desenvolvimento e indisponível nesta versão." },
+  { status: 403 }
+);
+
 export async function GET(request: NextRequest) {
+  return MVP_BLOCK;
   try {
     const context = await requireTenant(request, "checklists:manage");
     await requirePlanFeature(context, "allowCustomerChecklist", "Checklist do atendimento");
 
-    const appointmentId = request.nextUrl.searchParams.get("appointmentId");
+    const appointmentId = request.nextUrl.searchParams.get("appointmentId") ?? undefined;
 
     const checklists = await prisma.checklist.findMany({
       where: {
@@ -41,6 +48,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  return MVP_BLOCK;
   try {
     assertSameOrigin(request);
     const context = await requireTenant(request, "checklists:manage");

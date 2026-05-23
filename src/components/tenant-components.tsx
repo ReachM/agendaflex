@@ -189,6 +189,14 @@ export function TenantDashboard() {
               <Plus size={16} />
               Cliente
             </Link>
+            <Link className="button secondary" href="/servicos">
+              <Briefcase size={16} />
+              Serviço
+            </Link>
+            <Link className="button secondary" href="/profissionais">
+              <Users size={16} />
+              Profissional
+            </Link>
           </>
         }
       />

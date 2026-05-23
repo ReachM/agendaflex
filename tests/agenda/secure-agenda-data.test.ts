@@ -63,9 +63,10 @@ describe("Agenda secure data rules", () => {
     expect(canAccessClinicalSensitiveFields(role)).toBe(false);
   });
 
-  it("allows managers to see financial data only when the plan allows it", () => {
+  it("does not allow managers to see financial data in MVP (financial:view removed)", () => {
     const role = "MANAGER" as RoleName;
-    expect(canAccessAgendaFinancials(role, maxPlan)).toBe(true);
+    // MVP: MANAGER no longer has financial:view, so access is always false regardless of plan
+    expect(canAccessAgendaFinancials(role, maxPlan)).toBe(false);
     expect(canAccessAgendaFinancials(role, starterPlan)).toBe(false);
     expect(canManageAgendaFinancials(role, maxPlan)).toBe(false);
   });

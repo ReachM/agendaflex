@@ -45,18 +45,24 @@ const rolePermissions: Record<RoleName, string[]> = {
     "users:manage","customers:manage","customers:view","services:manage","services:view",
     "professionals:manage","professionals:view","appointments:manage","appointments:view",
     "custom_fields:manage","custom_fields:view","reports:view","reports:advanced","logs:view",
-    "settings:manage","financial:view","financial:manage","invoices:manage",
-    "checklists:manage","checklists:view","public_booking:manage","clinical_notes:view"
+    "settings:manage",
+    // TODO [MVP-FUTURE] Reativar permissões financeiras na v2
+    // "financial:view","financial:manage","invoices:manage",
+    // "checklists:manage","checklists:view",
+    "public_booking:manage","clinical_notes:view"
   ],
   MANAGER: [
     "customers:manage","customers:view","services:manage","services:view",
     "professionals:manage","professionals:view","appointments:manage","appointments:view",
-    "custom_fields:view","reports:view","logs:view","settings:manage","financial:view",
-    "checklists:manage","checklists:view"
+    "custom_fields:view","reports:view","logs:view","settings:manage",
+    // TODO [MVP-FUTURE] Reativar permissões financeiras na v2
+    // "financial:view","checklists:manage","checklists:view"
   ],
   STAFF: [
     "customers:view","customers:manage","services:view","professionals:view",
-    "appointments:manage","appointments:view","custom_fields:view","checklists:view"
+    "appointments:manage","appointments:view","custom_fields:view",
+    // TODO [MVP-FUTURE] Reativar checklist na v2
+    // "checklists:view"
   ],
   USER: ["customers:view","appointments:view"]
 };

@@ -51,6 +51,9 @@ function applyAutoCalc(updatedValues: CustomValues, fieldKeys: Set<string>): Cus
   return result;
 }
 
+// TODO [MVP-FUTURE] Reativar tipos avançados na v2
+const MVP_HIDDEN_FIELD_TYPES = new Set(["MONEY", "PERCENT", "FILE", "CPF_CNPJ"]);
+
 export function DynamicFields({
   fields,
   values,
@@ -60,7 +63,9 @@ export function DynamicFields({
   values: CustomValues;
   onChange: (values: CustomValues) => void;
 }) {
-  const fieldKeys = new Set(fields.map((f) => f.fieldKey));
+  // Filter out advanced field types hidden in the MVP
+  const visibleFields = fields.filter((f) => !MVP_HIDDEN_FIELD_TYPES.has(f.fieldType));
+  const fieldKeys = new Set(visibleFields.map((f) => f.fieldKey));
 
   function setValue(key: string, value: unknown) {
     const updated = { ...values, [key]: value };
@@ -73,11 +78,11 @@ export function DynamicFields({
     }
   }
 
-  if (fields.length === 0) return null;
+  if (visibleFields.length === 0) return null;
 
   return (
     <>
-      {fields.map((field) => {
+      {visibleFields.map((field) => {
         const value = values[field.fieldKey] ?? "";
         const required = field.isRequired;
         // Mark auto-calculated fields as read-only
