@@ -166,33 +166,41 @@ enum PatientOrigin {
   OUTRO
 }
 
+enum BotConversationStep {
+  IDLE
+  AWAITING_SERVICE
+  AWAITING_DATE
+  AWAITING_SLOT
+  AWAITING_NAME
+}
+
 // ═══════════════════════════════════════════════════
 // PLANS & SUBSCRIPTIONS
 // ═══════════════════════════════════════════════════
 
 model Plan {
-  id                                  String    @id @default(cuid())
+  id                                  String   @id @default(cuid())
   name                                String
-  slug                                String    @unique
+  slug                                String   @unique
   description                         String?
-  price                               Decimal   @default(0) @db.Decimal(12, 2)
-  maxUsers                            Int       @default(3)
-  maxProfessionals                    Int       @default(5)
-  maxCustomers                        Int       @default(100)
-  maxAppointmentsPerMonth             Int       @default(200)
-  allowClientSelfScheduling           Boolean   @default(false)
-  allowAdvancedReports                Boolean   @default(false)
-  allowFinancialControl               Boolean   @default(false)
-  allowInvoiceRequest                 Boolean   @default(false)
-  allowCustomerChecklist              Boolean   @default(false)
-  allowAuditLogs                      Boolean   @default(true)
-  allowCustomFields                   Boolean   @default(true)
-  allowMultipleServicesPerAppointment Boolean   @default(true)
-  allowBotIntegration                 Boolean   @default(false)
-  isActive                            Boolean   @default(true)
-  sortOrder                           Int       @default(0)
-  createdAt                           DateTime  @default(now())
-  updatedAt                           DateTime  @updatedAt
+  price                               Decimal  @default(0) @db.Decimal(12, 2)
+  maxUsers                            Int      @default(3)
+  maxProfessionals                    Int      @default(5)
+  maxCustomers                        Int      @default(100)
+  maxAppointmentsPerMonth             Int      @default(200)
+  allowClientSelfScheduling           Boolean  @default(false)
+  allowAdvancedReports                Boolean  @default(false)
+  allowFinancialControl               Boolean  @default(false)
+  allowInvoiceRequest                 Boolean  @default(false)
+  allowCustomerChecklist              Boolean  @default(false)
+  allowAuditLogs                      Boolean  @default(true)
+  allowCustomFields                   Boolean  @default(true)
+  allowMultipleServicesPerAppointment Boolean  @default(true)
+  allowBotIntegration                 Boolean  @default(false)
+  isActive                            Boolean  @default(true)
+  sortOrder                           Int      @default(0)
+  createdAt                           DateTime @default(now())
+  updatedAt                           DateTime @updatedAt
 
   features      PlanFeature[]
   subscriptions CompanySubscription[]
@@ -201,14 +209,14 @@ model Plan {
 }
 
 model PlanFeature {
-  id           String    @id @default(cuid())
-  planId       String
-  featureKey   String
-  featureName  String
-  enabled      Boolean   @default(true)
-  limitValue   Int?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String   @id @default(cuid())
+  planId      String
+  featureKey  String
+  featureName String
+  enabled     Boolean  @default(true)
+  limitValue  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
@@ -217,16 +225,16 @@ model PlanFeature {
 }
 
 model CompanySubscription {
-  id           String             @id @default(cuid())
-  companyId    String
-  planId       String
-  status       SubscriptionStatus @default(ACTIVE)
-  startsAt     DateTime           @default(now())
-  endsAt       DateTime?
-  trialEndsAt  DateTime?
-  canceledAt   DateTime?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id          String             @id @default(cuid())
+  companyId   String
+  planId      String
+  status      SubscriptionStatus @default(ACTIVE)
+  startsAt    DateTime           @default(now())
+  endsAt      DateTime?
+  trialEndsAt DateTime?
+  canceledAt  DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   plan    Plan    @relation(fields: [planId], references: [id])
@@ -241,46 +249,53 @@ model CompanySubscription {
 // ═══════════════════════════════════════════════════
 
 model Company {
-  id                    String          @id @default(cuid())
-  name                  String
-  tradeName             String?
-  document              String?
-  email                 String
-  phone                 String?
-  slug                  String?         @unique
-  segment               BusinessSegment @default(PERSONALIZADO)
-  status                CompanyStatus   @default(ACTIVE)
-  plan                  String          @default("starter")
-  publicBookingEnabled  Boolean         @default(false)
-  autoConfirmBooking    Boolean         @default(false)
-  settings              Json?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  id                   String          @id @default(cuid())
+  name                 String
+  tradeName            String?
+  document             String?
+  email                String
+  phone                String?
+  slug                 String?         @unique
+  segment              BusinessSegment @default(PERSONALIZADO)
+  status               CompanyStatus   @default(ACTIVE)
+  plan                 String          @default("starter")
+  publicBookingEnabled Boolean         @default(false)
+  autoConfirmBooking   Boolean         @default(false)
+  settings             Json?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
-  users               CompanyUser[]
-  customers           Customer[]
-  services            Service[]
-  professionals       Professional[]
-  appointments        Appointment[]
-  appointmentServices AppointmentService[]
-  customFields        CustomField[]
-  fieldValues         CustomFieldValue[]
-  auditLogs           AuditLog[]
-  subscriptions       CompanySubscription[]
-  financialRecords    FinancialRecord[]
-  invoiceRequests     InvoiceRequest[]
-  checklists          Checklist[]
-  checklistItems      ChecklistItem[]
-  customerCopies      CustomerCopy[]
-  bookingSettings     PublicBookingSettings?
-  notificationLogs    NotificationLog[]
+  users                 CompanyUser[]
+  customers             Customer[]
+  services              Service[]
+  professionals         Professional[]
+  appointments          Appointment[]
+  appointmentServices   AppointmentService[]
+  customFields          CustomField[]
+  fieldValues           CustomFieldValue[]
+  auditLogs             AuditLog[]
+  subscriptions         CompanySubscription[]
+  financialRecords      FinancialRecord[]
+  invoiceRequests       InvoiceRequest[]
+  checklists            Checklist[]
+  checklistItems        ChecklistItem[]
+  customerCopies        CustomerCopy[]
+  bookingSettings       PublicBookingSettings?
+  notificationLogs      NotificationLog[]
+  botConfiguration      CompanyBotConfig?
+  botConversationStates BotConversationState[]
 
-  // Integração ChatBot Service
-  botEnabled        Boolean   @default(false)
-  botApiKey         String?   @unique
-  botWebhookSecret  String?
-  botRegisteredAt   DateTime?
-  botConfig         Json?
+  // Liga/desliga do bot — fonte única de verdade. Reaproveitado pelo bot Evolution API.
+  botEnabled Boolean @default(false)
+
+  // @deprecated Campos da antiga integração via ChatBot Service (microsserviço externo).
+  // Serão removidos quando as rotas/cliente do microsserviço forem retirados
+  // (decisão: substituir pelo bot in-process via Evolution API). Mantidos por ora
+  // para não quebrar o código existente. Não migrar dados.
+  botApiKey        String?   @unique
+  botWebhookSecret String?
+  botRegisteredAt  DateTime?
+  botConfig        Json?
 
   @@index([status])
   @@index([segment])
@@ -292,39 +307,39 @@ model Company {
 // ═══════════════════════════════════════════════════
 
 model User {
-  id             String        @id @default(cuid())
-  name           String
-  email          String        @unique
-  passwordHash   String
-  status         UserStatus    @default(ACTIVE)
-  systemRoleId   String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  systemRoleId String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  systemRole     Role?         @relation("SystemRole", fields: [systemRoleId], references: [id])
-  memberships    CompanyUser[]
-  createdAppointments Appointment[] @relation("AppointmentCreatedBy")
-  updatedAppointments Appointment[] @relation("AppointmentUpdatedBy")
-  auditLogs      AuditLog[]
-  createdChecklists Checklist[]
-  invoiceRequests   InvoiceRequest[] @relation("InvoiceRequestedBy")
+  systemRole          Role?            @relation("SystemRole", fields: [systemRoleId], references: [id])
+  memberships         CompanyUser[]
+  createdAppointments Appointment[]    @relation("AppointmentCreatedBy")
+  updatedAppointments Appointment[]    @relation("AppointmentUpdatedBy")
+  auditLogs           AuditLog[]
+  createdChecklists   Checklist[]
+  invoiceRequests     InvoiceRequest[] @relation("InvoiceRequestedBy")
 
   @@index([status])
   @@index([systemRoleId])
 }
 
 model CompanyUser {
-  id          String      @id @default(cuid())
-  companyId   String
-  userId      String
-  roleId      String
-  status      UserStatus  @default(ACTIVE)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id        String     @id @default(cuid())
+  companyId String
+  userId    String
+  roleId    String
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
-  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role        Role        @relation(fields: [roleId], references: [id])
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id])
 
   @@unique([companyId, userId])
   @@index([companyId])
@@ -334,12 +349,12 @@ model CompanyUser {
 }
 
 model Role {
-  id              String           @id @default(cuid())
-  name            RoleName         @unique
-  scope           RoleScope
-  description     String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id          String    @id @default(cuid())
+  name        RoleName  @unique
+  scope       RoleScope
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   users           User[]           @relation("SystemRole")
   companyUsers    CompanyUser[]
@@ -347,22 +362,22 @@ model Role {
 }
 
 model Permission {
-  id              String           @id @default(cuid())
-  key             String           @unique
-  description     String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   rolePermissions RolePermission[]
 }
 
 model RolePermission {
-  id            String      @id @default(cuid())
-  roleId        String
-  permissionId  String
+  id           String @id @default(cuid())
+  roleId       String
+  permissionId String
 
-  role          Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission    Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permissionId])
   @@index([roleId])
@@ -374,46 +389,46 @@ model RolePermission {
 // ═══════════════════════════════════════════════════
 
 model Customer {
-  id             String         @id @default(cuid())
-  companyId      String
-  name           String
-  email          String?
-  phone          String?
-  whatsapp       String?
-  cpf            String?
-  rg             String?
-  birthDate      DateTime?
-  gender         String?
-  notes          String?
-  status         String         @default("active")
+  id                    String    @id @default(cuid())
+  companyId             String
+  name                  String
+  email                 String?
+  phone                 String?
+  whatsapp              String?
+  cpf                   String?
+  rg                    String?
+  birthDate             DateTime?
+  gender                String?
+  notes                 String?
+  status                String    @default("active")
   // Address fields
-  zipCode        String?
-  address        String?
-  addressNumber  String?
-  neighborhood   String?
-  city           String?
-  state          String?
-  complement     String?
+  zipCode               String?
+  address               String?
+  addressNumber         String?
+  neighborhood          String?
+  city                  String?
+  state                 String?
+  complement            String?
   // Health/Clinic fields (LGPD-sensitive)
-  healthInsurance      String?
+  healthInsurance       String?
   healthInsuranceNumber String?
-  bloodType            String?
-  allergies            String?
-  medications          String?
+  bloodType             String?
+  allergies             String?
+  medications           String?
   preExistingConditions String?
-  requiredCare         String?
-  clinicalNotes        String?
-  emergencyContact     String?
-  emergencyPhone       String?
-  legalGuardian        String?
-  legalGuardianCpf     String?
+  requiredCare          String?
+  clinicalNotes         String?
+  emergencyContact      String?
+  emergencyPhone        String?
+  legalGuardian         String?
+  legalGuardianCpf      String?
   // Administrative
-  origin         String?
-  internalNotes  String?
-  anonymizedAt   DateTime?
-  deletedAt      DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  origin                String?
+  internalNotes         String?
+  anonymizedAt          DateTime?
+  deletedAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   appointments     Appointment[]
@@ -433,16 +448,16 @@ model Customer {
 // ═══════════════════════════════════════════════════
 
 model Service {
-  id              String    @id @default(cuid())
+  id              String   @id @default(cuid())
   companyId       String
   name            String
   description     String?
-  basePrice       Decimal?  @db.Decimal(12, 2)
-  durationMinutes Int       @default(60)
-  isActive        Boolean   @default(true)
-  isPublic        Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  basePrice       Decimal? @db.Decimal(12, 2)
+  durationMinutes Int      @default(60)
+  isActive        Boolean  @default(true)
+  isPublic        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   company             Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   appointments        Appointment[]
@@ -459,20 +474,20 @@ model Service {
 // ═══════════════════════════════════════════════════
 
 model Professional {
-  id             String    @id @default(cuid())
-  companyId      String
-  name           String
-  email          String?
-  phone          String?
-  specialty      String?
-  isActive       Boolean   @default(true)
-  isPublic       Boolean   @default(true)
-  workingHours   Json?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id           String   @id @default(cuid())
+  companyId    String
+  name         String
+  email        String?
+  phone        String?
+  specialty    String?
+  isActive     Boolean  @default(true)
+  isPublic     Boolean  @default(true)
+  workingHours Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  appointments   Appointment[]
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
 
   @@index([companyId])
   @@index([companyId, isActive])
@@ -485,52 +500,53 @@ model Professional {
 // ═══════════════════════════════════════════════════
 
 model Appointment {
-  id                String            @id @default(cuid())
-  companyId         String
-  customerId        String
-  serviceId         String?
-  professionalId    String
-  startAt           DateTime
-  endAt             DateTime
-  status            AppointmentStatus @default(SCHEDULED)
-  notes             String?
-  internalNotes     String?
+  id                 String            @id @default(cuid())
+  companyId          String
+  customerId         String
+  serviceId          String?
+  professionalId     String
+  startAt            DateTime
+  endAt              DateTime
+  status             AppointmentStatus @default(SCHEDULED)
+  notes              String?
+  internalNotes      String?
   // Financial fields
-  partsValue        Decimal?          @db.Decimal(12, 2)
-  laborValue        Decimal?          @db.Decimal(12, 2)
-  discountPercent   Decimal?          @db.Decimal(5, 2)
-  discountValue     Decimal?          @db.Decimal(12, 2)
-  totalValue        Decimal?          @db.Decimal(12, 2)
-  paymentStatus     PaymentStatus?
-  paymentMethod     PaymentMethod?
-  paidAt            DateTime?
+  partsValue         Decimal?          @db.Decimal(12, 2)
+  laborValue         Decimal?          @db.Decimal(12, 2)
+  discountPercent    Decimal?          @db.Decimal(5, 2)
+  discountValue      Decimal?          @db.Decimal(12, 2)
+  totalValue         Decimal?          @db.Decimal(12, 2)
+  paymentStatus      PaymentStatus?
+  paymentMethod      PaymentMethod?
+  paidAt             DateTime?
   // Status lifecycle tracking
-  startedAt         DateTime?
-  completedAt       DateTime?
-  canceledAt        DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  canceledAt         DateTime?
   cancellationReason String?
   // Source tracking
-  bookedByClient    Boolean           @default(false)
-  source            AppointmentSource @default(INTERNAL)
-  approvalStatus    ApprovalStatus    @default(APPROVED)
-  publicBookingToken String?          @unique
+  bookedByClient     Boolean           @default(false)
+  source             AppointmentSource @default(INTERNAL)
+  approvalStatus     ApprovalStatus    @default(APPROVED)
+  publicBookingToken String?           @unique
   // Creator tracking
-  createdById       String?
-  updatedById       String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customer          Customer          @relation(fields: [customerId], references: [id])
-  service           Service?          @relation(fields: [serviceId], references: [id])
-  professional      Professional      @relation(fields: [professionalId], references: [id])
-  createdBy         User?             @relation("AppointmentCreatedBy", fields: [createdById], references: [id])
-  updatedBy         User?             @relation("AppointmentUpdatedBy", fields: [updatedById], references: [id])
+  company             Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer            Customer             @relation(fields: [customerId], references: [id])
+  service             Service?             @relation(fields: [serviceId], references: [id])
+  professional        Professional         @relation(fields: [professionalId], references: [id])
+  createdBy           User?                @relation("AppointmentCreatedBy", fields: [createdById], references: [id])
+  updatedBy           User?                @relation("AppointmentUpdatedBy", fields: [updatedById], references: [id])
   appointmentServices AppointmentService[]
-  financialRecords  FinancialRecord[]
-  invoiceRequests   InvoiceRequest[]
-  checklists        Checklist[]
-  notificationLogs  NotificationLog[]
+  financialRecords    FinancialRecord[]
+  invoiceRequests     InvoiceRequest[]
+  checklists          Checklist[]
+  notificationLogs    NotificationLog[]
+  sentReminders       SentReminder[]
 
   @@index([companyId])
   @@index([companyId, startAt])
@@ -550,17 +566,17 @@ model Appointment {
 // ═══════════════════════════════════════════════════
 
 model AppointmentService {
-  id                  String    @id @default(cuid())
+  id                  String   @id @default(cuid())
   companyId           String
   appointmentId       String
   serviceId           String
   serviceNameSnapshot String
-  quantity            Int       @default(1)
-  unitPrice           Decimal?  @db.Decimal(12, 2)
-  discountPercentage  Decimal?  @db.Decimal(5, 2)
-  totalPrice          Decimal?  @db.Decimal(12, 2)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  quantity            Int      @default(1)
+  unitPrice           Decimal? @db.Decimal(12, 2)
+  discountPercentage  Decimal? @db.Decimal(5, 2)
+  totalPrice          Decimal? @db.Decimal(12, 2)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
@@ -649,19 +665,19 @@ model InvoiceRequest {
 // ═══════════════════════════════════════════════════
 
 model Checklist {
-  id              String    @id @default(cuid())
+  id              String   @id @default(cuid())
   companyId       String
   appointmentId   String
   title           String
   notes           String?
-  status          String    @default("draft")
+  status          String   @default("draft")
   createdByUserId String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  appointment  Appointment    @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  createdBy    User?          @relation(fields: [createdByUserId], references: [id])
+  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointment  Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  createdBy    User?           @relation(fields: [createdByUserId], references: [id])
   items        ChecklistItem[]
   customerCopy CustomerCopy?
 
@@ -670,14 +686,14 @@ model Checklist {
 }
 
 model ChecklistItem {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   companyId   String
   checklistId String
   description String
-  isChecked   Boolean   @default(false)
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isChecked   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
@@ -687,18 +703,18 @@ model ChecklistItem {
 }
 
 model CustomerCopy {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   companyId     String
   appointmentId String
-  checklistId   String    @unique
+  checklistId   String   @unique
   content       Json?
-  publicToken   String    @unique @default(cuid())
-  status        String    @default("active")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  publicToken   String   @unique @default(cuid())
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  checklist   Checklist   @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([appointmentId])
@@ -710,25 +726,25 @@ model CustomerCopy {
 // ═══════════════════════════════════════════════════
 
 model CustomField {
-  id            String          @id @default(cuid())
-  companyId     String
-  entityType    EntityType
-  label         String
-  fieldKey      String
-  fieldType     CustomFieldType
-  isRequired    Boolean         @default(false)
-  sortOrder     Int             @default(0)
-  placeholder   String?
-  helpText      String?
-  options       Json?
-  defaultValue  Json?
-  isActive      Boolean         @default(true)
-  isPublic      Boolean         @default(false)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id           String          @id @default(cuid())
+  companyId    String
+  entityType   EntityType
+  label        String
+  fieldKey     String
+  fieldType    CustomFieldType
+  isRequired   Boolean         @default(false)
+  sortOrder    Int             @default(0)
+  placeholder  String?
+  helpText     String?
+  options      Json?
+  defaultValue Json?
+  isActive     Boolean         @default(true)
+  isPublic     Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
-  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  values        CustomFieldValue[]
+  company Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  values  CustomFieldValue[]
 
   @@unique([companyId, entityType, fieldKey])
   @@index([companyId])
@@ -737,17 +753,17 @@ model CustomField {
 }
 
 model CustomFieldValue {
-  id             String      @id @default(cuid())
-  companyId      String
-  customFieldId  String
-  entityType     EntityType
-  entityId       String
-  value          Json
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id            String     @id @default(cuid())
+  companyId     String
+  customFieldId String
+  entityType    EntityType
+  entityId      String
+  value         Json
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
-  company        Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customField    CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, customFieldId, entityType, entityId])
   @@index([companyId])
@@ -760,24 +776,24 @@ model CustomFieldValue {
 // ═══════════════════════════════════════════════════
 
 model PublicBookingSettings {
-  id                      String    @id @default(cuid())
-  companyId               String    @unique
-  enabled                 Boolean   @default(false)
-  publicSlug              String?   @unique
-  requireManualApproval   Boolean   @default(false)
-  allowChooseProfessional Boolean   @default(true)
-  minNoticeHours          Int       @default(1)
-  maxDaysAhead            Int       @default(30)
-  slotIntervalMinutes     Int       @default(30)
-  instructions            String?
-  confirmationMessage     String?
-  sendEmailNotifications  Boolean   @default(true)
-  sendWhatsappNotifications Boolean @default(false)
-  sendSmsNotifications    Boolean   @default(false)
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                        String   @id @default(cuid())
+  companyId                 String   @unique
+  enabled                   Boolean  @default(false)
+  publicSlug                String?  @unique
+  requireManualApproval     Boolean  @default(false)
+  allowChooseProfessional   Boolean  @default(true)
+  minNoticeHours            Int      @default(1)
+  maxDaysAhead              Int      @default(30)
+  slotIntervalMinutes       Int      @default(30)
+  instructions              String?
+  confirmationMessage       String?
+  sendEmailNotifications    Boolean  @default(true)
+  sendWhatsappNotifications Boolean  @default(false)
+  sendSmsNotifications      Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
-  company                 Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([publicSlug])
@@ -788,23 +804,23 @@ model PublicBookingSettings {
 // ═══════════════════════════════════════════════════
 
 model NotificationLog {
-  id              String             @id @default(cuid())
-  companyId       String
-  appointmentId   String?
-  customerId      String?
-  channel         NotificationChannel
-  type            NotificationType
-  recipient       String
-  subject         String?
-  body            String?
-  status          NotificationStatus @default(PENDING)
-  errorMessage    String?
-  sentAt          DateTime?
-  createdAt       DateTime           @default(now())
+  id            String              @id @default(cuid())
+  companyId     String
+  appointmentId String?
+  customerId    String?
+  channel       NotificationChannel
+  type          NotificationType
+  recipient     String
+  subject       String?
+  body          String?
+  status        NotificationStatus  @default(PENDING)
+  errorMessage  String?
+  sentAt        DateTime?
+  createdAt     DateTime            @default(now())
 
-  company         Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  appointment     Appointment?       @relation(fields: [appointmentId], references: [id])
-  customer        Customer?          @relation(fields: [customerId], references: [id])
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  customer    Customer?    @relation(fields: [customerId], references: [id])
 
   @@index([companyId])
   @@index([companyId, type])
@@ -819,20 +835,20 @@ model NotificationLog {
 // ═══════════════════════════════════════════════════
 
 model AuditLog {
-  id          String    @id @default(cuid())
-  companyId   String?
-  userId      String?
-  action      String
-  entityType  String
-  entityId    String?
-  oldValues   Json?
-  newValues   Json?
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime  @default(now())
+  id         String   @id @default(cuid())
+  companyId  String?
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
-  company     Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([userId])
@@ -856,4 +872,52 @@ model BotWebhookEvent {
   @@unique([companyId, eventId])
   @@index([companyId])
   @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════
+// BOT (Evolution API — configuração, estado e lembretes)
+// ═══════════════════════════════════════════════════
+
+model CompanyBotConfig {
+  id                 String   @id @default(cuid())
+  companyId          String   @unique
+  whatsappInstance   String?
+  allowBooking       Boolean  @default(false)
+  faqConfig          Json     @default("[]") // [{pergunta, resposta}]
+  reminderConfig     Json     @default("{}") // {enabled, send24h, send2h}
+  businessHours      String?
+  cancellationPolicy String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model BotConversationState {
+  id        String              @id @default(cuid())
+  companyId String
+  phone     String
+  step      BotConversationStep @default(IDLE)
+  context   Json                @default("{}")
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, phone])
+  @@index([companyId])
+}
+
+model SentReminder {
+  id            String   @id @default(cuid())
+  appointmentId String
+  type          String // "24h" | "2h"
+  sentAt        DateTime @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@unique([appointmentId, type])
+  @@index([appointmentId])
 }

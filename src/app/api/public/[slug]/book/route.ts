@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { ApiError, created, handleApiError, ok } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/security/rate-limit";
+import { ensureNoConflict } from "@/lib/services/availability";
 import { buildAppointmentInfo, notifyCustomerAboutAppointment } from "@/lib/services/notifications";
 import crypto from "crypto";
 
@@ -159,20 +160,12 @@ export async function POST(
 
     // Use a transactional approach to avoid race conditions
     const result = await prisma.$transaction(async (tx) => {
-      // Check for scheduling conflicts inside transaction
-      const conflict = await tx.appointment.findFirst({
-        where: {
-          companyId: company.id,
-          professionalId: body.professionalId,
-          status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
-          startAt: { lt: endAt },
-          endAt: { gt: startAt }
-        }
-      });
-
-      if (conflict) {
-        throw new ApiError(409, "Esse horário acabou de ficar indisponível. Escolha outro horário.");
-      }
+      // Check for scheduling conflicts inside transaction (lógica única)
+      await ensureNoConflict(
+        { companyId: company.id, professionalId: body.professionalId, startAt, endAt },
+        tx,
+        "Esse horário acabou de ficar indisponível. Escolha outro horário."
+      );
 
       // Find or create customer
       let customer = await tx.customer.findFirst({

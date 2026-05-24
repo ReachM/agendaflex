@@ -1,186 +1,161 @@
 "use client";
 
-import { Bot, CheckCircle, Loader2, MessageSquare, Unplug, Wifi, X } from "lucide-react";
+import { Bot, CheckCircle, Loader2, Plus, Save, Send, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/client-api";
 
-type BotStatus = {
-  enabled: boolean;
-  connectedAt?: string;
-  plan?: string;
-};
+type FaqItem = { pergunta: string; resposta: string };
+
+type ReminderConfig = { enabled?: boolean; send24h?: boolean; send2h?: boolean };
 
 type BotConfig = {
-  faqContext?: string;
-  businessHours?: string;
-  address?: string;
-  cancellationPolicy?: string;
-  reminders?: {
-    enabled?: boolean;
-    hours?: number[];
-  };
+  whatsappInstance: string | null;
+  allowBooking: boolean;
+  faqConfig: FaqItem[];
+  reminderConfig: ReminderConfig;
+  businessHours: string | null;
+  cancellationPolicy: string | null;
+};
+
+type BotResponse = {
+  botEnabled: boolean;
+  config: BotConfig;
 };
 
 export default function BotSettingsPage() {
-  const [status, setStatus] = useState<BotStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [apiKey, setApiKey] = useState("");
-  const [connecting, setConnecting] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
 
-  // Config form state
-  const [faqContext, setFaqContext] = useState("");
+  // Form state
+  const [botEnabled, setBotEnabled] = useState(false);
+  const [whatsappInstance, setWhatsappInstance] = useState("");
+  const [allowBooking, setAllowBooking] = useState(false);
+  const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [send24h, setSend24h] = useState(true);
+  const [send2h, setSend2h] = useState(true);
   const [businessHours, setBusinessHours] = useState("");
-  const [address, setAddress] = useState("");
   const [cancellationPolicy, setCancellationPolicy] = useState("");
-  const [remindersEnabled, setRemindersEnabled] = useState(true);
-  const [reminder24h, setReminder24h] = useState(true);
-  const [reminder2h, setReminder2h] = useState(true);
-
-  // Session for plan check
-  const [session, setSession] = useState<{ company?: { plan?: string } } | null>(null);
+  const [faq, setFaq] = useState<FaqItem[]>([]);
+  const [testPhone, setTestPhone] = useState("");
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/auth/me").then((r) => r.json()),
-      fetch("/api/bot/status").then((r) => r.json())
-    ])
-      .then(([me, botStatus]) => {
-        setSession(me);
-        setStatus(botStatus);
-
-        // Load existing config if connected
-        if (botStatus.enabled) {
-          loadConfig();
+    (async () => {
+      try {
+        const me = await apiFetch<{ planFeatures?: Record<string, boolean> }>("/api/auth/me");
+        if (!me.planFeatures?.allowBotIntegration) {
+          setBlocked(true);
+          return;
         }
-      })
-      .catch(() => setError("Erro ao carregar dados."))
-      .finally(() => setLoading(false));
+
+        const data = await apiFetch<BotResponse>("/api/bot-whatsapp");
+        applyConfig(data);
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  async function loadConfig() {
-    try {
-      const res = await fetch("/api/bot/config");
-      if (!res.ok) return;
-      const data = await res.json();
-      const config = data as BotConfig;
-      setFaqContext(config.faqContext ?? "");
-      setBusinessHours(config.businessHours ?? "");
-      setAddress(config.address ?? "");
-      setCancellationPolicy(config.cancellationPolicy ?? "");
-      setRemindersEnabled(config.reminders?.enabled ?? true);
-      setReminder24h(config.reminders?.hours?.includes(24) ?? true);
-      setReminder2h(config.reminders?.hours?.includes(2) ?? true);
-    } catch {
-      // silently fail
-    }
+  function applyConfig(data: BotResponse) {
+    setBotEnabled(data.botEnabled);
+    setWhatsappInstance(data.config.whatsappInstance ?? "");
+    setAllowBooking(data.config.allowBooking);
+    setReminderEnabled(data.config.reminderConfig?.enabled ?? true);
+    setSend24h(data.config.reminderConfig?.send24h ?? true);
+    setSend2h(data.config.reminderConfig?.send2h ?? true);
+    setBusinessHours(data.config.businessHours ?? "");
+    setCancellationPolicy(data.config.cancellationPolicy ?? "");
+    setFaq(Array.isArray(data.config.faqConfig) ? data.config.faqConfig : []);
   }
 
-  function clearMessages() {
-    setError("");
-    setSuccess("");
-  }
-
-  async function handleConnect() {
-    clearMessages();
-    if (!apiKey.trim()) {
-      setError("Informe a API Key do ChatBot Service.");
-      return;
-    }
-
-    setConnecting(true);
-    try {
-      const res = await fetch("/api/bot/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatbotApiKey: apiKey })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error ?? "Erro ao conectar o bot.");
-        return;
-      }
-
-      setSuccess("Bot conectado com sucesso!");
-      setApiKey("");
-      setStatus({ enabled: true, connectedAt: data.connectedAt, plan: status?.plan });
-    } catch {
-      setError("Erro de rede. Tente novamente.");
-    } finally {
-      setConnecting(false);
-    }
-  }
-
-  async function handleDisconnect() {
-    clearMessages();
-    setDisconnecting(true);
-    try {
-      const res = await fetch("/api/bot/connect", { method: "DELETE" });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error ?? "Erro ao desconectar o bot.");
-        return;
-      }
-
-      setSuccess("Bot desconectado.");
-      setStatus({ enabled: false, plan: status?.plan });
-      setShowDisconnectModal(false);
-    } catch {
-      setError("Erro de rede. Tente novamente.");
-    } finally {
-      setDisconnecting(false);
-    }
-  }
-
-  async function handleSaveConfig() {
-    clearMessages();
-    setSaving(true);
-    try {
-      const hours: number[] = [];
-      if (reminder24h) hours.push(24);
-      if (reminder2h) hours.push(2);
-
-      const res = await fetch("/api/bot/config", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          faqContext: faqContext || undefined,
-          businessHours: businessHours || undefined,
-          address: address || undefined,
-          cancellationPolicy: cancellationPolicy || undefined,
-          remindersEnabled,
-          reminderHours: hours
-        })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error ?? "Erro ao salvar configurações.");
-        return;
-      }
-
-      setSuccess("Configurações salvas com sucesso!");
-    } catch {
-      setError("Erro de rede. Tente novamente.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // Auto-hide success messages
   useEffect(() => {
     if (success) {
       const timer = setTimeout(() => setSuccess(""), 4000);
       return () => clearTimeout(timer);
     }
   }, [success]);
+
+  async function toggleEnabled(checked: boolean) {
+    setError("");
+    setBotEnabled(checked); // optimistic
+    try {
+      await apiFetch("/api/bot-whatsapp", {
+        method: "PATCH",
+        body: JSON.stringify({ botEnabled: checked })
+      });
+      setSuccess(checked ? "Bot ativado." : "Bot desativado.");
+    } catch (err) {
+      setBotEnabled(!checked); // revert
+      setError((err as Error).message);
+    }
+  }
+
+  async function handleSave() {
+    setError("");
+    setSuccess("");
+    setSaving(true);
+    try {
+      const cleanFaq = faq
+        .map((f) => ({ pergunta: f.pergunta.trim(), resposta: f.resposta.trim() }))
+        .filter((f) => f.pergunta && f.resposta);
+
+      const data = await apiFetch<BotResponse>("/api/bot-whatsapp", {
+        method: "PATCH",
+        body: JSON.stringify({
+          whatsappInstance: whatsappInstance.trim() || null,
+          allowBooking,
+          faqConfig: cleanFaq,
+          reminderConfig: { enabled: reminderEnabled, send24h, send2h },
+          businessHours: businessHours.trim() || null,
+          cancellationPolicy: cancellationPolicy.trim() || null
+        })
+      });
+      applyConfig(data);
+      setSuccess("Configurações salvas com sucesso!");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTest() {
+    setError("");
+    setSuccess("");
+    if (!testPhone.trim()) {
+      setError("Informe um número para enviar o teste.");
+      return;
+    }
+    setTesting(true);
+    try {
+      await apiFetch("/api/bot-whatsapp/test", {
+        method: "POST",
+        body: JSON.stringify({ phone: testPhone.trim() })
+      });
+      setSuccess("Mensagem de teste enviada!");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  function updateFaq(index: number, field: keyof FaqItem, value: string) {
+    setFaq((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  }
+
+  function addFaq() {
+    setFaq((prev) => [...prev, { pergunta: "", resposta: "" }]);
+  }
+
+  function removeFaq(index: number) {
+    setFaq((prev) => prev.filter((_, i) => i !== index));
+  }
 
   if (loading) {
     return (
@@ -190,26 +165,35 @@ export default function BotSettingsPage() {
     );
   }
 
-  const planSlug = session?.company?.plan ?? "starter";
-  const isStarter = planSlug === "starter";
-
-  if (isStarter) {
+  if (blocked) {
     return (
       <>
         <div className="topbar">
           <div className="page-title">
             <h1>Bot WhatsApp</h1>
-            <p className="muted">Integração com bot de WhatsApp com IA</p>
+            <p className="muted">Atendimento e agendamento automático pelo WhatsApp</p>
           </div>
         </div>
 
         <div className="panel" style={{ textAlign: "center", padding: "48px 24px" }}>
           <Bot size={48} style={{ color: "var(--muted)", marginBottom: 16 }} />
           <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 700 }}>Recurso indisponível no plano Starter</h2>
-          <p className="muted" style={{ maxWidth: 420, margin: "0 auto", fontSize: 14, lineHeight: 1.7 }}>
-            A integração com Bot WhatsApp está disponível a partir do plano <strong>Pro</strong>.
-            Faça upgrade para conectar um bot de IA e automatizar seus agendamentos via WhatsApp.
+          <p className="muted" style={{ maxWidth: 440, margin: "0 auto 20px", fontSize: 14, lineHeight: 1.7 }}>
+            O Bot de WhatsApp está disponível a partir do plano <strong>Pro</strong>. Faça upgrade para automatizar
+            atendimento, lembretes e agendamentos pelo WhatsApp.
           </p>
+          <div
+            style={{
+              padding: "12px 20px",
+              background: "var(--warning-light)",
+              borderRadius: "var(--radius)",
+              display: "inline-block",
+              fontSize: 14,
+              color: "var(--warning)"
+            }}
+          >
+            ⚡ Faça upgrade para o plano Pro ou Max para liberar essa funcionalidade.
+          </div>
         </div>
       </>
     );
@@ -220,7 +204,7 @@ export default function BotSettingsPage() {
       <div className="topbar">
         <div className="page-title">
           <h1>Bot WhatsApp</h1>
-          <p className="muted">Integração com bot de WhatsApp com IA</p>
+          <p className="muted">Atendimento e agendamento automático pelo WhatsApp</p>
         </div>
       </div>
 
@@ -229,7 +213,7 @@ export default function BotSettingsPage() {
       {success && (
         <div
           style={{
-            padding: "14px 16px",
+            padding: "12px 16px",
             borderRadius: "var(--radius)",
             border: "1px solid #bbf7d0",
             background: "#f0fdf4",
@@ -239,8 +223,7 @@ export default function BotSettingsPage() {
             marginBottom: 16,
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            animation: "slideDown 0.2s ease-out"
+            gap: 8
           }}
         >
           <CheckCircle size={16} />
@@ -248,10 +231,10 @@ export default function BotSettingsPage() {
         </div>
       )}
 
-      {!status?.enabled ? (
-        /* ─── Not Connected ─── */
-        <div className="panel" style={{ maxWidth: 600 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+      {/* On/off switch — Company.botEnabled */}
+      <section className="panel" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div
               style={{
                 width: 44,
@@ -266,259 +249,219 @@ export default function BotSettingsPage() {
               <Bot size={22} />
             </div>
             <div>
-              <h2 className="section-title" style={{ marginBottom: 2 }}>Conectar Bot WhatsApp</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h2 className="section-title" style={{ marginBottom: 0 }}>Bot de WhatsApp</h2>
+                <span className={`badge ${botEnabled ? "success" : ""}`}>
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: botEnabled ? "#16a34a" : "#94a3b8",
+                      display: "inline-block"
+                    }}
+                  />
+                  {botEnabled ? "Ativo" : "Inativo"}
+                </span>
+              </div>
               <p className="muted" style={{ margin: 0 }}>
-                Cole a API Key fornecida pelo ChatBot Service para ativar o bot.
+                {botEnabled ? "O bot está atendendo seus clientes." : "Ative para o bot começar a atender."}
               </p>
             </div>
           </div>
 
-          <div
-            style={{
-              padding: 16,
-              borderRadius: "var(--radius)",
-              background: "var(--info-light)",
-              border: "1px solid #bfdbfe",
-              marginBottom: 20,
-              fontSize: 13,
-              lineHeight: 1.7,
-              color: "#1e40af"
-            }}
-          >
-            <strong>Como funciona:</strong> O bot de IA atenderá seus clientes no WhatsApp, consultando seus serviços,
-            verificando horários disponíveis e criando agendamentos automaticamente.
-          </div>
-
-          <div className="field" style={{ marginBottom: 16 }}>
-            <label htmlFor="bot-api-key">API Key do ChatBot Service</label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600 }}>
             <input
-              id="bot-api-key"
-              type="text"
-              placeholder="chatbot_sk_..."
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              disabled={connecting}
+              type="checkbox"
+              checked={botEnabled}
+              onChange={(e) => toggleEnabled(e.target.checked)}
+              style={{ width: 18, height: 18 }}
             />
-          </div>
-
-          <button
-            className="button"
-            onClick={handleConnect}
-            disabled={connecting || !apiKey.trim()}
-            type="button"
-          >
-            {connecting ? <Loader2 size={16} className="spin" /> : <Wifi size={16} />}
-            {connecting ? "Conectando..." : "Conectar bot"}
-          </button>
+            {botEnabled ? "Desativar" : "Ativar"}
+          </label>
         </div>
-      ) : (
-        /* ─── Connected ─── */
-        <>
-          {/* Status Card */}
-          <div className="panel" style={{ marginBottom: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: "var(--radius)",
-                    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
-                    display: "grid",
-                    placeItems: "center",
-                    color: "white"
-                  }}
-                >
-                  <MessageSquare size={22} />
-                </div>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <h2 className="section-title" style={{ marginBottom: 0 }}>Bot WhatsApp</h2>
-                    <span className="badge success">
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
-                      Ativo
-                    </span>
-                  </div>
-                  {status.connectedAt && (
-                    <p className="muted" style={{ margin: 0 }}>
-                      Conectado em {new Date(status.connectedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  )}
-                </div>
-              </div>
+      </section>
 
-              <button
-                className="button secondary"
-                onClick={() => setShowDisconnectModal(true)}
-                type="button"
-                style={{ color: "var(--danger)" }}
-              >
-                <Unplug size={16} />
-                Desconectar
+      {/* Connection / instance */}
+      <section className="panel" style={{ marginBottom: 16 }}>
+        <h3 className="section-title" style={{ marginBottom: 16 }}>Conexão</h3>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="bot-instance">Instância do WhatsApp (Evolution API)</label>
+            <input
+              id="bot-instance"
+              type="text"
+              placeholder="ex: minha-empresa"
+              value={whatsappInstance}
+              onChange={(e) => setWhatsappInstance(e.target.value)}
+              maxLength={100}
+            />
+            <small style={{ color: "var(--muted)", marginTop: 4, display: "block" }}>
+              Nome da instância criada na Evolution API para esta empresa.
+            </small>
+          </div>
+          <div className="field">
+            <label htmlFor="bot-test-phone">Enviar mensagem de teste</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                id="bot-test-phone"
+                type="text"
+                placeholder="55 11 97777-8888"
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                maxLength={20}
+              />
+              <button className="button secondary" type="button" onClick={handleTest} disabled={testing}>
+                {testing ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
+                Testar
               </button>
             </div>
+            <small style={{ color: "var(--muted)", marginTop: 4, display: "block" }}>
+              Salve a instância antes de testar.
+            </small>
           </div>
+        </div>
+      </section>
 
-          {/* Config Form */}
-          <div className="panel">
-            <h3 className="section-title" style={{ marginBottom: 16 }}>Configurações do Bot</h3>
+      {/* Behaviour: booking + reminders */}
+      <div className="grid cols-2" style={{ gap: 16, marginBottom: 16 }}>
+        <section className="panel">
+          <h3 className="section-title" style={{ marginBottom: 16 }}>Agendamento</h3>
+          <div className="checkbox-line">
+            <input
+              type="checkbox"
+              id="bot-allow-booking"
+              checked={allowBooking}
+              onChange={(e) => setAllowBooking(e.target.checked)}
+            />
+            <label htmlFor="bot-allow-booking">Permitir que o bot crie agendamentos</label>
+          </div>
+          <small style={{ color: "var(--muted)", marginTop: 8, display: "block" }}>
+            Quando ativo, os clientes podem marcar horários direto pela conversa.
+          </small>
+        </section>
 
-            <div style={{ display: "grid", gap: 16 }}>
-              <div className="field full">
-                <label htmlFor="bot-faq">Contexto para FAQ</label>
-                <textarea
-                  id="bot-faq"
-                  placeholder="Descreva informações frequentes sobre seu negócio que o bot pode usar para responder perguntas..."
-                  value={faqContext}
-                  onChange={(e) => setFaqContext(e.target.value)}
-                  maxLength={2000}
-                  rows={4}
+        <section className="panel">
+          <h3 className="section-title" style={{ marginBottom: 16 }}>Lembretes automáticos</h3>
+          <div className="checkbox-line">
+            <input
+              type="checkbox"
+              id="bot-reminders-enabled"
+              checked={reminderEnabled}
+              onChange={(e) => setReminderEnabled(e.target.checked)}
+            />
+            <label htmlFor="bot-reminders-enabled">Ativar lembretes</label>
+          </div>
+          {reminderEnabled && (
+            <div style={{ paddingLeft: 28, marginTop: 8, display: "grid", gap: 6 }}>
+              <div className="checkbox-line">
+                <input
+                  type="checkbox"
+                  id="bot-reminder-24h"
+                  checked={send24h}
+                  onChange={(e) => setSend24h(e.target.checked)}
                 />
-                <span className="muted">{faqContext.length}/2000 caracteres</span>
+                <label htmlFor="bot-reminder-24h">24 horas antes</label>
               </div>
+              <div className="checkbox-line">
+                <input
+                  type="checkbox"
+                  id="bot-reminder-2h"
+                  checked={send2h}
+                  onChange={(e) => setSend2h(e.target.checked)}
+                />
+                <label htmlFor="bot-reminder-2h">2 horas antes</label>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
 
-              <div className="form-grid">
-                <div className="field">
-                  <label htmlFor="bot-hours">Horário de funcionamento</label>
-                  <input
-                    id="bot-hours"
-                    type="text"
-                    placeholder="Seg-Sex 8h às 18h, Sáb 8h às 12h"
-                    value={businessHours}
-                    onChange={(e) => setBusinessHours(e.target.value)}
-                    maxLength={200}
-                  />
-                </div>
+      {/* Texts */}
+      <section className="panel" style={{ marginBottom: 16 }}>
+        <h3 className="section-title" style={{ marginBottom: 16 }}>Informações do negócio</h3>
+        <div className="form-grid">
+          <div className="field full">
+            <label htmlFor="bot-hours">Horário de atendimento</label>
+            <input
+              id="bot-hours"
+              type="text"
+              placeholder="Seg-Sex 8h às 18h, Sáb 8h às 12h"
+              value={businessHours}
+              onChange={(e) => setBusinessHours(e.target.value)}
+              maxLength={500}
+            />
+          </div>
+          <div className="field full">
+            <label htmlFor="bot-cancel-policy">Política de cancelamento</label>
+            <textarea
+              id="bot-cancel-policy"
+              placeholder="Ex: Cancelamentos devem ser feitos com pelo menos 2 horas de antecedência..."
+              value={cancellationPolicy}
+              onChange={(e) => setCancellationPolicy(e.target.value)}
+              maxLength={1000}
+              rows={2}
+            />
+          </div>
+        </div>
+      </section>
 
-                <div className="field">
-                  <label htmlFor="bot-address">Endereço</label>
+      {/* FAQ editor */}
+      <section className="panel" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <h3 className="section-title" style={{ margin: 0 }}>Perguntas frequentes (FAQ)</h3>
+          <button className="button secondary" type="button" onClick={addFaq}>
+            <Plus size={16} /> Adicionar
+          </button>
+        </div>
+
+        {faq.length === 0 ? (
+          <div className="empty">Nenhuma pergunta cadastrada. O bot usa estas respostas para tirar dúvidas dos clientes.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {faq.map((item, index) => (
+              <div
+                key={index}
+                style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 12, display: "grid", gap: 8 }}
+              >
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                   <input
-                    id="bot-address"
                     type="text"
-                    placeholder="Rua, número, bairro, cidade"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Pergunta"
+                    value={item.pergunta}
+                    onChange={(e) => updateFaq(index, "pergunta", e.target.value)}
                     maxLength={300}
+                    style={{ flex: 1 }}
                   />
+                  <button
+                    className="icon-button secondary"
+                    type="button"
+                    onClick={() => removeFaq(index)}
+                    title="Remover"
+                    style={{ color: "var(--danger)" }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-              </div>
-
-              <div className="field full">
-                <label htmlFor="bot-cancel-policy">Política de cancelamento</label>
                 <textarea
-                  id="bot-cancel-policy"
-                  placeholder="Ex: Cancelamentos devem ser feitos com pelo menos 2 horas de antecedência..."
-                  value={cancellationPolicy}
-                  onChange={(e) => setCancellationPolicy(e.target.value)}
-                  maxLength={500}
+                  placeholder="Resposta"
+                  value={item.resposta}
+                  onChange={(e) => updateFaq(index, "resposta", e.target.value)}
+                  maxLength={2000}
                   rows={2}
                 />
               </div>
-
-              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Lembretes automáticos</h4>
-
-                <div className="checkbox-line">
-                  <input
-                    type="checkbox"
-                    id="bot-reminders-enabled"
-                    checked={remindersEnabled}
-                    onChange={(e) => setRemindersEnabled(e.target.checked)}
-                  />
-                  <label htmlFor="bot-reminders-enabled">Ativar lembretes automáticos</label>
-                </div>
-
-                {remindersEnabled && (
-                  <div style={{ paddingLeft: 28, marginTop: 8, display: "grid", gap: 6 }}>
-                    <div className="checkbox-line">
-                      <input
-                        type="checkbox"
-                        id="bot-reminder-24h"
-                        checked={reminder24h}
-                        onChange={(e) => setReminder24h(e.target.checked)}
-                      />
-                      <label htmlFor="bot-reminder-24h">24 horas antes</label>
-                    </div>
-                    <div className="checkbox-line">
-                      <input
-                        type="checkbox"
-                        id="bot-reminder-2h"
-                        checked={reminder2h}
-                        onChange={(e) => setReminder2h(e.target.checked)}
-                      />
-                      <label htmlFor="bot-reminder-2h">2 horas antes</label>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div style={{ marginTop: 20, display: "flex", gap: 8 }}>
-              <button
-                className="button"
-                onClick={handleSaveConfig}
-                disabled={saving}
-                type="button"
-              >
-                {saving ? <Loader2 size={16} className="spin" /> : null}
-                {saving ? "Salvando..." : "Salvar configurações"}
-              </button>
-            </div>
+            ))}
           </div>
-        </>
-      )}
+        )}
+      </section>
 
-      {/* Disconnect confirmation modal */}
-      {showDisconnectModal && (
-        <div className="modal-overlay" onClick={() => setShowDisconnectModal(false)}>
-          <div
-            className="modal-content"
-            style={{ maxWidth: 480 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 className="section-title" style={{ margin: 0 }}>Desconectar Bot</h3>
-              <button
-                className="icon-button secondary"
-                onClick={() => setShowDisconnectModal(false)}
-                type="button"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ margin: "0 0 20px", fontSize: 14, lineHeight: 1.7, color: "var(--text-secondary)" }}>
-              Tem certeza que deseja desconectar o bot de WhatsApp?
-              <br />
-              <strong>Esta ação irá:</strong>
-            </p>
-            <ul style={{ margin: "0 0 20px", paddingLeft: 20, fontSize: 13, lineHeight: 2, color: "var(--text-secondary)" }}>
-              <li>Desativar o bot de atendimento</li>
-              <li>Remover a integração com o ChatBot Service</li>
-              <li>Clientes não serão mais atendidos pelo bot</li>
-            </ul>
-
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button
-                className="button secondary"
-                onClick={() => setShowDisconnectModal(false)}
-                type="button"
-              >
-                Cancelar
-              </button>
-              <button
-                className="button danger"
-                onClick={handleDisconnect}
-                disabled={disconnecting}
-                type="button"
-              >
-                {disconnecting ? <Loader2 size={16} className="spin" /> : <Unplug size={16} />}
-                {disconnecting ? "Desconectando..." : "Desconectar bot"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="button" type="button" onClick={handleSave} disabled={saving}>
+          {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
+          {saving ? "Salvando..." : "Salvar configurações"}
+        </button>
+      </div>
     </>
   );
 }

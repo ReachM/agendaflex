@@ -136,6 +136,43 @@ npm run test
 
 ---
 
+## ⏰ Lembretes automáticos do Bot (agendador interno)
+
+Os lembretes de agendamento via WhatsApp (Evolution API) são disparados por um
+**agendador interno em `node-cron`** que roda **dentro do próprio processo Next**
+(`next start`) — não há Vercel Cron, cron do sistema, nem endpoint externo.
+
+**Como sobe com o container:**
+
+1. O Next executa `src/instrumentation.ts` (hook `register()`) **uma vez** no
+   bootstrap do servidor.
+2. O agendador só é ativado quando `NEXT_RUNTIME === "nodejs"` **e**
+   `NODE_ENV === "production"` (ou seja, no `next start` do container). Em
+   desenvolvimento (`next dev`) ele fica desligado para não duplicar com o
+   hot-reload. Uma flag global (`globalThis`) garante uma única instância por
+   processo.
+3. A cada **15 minutos** o cron chama `processReminders()`
+   ([src/lib/services/bot-reminder.ts](src/lib/services/bot-reminder.ts)), que
+   varre os agendamentos `SCHEDULED` nas janelas de **24h** e **2h**.
+4. Um lembrete só é enviado se: `Company.botEnabled` = true, o plano tem
+   `allowBotIntegration`, a janela está ligada em `reminderConfig`, e ainda **não
+   existe** `SentReminder(appointmentId, type)`. Após o envio, grava-se o
+   `SentReminder` — o `@@unique(appointmentId, type)` garante **zero duplicado**.
+
+**Pré-requisitos de ambiente** (ver `.env.example`): `EVOLUTION_API_URL`,
+`EVOLUTION_API_KEY` e `WHATSAPP_WEBHOOK_TOKEN`.
+
+> **Escala horizontal:** o agendador vive no processo Node. Se você rodar
+> **múltiplas réplicas** do container, cada réplica terá seu próprio cron. A
+> duplicidade de **mensagens** continua barrada pelo `SentReminder` (idempotência
+> no banco), mas se quiser apenas um disparador, rode o cron em uma única
+> réplica/worker dedicado.
+
+A lógica é **testável sem o cron**: basta chamar
+`processReminders({ now, intervalMinutes })` com uma data fixa.
+
+---
+
 <div align="center">
   <p>Construído com ❤️ e dedicação à excelência em arquitetura de software.</p>
 </div>

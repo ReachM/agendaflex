@@ -1,4 +1,3 @@
-import { AppointmentStatus } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ApiError, handleApiError, ok } from "@/lib/api/errors";
 import { audit } from "@/lib/audit";
@@ -14,6 +13,7 @@ import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { hasPermission } from "@/lib/security/permissions";
 import { resolvePlanFeatures } from "@/lib/security/plan-guard";
+import { ensureNoConflict } from "@/lib/services/availability";
 import { attachCustomValues, saveCustomFieldValues } from "@/lib/services/custom-field-values";
 import { buildAppointmentInfo, notifyCustomerAboutAppointment } from "@/lib/services/notifications";
 import { appointmentUpdateSchema } from "@/lib/validation/schemas";
@@ -24,29 +24,6 @@ type RouteContext = {
 
 async function getParams(context: RouteContext) {
   return await context.params;
-}
-
-async function ensureNoConflict(input: {
-  companyId: string;
-  professionalId: string;
-  startAt: Date;
-  endAt: Date;
-  excludeId: string;
-}) {
-  const conflict = await prisma.appointment.findFirst({
-    where: {
-      companyId: input.companyId,
-      professionalId: input.professionalId,
-      status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
-      id: { not: input.excludeId },
-      startAt: { lt: input.endAt },
-      endAt: { gt: input.startAt }
-    }
-  });
-
-  if (conflict) {
-    throw new ApiError(409, "Já existe um agendamento para este profissional nesse horário.");
-  }
 }
 
 type AgendaAccess = {
