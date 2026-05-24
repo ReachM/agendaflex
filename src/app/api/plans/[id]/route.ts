@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { ApiError, handleApiError, ok } from "@/lib/api/errors";
+import { handleApiError, ok } from "@/lib/api/errors";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/security/auth";
@@ -15,7 +15,7 @@ async function getParams(context: RouteContext) {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireSuperAdmin(request);
+    await requireSuperAdmin(request);
     const { id } = await getParams(context);
     const plan = await prisma.plan.findUniqueOrThrow({
       where: { id },

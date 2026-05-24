@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\moise\\\\Downloads\\\\AgendaFlex\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(Select-Object -First 50)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\moise\\\\Downloads\\\\AgendaFlex\" -File | Where-Object {$_.Extension -in @\\('.json', '.ts', '.tsx', '.md'\\)} | Select-Object -ExpandProperty Name | Sort-Object)"
+    ]
+  }
+}

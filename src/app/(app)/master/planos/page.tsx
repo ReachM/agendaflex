@@ -1,5 +1,5 @@
 "use client";
-import { Check, CreditCard, Edit2, Plus, Save, ToggleLeft, ToggleRight, X } from "lucide-react";
+import { Check, Edit2, Plus, Save, ToggleLeft, ToggleRight, X } from "lucide-react";
 import { useEffect, useState, FormEvent } from "react";
 import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";

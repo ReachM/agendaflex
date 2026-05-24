@@ -29,6 +29,7 @@ export default function RelatoriosPage() {
     apiFetch<AnyRecord>(`/api/reports?${params}`).then(setData).catch(err => setError(err.message));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
   if (!data) {

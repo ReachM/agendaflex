@@ -56,7 +56,7 @@ export function AppointmentPreviewModal({
   onStatusChange,
   onRefresh,
   role,
-  planFeatures
+  planFeatures: _planFeatures
 }: {
   appointment: AnyRecord;
   onClose: () => void;
@@ -75,9 +75,6 @@ export function AppointmentPreviewModal({
   const canManage = !role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"].includes(role);
   const canChangeStatus = !role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER", "STAFF"].includes(role);
   const isTerminal = status === "CANCELLED" || status === "COMPLETED" || status === "NO_SHOW";
-  const isInProgress = status === "IN_PROGRESS";
-  const isCompleted = status === "COMPLETED";
-  const checklistAllowed = planFeatures?.allowCustomerChecklist !== false;
 
   async function handleStatus(newStatus: string, reason?: string) {
     setLoading(true);
@@ -96,18 +93,6 @@ export function AppointmentPreviewModal({
     await handleStatus("CANCELLED", cancelReason);
     setShowCancelModal(false);
   }
-
-  // Calculate totals
-  const servicesTotal = (appointment.appointmentServices ?? []).reduce(
-    (sum: number, s: AnyRecord) => sum + (s.unitPrice ? Number(s.unitPrice) : 0), 0
-  );
-  const parts = appointment.partsValue ? Number(appointment.partsValue) : 0;
-  const labor = appointment.laborValue ? Number(appointment.laborValue) : 0;
-  const discountPct = appointment.discountPercent ? Number(appointment.discountPercent) : 0;
-  const discountVal = appointment.discountValue ? Number(appointment.discountValue) : 0;
-  const subtotal = servicesTotal + parts + labor;
-  const calculatedDiscount = discountPct > 0 ? subtotal * discountPct / 100 : discountVal;
-  const total = appointment.totalValue ? Number(appointment.totalValue) : subtotal - calculatedDiscount;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -406,7 +391,6 @@ export function TodayAppointments({
   const [statusFilter, setStatusFilter] = useState("");
   const [profFilter, setProfFilter] = useState("");
 
-  const canSeeValues = !role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"].includes(role);
   const canChangeStatus = !role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER", "STAFF"].includes(role);
 
   // Unique professionals for filter

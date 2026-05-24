@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Plus, RefreshCcw, Save, Trash2 } from "lucide-react";
+import { Plus, RefreshCcw, Trash2 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
 import { PageHeader, StatCard } from "@/components/page-header";

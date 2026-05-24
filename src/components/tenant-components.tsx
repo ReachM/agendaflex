@@ -7,14 +7,12 @@ import {
   Check,
   CheckCircle,
   Clock,
-  DollarSign,
   Edit2,
   Eye,
   Plus,
   RefreshCcw,
   Save,
   Trash2,
-  User,
   UserPlus,
   Users,
   X
@@ -987,6 +985,8 @@ export function ProfessionalManager() {
   );
 }
 
+const PRICING_FIELD_KEYS = new Set(["valor_da_peca", "valor_da_mao_de_obra", "desconto_em_porcentagem", "valor_total"]);
+
 export function AppointmentManager() {
   const now = new Date();
   const later = new Date(now.getTime() + 60 * 60 * 1000);
@@ -999,7 +999,7 @@ export function AppointmentManager() {
   const [view, setView] = useState<"list" | "day" | "week" | "month">("week");
   const [error, setError] = useState("");
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
-  const [pricing, setPricing] = useState({ partsValue: "", laborValue: "", discountPercent: "" });
+  const [, setPricing] = useState({ partsValue: "", laborValue: "", discountPercent: "" });
 
   const [form, setForm] = useState({
     customerId: "",
@@ -1018,14 +1018,10 @@ export function AppointmentManager() {
     }, 0);
   }, [selectedServiceIds, services]);
 
-  const selectedServiceNames = useMemo(() => {
-    return selectedServiceIds.map((id) => services.find((s) => s.id === id)?.name).filter(Boolean).join(", ");
-  }, [selectedServiceIds, services]);
-
   // ─── Editing state ─────────────────────────────────────────
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editSelectedServiceIds, setEditSelectedServiceIds] = useState<string[]>([]);
-  const [editPricing, setEditPricing] = useState({ partsValue: "", laborValue: "", discountPercent: "" });
+  const [, setEditPricing] = useState({ partsValue: "", laborValue: "", discountPercent: "" });
 
   const [editForm, setEditForm] = useState({
     customerId: "",
@@ -1063,8 +1059,7 @@ export function AppointmentManager() {
   }
 
   // Filter out old pricing custom fields — now handled by PricingCalculator
-  const pricingFieldKeys = new Set(["valor_da_peca", "valor_da_mao_de_obra", "desconto_em_porcentagem", "valor_total"]);
-  const filteredFields = useMemo(() => fields.filter((f) => !pricingFieldKeys.has(f.fieldKey)), [fields]);
+  const filteredFields = useMemo(() => fields.filter((f) => !PRICING_FIELD_KEYS.has(f.fieldKey)), [fields]);
 
   useEffect(() => {
     load().catch((err) => setError(err.message));
@@ -1380,127 +1375,6 @@ function MultiServiceSelect({
     </div>
   );
 }
-
-function PricingSummary({
-  services,
-  selectedIds,
-  servicesTotal,
-  pricing,
-  onPricingChange
-}: {
-  services: AnyRecord[];
-  selectedIds: string[];
-  servicesTotal: number;
-  pricing: { partsValue: string; laborValue: string; discountPercent: string };
-  onPricingChange: (p: { partsValue: string; laborValue: string; discountPercent: string }) => void;
-}) {
-  const parts = pricing.partsValue ? Number(pricing.partsValue) : 0;
-  const labor = pricing.laborValue ? Number(pricing.laborValue) : 0;
-  const discount = pricing.discountPercent ? Number(pricing.discountPercent) : 0;
-  const subtotal = servicesTotal + parts + labor;
-  const discountValue = subtotal * discount / 100;
-  const grandTotal = subtotal - discountValue;
-
-  return (
-    <div className="field full">
-      <div className="price-calculator">
-        {/* Serviços selecionados */}
-        {selectedIds.length > 0 ? (
-          <div className="price-calculator__section">
-            <div className="price-calculator__section-title">
-              <DollarSign size={14} />
-              Serviços selecionados
-            </div>
-            {selectedIds.map((id) => {
-              const svc = services.find((s) => s.id === id);
-              if (!svc) return null;
-              return (
-                <div key={id} className="price-calculator__row">
-                  <span>{svc.name}</span>
-                  <span>{svc.basePrice != null ? formatMoney(svc.basePrice) : "-"}</span>
-                </div>
-              );
-            })}
-            <div className="price-calculator__row subtotal">
-              <span>Subtotal serviços</span>
-              <strong>{formatMoney(servicesTotal)}</strong>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Campos editáveis */}
-        <div className="price-calculator__fields">
-          <div className="price-calculator__field">
-            <label>Valor da Peça (R$)</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0,00"
-              value={pricing.partsValue}
-              onChange={(e) => onPricingChange({ ...pricing, partsValue: e.target.value })}
-            />
-          </div>
-          <div className="price-calculator__field">
-            <label>Mão de Obra (R$)</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0,00"
-              value={pricing.laborValue}
-              onChange={(e) => onPricingChange({ ...pricing, laborValue: e.target.value })}
-            />
-          </div>
-          <div className="price-calculator__field">
-            <label>Desconto (%)</label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="0.1"
-              placeholder="0"
-              value={pricing.discountPercent}
-              onChange={(e) => onPricingChange({ ...pricing, discountPercent: e.target.value })}
-            />
-          </div>
-        </div>
-
-        {/* Totais */}
-        <div className="price-calculator__totals">
-          <div className="price-calculator__row">
-            <span>Serviços</span>
-            <span>{formatMoney(servicesTotal)}</span>
-          </div>
-          {parts > 0 ? (
-            <div className="price-calculator__row">
-              <span>Peças</span>
-              <span>{formatMoney(parts)}</span>
-            </div>
-          ) : null}
-          {labor > 0 ? (
-            <div className="price-calculator__row">
-              <span>Mão de obra</span>
-              <span>{formatMoney(labor)}</span>
-            </div>
-          ) : null}
-          {discount > 0 ? (
-            <div className="price-calculator__row discount">
-              <span>Desconto ({discount}%)</span>
-              <span>- {formatMoney(discountValue)}</span>
-            </div>
-          ) : null}
-          <div className="price-calculator__grand-total">
-            <span>Valor Total</span>
-            <strong>{formatMoney(grandTotal)}</strong>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
 
 function AppointmentTable({
   appointments,
