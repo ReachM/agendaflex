@@ -73,7 +73,8 @@ describe("Bot Booking — criação", () => {
     expect(data.status).toBe("SCHEDULED");
     expect(data.companyId).toBe(COMPANY);
     expect(data.professionalId).toBe("prof-1");
-    expect(reply.toLowerCase()).toContain("confirmado");
+    expect(reply).not.toBeNull();
+    expect(reply!.toLowerCase()).toContain("confirmado");
     // Estado da conversa é limpo ao concluir.
     expect(prismaMock.botConversationState.deleteMany).toHaveBeenCalled();
   });

@@ -288,10 +288,10 @@ model Company {
   // Liga/desliga do bot — fonte única de verdade. Reaproveitado pelo bot Evolution API.
   botEnabled Boolean @default(false)
 
-  // @deprecated Campos da antiga integração via ChatBot Service (microsserviço externo).
-  // Serão removidos quando as rotas/cliente do microsserviço forem retirados
-  // (decisão: substituir pelo bot in-process via Evolution API). Mantidos por ora
-  // para não quebrar o código existente. Não migrar dados.
+  // @deprecated Campos órfãos da antiga integração via ChatBot Service (microsserviço
+  // externo), já REMOVIDA. Não há mais código que os leia/escreva — o bot atual é
+  // in-process (Evolution API) e usa CompanyBotConfig + botEnabled. Mantidos apenas
+  // para evitar uma migração destrutiva agora; remover numa migração futura.
   botApiKey        String?   @unique
   botWebhookSecret String?
   botRegisteredAt  DateTime?
@@ -861,6 +861,9 @@ model AuditLog {
 // BOT WEBHOOK EVENTS (idempotency)
 // ═══════════════════════════════════════════════════
 
+// @deprecated Tabela de idempotência do webhook do antigo ChatBot Service, já
+// REMOVIDO. O webhook in-process atual (/api/webhooks/whatsapp/[companyId]) não
+// usa este model. Mantido para evitar migração destrutiva agora; remover depois.
 model BotWebhookEvent {
   id        String   @id @default(cuid())
   companyId String
