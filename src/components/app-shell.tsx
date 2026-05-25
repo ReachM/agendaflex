@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useMemo, useState } from "react";
+import { TrialBanner, TrialExpiredModal, type SubscriptionState } from "@/components/subscription-gate";
 
 type Session = {
   kind: "super_admin" | "tenant";
@@ -33,6 +34,7 @@ type Session = {
   company: null | { id: string; name: string; segment: string; status: string; plan: string; slug?: string; publicBookingEnabled?: boolean };
   planFeatures?: Record<string, boolean>;
   menuItems?: { href: string; label: string; icon: string }[];
+  subscription?: SubscriptionState | null;
 };
 
 const iconMap: Record<string, any> = {
@@ -98,6 +100,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const planSlug = session?.company?.plan ?? "starter";
+  const subscription = session?.subscription ?? null;
+  const showTrialBanner = subscription?.isTrial && !subscription.isBlocked;
+  const showBlockingModal = subscription?.isBlocked ?? false;
 
   return (
     <div className="app-shell">
@@ -158,7 +163,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {mobileOpen && <div className="sidebar-backdrop" onClick={() => setMobileOpen(false)} />}
 
-      <main className="content">{children}</main>
+      <main className={`content ${showBlockingModal ? "content--blocked" : ""}`}>
+        {showTrialBanner && <TrialBanner daysLeft={subscription!.trialDaysLeft} />}
+        {children}
+      </main>
+
+      {showBlockingModal && <TrialExpiredModal />}
     </div>
   );
 }

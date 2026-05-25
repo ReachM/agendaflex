@@ -2650,3 +2650,153 @@ tbody tr:hover {
     flex-direction: column;
   }
 }
+
+/* ═══════════════════════════════════════════════════
+   TRIAL — banner de contagem + modal de bloqueio
+   ═══════════════════════════════════════════════════ */
+
+.trial-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  border: 1px solid var(--primary);
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.trial-banner--urgent {
+  border-color: var(--warning);
+  background: var(--warning-light);
+  color: var(--warning);
+}
+
+.content--blocked {
+  filter: blur(4px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.trial-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.trial-modal {
+  width: 100%;
+  max-width: 920px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 32px;
+}
+
+.trial-modal-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.trial-modal-icon {
+  color: var(--warning);
+}
+
+.trial-modal-header h2 {
+  margin: 8px 0 4px;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.trial-modal-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.trial-modal-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.trial-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.trial-plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
+}
+
+.trial-plan-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.trial-plan-price {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.trial-plan-price span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.trial-plan-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.trial-plan-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.trial-plan-features li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.trial-plan-features li svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.trial-plan-card .button {
+  margin-top: 8px;
+  width: 100%;
+  justify-content: center;
+}

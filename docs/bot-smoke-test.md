@@ -246,6 +246,74 @@ Confira: **path** `/message/sendText/<instance>`, **header `apikey`** presente, 
 
 ---
 
+## 7. Fluxo de agendamento ponta a ponta (automatizado)
+
+O `scripts/smoke-booking-flow.ts` percorre a conversa de agendamento inteira
+contra a **Oficina Central (Max)**, enviando as mensagens em sequência e lendo o
+banco (via Prisma) entre os passos. Ele descobre a empresa pelo slug
+`oficina-central` e usa a `whatsappInstance` que você configurou (não precisa
+passar `companyId` nem `instance`).
+
+> **Como ele escolhe serviço/horário:** entre os passos, o script lê
+> `BotConversationState.context` (que o bot persiste) para saber as **opções reais**
+> que o bot ofertou — e escolhe entre elas. Assim o horário agendado é
+> comprovadamente **um dos ofertados pelo sistema, nunca inventado**.
+
+### Pré-requisitos
+
+- Banco no ar + seed aplicado (seção 2).
+- Bot **ativado** para a Oficina Central em `/configuracoes/bot`: `botEnabled` on,
+  `whatsappInstance` preenchida, **allowBooking ON** (para o cenário positivo).
+- `WHATSAPP_WEBHOOK_TOKEN` no `.env` **e o servidor reiniciado** com esse valor.
+- (Opcional, recomendado) `scripts/mock-evolution.mjs` rodando, para ver os textos
+  de resposta. Mesmo sem o mock, o agendamento é criado no banco — o envio apenas
+  falha e é logado como `[Bot WhatsApp] falha de envio`.
+
+### Rodar
+
+```bash
+npx tsx scripts/smoke-booking-flow.ts all        # positivo + negativo
+npx tsx scripts/smoke-booking-flow.ts positive   # só o fluxo feliz
+npx tsx scripts/smoke-booking-flow.ts negative    # só o sub-cenário allowBooking=false
+```
+
+Telefones de teste (sobrescrevíveis por env `SMOKE_POS_PHONE` / `SMOKE_NEG_PHONE`):
+`5511970000001` (positivo) e `5511970000002` (negativo).
+
+### Idempotência
+
+Antes de cada execução o script **limpa** o cliente de teste, seus agendamentos
+(cascade em `AppointmentService`/`SentReminder`) e o `BotConversationState` daquele
+número — então pode rodar quantas vezes quiser. Se quiser limpar manualmente:
+`npx prisma studio` → apague a linha de `BotConversationState` com o `phone` de
+teste (e, se quiser, o cliente/agendamentos correspondentes).
+
+### Como interpretar
+
+Cada passo imprime **enviado → HTTP**, o **step lido do banco**, e ✅/❌ por
+verificação. No fim, um resumo e o **exit code** (0 = tudo passou).
+
+**Positivo** valida as transições e a criação:
+
+1. `"quero agendar"` → `step = AWAITING_SERVICE`, bot ofertou `serviceOptions`.
+2. escolhe o serviço (1º real ofertado) → `step = AWAITING_DATE`, `serviceId` gravado.
+3. informa data (tenta dias úteis até haver vaga) → `step = AWAITING_SLOT`, `slotOptions` reais.
+4. escolhe o 1º horário → `step = AWAITING_NAME` (cliente novo).
+5. informa o nome → `BotConversationState` removido + `Appointment` criado com
+   `source = BOT`, `status = SCHEDULED`, `startAt` **igual ao horário escolhido** e
+   **pertencente ao conjunto ofertado** no passo 3.
+
+**Negativo** (sub-cenário): o script grava `allowBooking = false` temporariamente
+(restaura no fim, via `try/finally`), envia `"quero agendar"` de outro número e
+verifica que **não** avançou o step e **não** criou `Appointment` (a recusa
+amigável sai na captura).
+
+> Para conferir o texto de confirmação/recusa, olhe o terminal do mock
+> (`scripts/mock-evolution.mjs`) — o corpo HTTP do webhook continua sendo só
+> `{received:true}`.
+
+---
+
 ## Resumo do "esperado" por cenário
 
 | Caso | HTTP | Resposta do bot (na captura/logs) | Efeito no banco |

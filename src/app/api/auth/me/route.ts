@@ -3,6 +3,7 @@ import { handleApiError, ok } from "@/lib/api/errors";
 import { requireAnyAuth } from "@/lib/security/auth";
 import { featuresToBooleanMap, resolvePlanFeatures } from "@/lib/security/plan-guard";
 import { getVisibleMenuItems, MASTER_MENU_ITEMS } from "@/lib/security/permissions";
+import { getSubscriptionState, type SubscriptionState } from "@/lib/services/subscription";
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,11 +11,13 @@ export async function GET(request: NextRequest) {
 
     let planFeatures: Record<string, boolean> = {};
     let menuItems: { href: string; label: string; icon: string }[] = [];
+    let subscription: SubscriptionState | null = null;
 
     if (context.kind === "tenant") {
       const features = await resolvePlanFeatures(context.companyId);
       planFeatures = featuresToBooleanMap(features);
       menuItems = getVisibleMenuItems(context.roleName, planFeatures);
+      subscription = await getSubscriptionState(context.companyId);
     } else {
       menuItems = MASTER_MENU_ITEMS;
     }
@@ -40,7 +43,8 @@ export async function GET(request: NextRequest) {
           }
         : null,
       planFeatures,
-      menuItems
+      menuItems,
+      subscription
     });
   } catch (error) {
     return handleApiError(error);

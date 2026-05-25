@@ -4,6 +4,9 @@ import { ApiError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { verifyAuthToken } from "@/lib/security/jwt";
 import { hasPermission, type PermissionKey } from "@/lib/security/permissions";
+import { assertSubscriptionActive } from "@/lib/services/subscription";
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 type MembershipWithRole = CompanyUser & {
   company: Company;
@@ -114,7 +117,20 @@ export async function requireSuperAdmin(request: NextRequest) {
   return context;
 }
 
-export async function requireTenant(request: NextRequest, permission?: PermissionKey) {
+export type RequireTenantOptions = {
+  /**
+   * Pula o bloqueio por assinatura vencida. Use APENAS em rotas que precisam
+   * permanecer abertas mesmo com o trial expirado (ex.: checkout/assinar plano).
+   * Logout e /api/auth/me usam requireAnyAuth e já não passam por aqui.
+   */
+  skipSubscriptionCheck?: boolean;
+};
+
+export async function requireTenant(
+  request: NextRequest,
+  permission?: PermissionKey,
+  options?: RequireTenantOptions
+) {
   const context = await resolveAuth(request);
   if (context.kind !== "tenant") {
     throw new ApiError(403, "Acesso restrito ao painel da empresa.");
@@ -122,6 +138,13 @@ export async function requireTenant(request: NextRequest, permission?: Permissio
 
   if (permission && !hasPermission(context.roleName, permission)) {
     throw new ApiError(403, "Permissão insuficiente para esta ação.");
+  }
+
+  // Enforcement central: rotas de escrita ficam bloqueadas quando a assinatura
+  // está vencida. Leituras (GET/HEAD/OPTIONS) seguem abertas — o front exibe o
+  // modal de bloqueio e o caminho para assinar permanece acessível.
+  if (!options?.skipSubscriptionCheck && !SAFE_METHODS.has(request.method)) {
+    await assertSubscriptionActive(context.companyId);
   }
 
   return context;
