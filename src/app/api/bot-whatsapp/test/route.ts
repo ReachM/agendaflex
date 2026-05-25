@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const body = testSchema.parse(await request.json());
     const message =
-      body.message ?? "✅ Teste do AgendaFlex: seu bot de WhatsApp está conectado e funcionando.";
+      body.message ?? "✅ Teste do MarcaiFlex: seu bot de WhatsApp está conectado e funcionando.";
 
     await sendTextMessage(context.companyId, body.phone, message);
 

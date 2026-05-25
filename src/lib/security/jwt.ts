@@ -8,7 +8,7 @@ export type AuthTokenPayload = {
 };
 
 function secretKey() {
-  const secret = process.env.AUTH_SECRET ?? "dev-agendaflex-secret-change-me-with-32-characters";
+  const secret = process.env.AUTH_SECRET ?? "dev-marcaiflex-secret-change-me-with-32-characters";
 
   if (process.env.NODE_ENV === "production" && secret.includes("change-me")) {
     throw new Error("AUTH_SECRET precisa ser configurado em produção.");

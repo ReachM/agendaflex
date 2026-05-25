@@ -179,7 +179,7 @@ export function CheckoutModal({ planSlug, planName, amount, onClose, onSuccess }
             {/* Container onde o Brick do MP injeta os campos do cartão (iframes do MP). */}
             <div id={BRICK_CONTAINER_ID} className="checkout-brick" />
             <p className="checkout-secure muted">
-              Pagamento processado pelo Mercado Pago. Seus dados de cartão não passam pelo AgendaFlex.
+              Pagamento processado pelo Mercado Pago. Seus dados de cartão não passam pelo MarcaiFlex.
             </p>
           </>
         )}

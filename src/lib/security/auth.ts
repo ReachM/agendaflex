@@ -41,7 +41,7 @@ export type AuthContext = SuperAdminContext | TenantAuthContext;
 function tokenFromRequest(request: NextRequest) {
   const bearer = request.headers.get("authorization");
   if (bearer?.startsWith("Bearer ")) return bearer.slice(7);
-  return request.cookies.get("agendaflex_token")?.value;
+  return request.cookies.get("marcaiflex_token")?.value;
 }
 
 async function resolveAuth(request: NextRequest): Promise<AuthContext> {

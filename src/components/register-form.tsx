@@ -178,7 +178,7 @@ export function RegisterForm() {
             );
           })}
         </div>
-        <h2>Criar conta no AgendaFlex</h2>
+        <h2>Criar conta no MarcaiFlex</h2>
         <p className="muted">Teste grátis por 7 dias. Sem cartão de crédito.</p>
       </div>
 

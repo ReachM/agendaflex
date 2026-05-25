@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       redirectTo: superRole ? "/master" : "/dashboard"
     });
 
-    response.cookies.set("agendaflex_token", token, {
+    response.cookies.set("marcaiflex_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",

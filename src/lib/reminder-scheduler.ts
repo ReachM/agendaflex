@@ -6,7 +6,7 @@ const LOG_PREFIX = "[Bot Reminder]";
 // Flag global para sobreviver ao hot-reload do dev e evitar múltiplos
 // agendadores no mesmo processo Node.
 const globalForCron = globalThis as typeof globalThis & {
-  __agendaflexReminderCronStarted?: boolean;
+  __marcaiflexReminderCronStarted?: boolean;
 };
 
 /**
@@ -14,8 +14,8 @@ const globalForCron = globalThis as typeof globalThis & {
  * Idempotente: só instancia um agendador por processo.
  */
 export function startReminderScheduler(): void {
-  if (globalForCron.__agendaflexReminderCronStarted) return;
-  globalForCron.__agendaflexReminderCronStarted = true;
+  if (globalForCron.__marcaiflexReminderCronStarted) return;
+  globalForCron.__marcaiflexReminderCronStarted = true;
 
   cron.schedule("*/15 * * * *", () => {
     processReminders()

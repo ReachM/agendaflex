@@ -4,7 +4,7 @@ const PUBLIC_PATHS = ["/login", "/cadastro", "/agendar"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get("agendaflex_token")?.value;
+  const token = request.cookies.get("marcaiflex_token")?.value;
   const isPublic = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
 
   // Raiz: usuário logado vai para o app; visitante vê a landing pública (segue
