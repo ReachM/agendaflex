@@ -12,6 +12,7 @@ import {
   validateStep,
   type RegisterFormState
 } from "@/lib/registration";
+import { CheckoutModal } from "@/components/checkout-modal";
 
 type PublicPlan = {
   name: string;
@@ -37,6 +38,7 @@ export function RegisterForm() {
   const [submitError, setSubmitError] = useState("");
   const [emailExists, setEmailExists] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkout, setCheckout] = useState<{ slug: string; name: string; amount: number } | null>(null);
 
   const [plans, setPlans] = useState<PublicPlan[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
@@ -98,8 +100,7 @@ export function RegisterForm() {
     setSubmitError("");
     setEmailExists(false);
 
-    // TODO: para planos PAGOS, iniciar aqui o checkout do Mercado Pago antes de
-    // criar a conta. Por ora, todos os caminhos iniciam o trial gratuito de 7 dias.
+    // A conta sempre nasce em TRIAL (a rota /register cria a assinatura TRIALING).
     const response = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -121,7 +122,15 @@ export function RegisterForm() {
       return;
     }
 
-    // O cookie de sessão é setado pela API (Set-Cookie). Apenas navegamos.
+    // O cookie de sessão é setado pela API (Set-Cookie) — o usuário já está logado.
+    // Se escolheu um plano PAGO, abrimos o checkout para assinar (a ativação real
+    // virá pelo webhook). Se for grátis / só testar, segue direto no trial.
+    const selectedPlan = plans.find((p) => p.slug === state.planSlug);
+    if (selectedPlan && selectedPlan.price > 0) {
+      setCheckout({ slug: selectedPlan.slug, name: selectedPlan.name, amount: selectedPlan.price });
+      return;
+    }
+
     // TODO: futuramente direcionar para um onboarding de configuração da agenda.
     router.push(data.redirectTo ?? "/dashboard");
     router.refresh();
@@ -132,6 +141,26 @@ export function RegisterForm() {
       event.preventDefault();
       update("segment", value);
     }
+  }
+
+  // Conta já criada (trial). Plano pago escolhido -> abrir checkout. O usuário
+  // pode "pagar depois" e seguir no teste gratuito.
+  if (checkout) {
+    return (
+      <CheckoutModal
+        planSlug={checkout.slug}
+        planName={checkout.name}
+        amount={checkout.amount}
+        onClose={() => {
+          router.push("/dashboard");
+          router.refresh();
+        }}
+        onSuccess={() => {
+          router.push("/dashboard");
+          router.refresh();
+        }}
+      />
+    );
   }
 
   return (

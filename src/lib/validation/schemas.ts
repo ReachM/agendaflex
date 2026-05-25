@@ -38,6 +38,14 @@ export const registerSchema = z.object({
   companyPhone: optionalString(30)
 });
 
+export const subscriptionCheckoutSchema = z.object({
+  planSlug: requiredString(60),
+  // Token do cartão gerado NO FRONT pelo SDK/Brick do Mercado Pago. O PAN/CVV
+  // nunca chegam ao backend — só este token.
+  cardTokenId: requiredString(120),
+  payerEmail: z.string().trim().email().max(255).optional()
+});
+
 export const companyCreateSchema = z.object({
   name: requiredString(180),
   tradeName: optionalString(180),

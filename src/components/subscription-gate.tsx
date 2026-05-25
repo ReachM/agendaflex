@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Check, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
+import { CheckoutModal } from "@/components/checkout-modal";
 
 export type SubscriptionState = {
   status: string;
@@ -56,6 +57,7 @@ export function TrialBanner({ daysLeft }: { daysLeft: number }) {
 export function TrialExpiredModal() {
   const [plans, setPlans] = useState<PublicPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkout, setCheckout] = useState<{ slug: string; name: string; amount: number } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -75,12 +77,19 @@ export function TrialExpiredModal() {
     };
   }, []);
 
-  function handleSubscribe(planSlug: string) {
-    // TODO: integrar Mercado Pago — iniciar checkout do plano selecionado.
-    // Próxima frente de pagamento substitui este stub pela criação da preferência
-    // de pagamento e redirecionamento ao checkout.
-    window.alert(
-      `Checkout do plano "${planSlug}" será integrado ao Mercado Pago na próxima etapa.`
+  function handleSubscribe(plan: PublicPlan) {
+    setCheckout({ slug: plan.slug, name: plan.name, amount: Number(plan.price) });
+  }
+
+  if (checkout) {
+    return (
+      <CheckoutModal
+        planSlug={checkout.slug}
+        planName={checkout.name}
+        amount={checkout.amount}
+        onClose={() => setCheckout(null)}
+        onSuccess={() => window.location.reload()}
+      />
     );
   }
 
@@ -130,7 +139,7 @@ export function TrialExpiredModal() {
                     </li>
                   )}
                 </ul>
-                <button className="button primary" onClick={() => handleSubscribe(plan.slug)} type="button">
+                <button className="button primary" onClick={() => handleSubscribe(plan)} type="button">
                   Assinar {plan.name}
                 </button>
               </div>

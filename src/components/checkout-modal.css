@@ -1,0 +1,105 @@
+/* Modal de checkout (Mercado Pago Card Brick). Reaproveita os tokens globais. */
+
+.checkout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.checkout-modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 24px;
+}
+
+.checkout-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.checkout-modal__head h2 {
+  margin: 0 0 2px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.checkout-modal__head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.checkout-modal__close {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  color: var(--muted);
+  transition: background var(--transition), color var(--transition);
+}
+
+.checkout-modal__close:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.checkout-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.checkout-brick {
+  min-height: 8px;
+}
+
+.checkout-secure {
+  margin: 14px 0 0;
+  font-size: 12px;
+  text-align: center;
+}
+
+.checkout-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 16px 8px 8px;
+}
+
+.checkout-success svg {
+  color: var(--success);
+}
+
+.checkout-success h3 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.checkout-success p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}

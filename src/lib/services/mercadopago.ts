@@ -1,5 +1,7 @@
-import { MercadoPagoConfig } from "mercadopago";
+import { MercadoPagoConfig, PreApproval } from "mercadopago";
 import type { SubscriptionStatus } from "@prisma/client";
+import { ApiError } from "@/lib/api/errors";
+import { prisma } from "@/lib/prisma";
 
 /**
  * Ponto ÚNICO de integração com o Mercado Pago (produto Assinaturas/preapproval).
@@ -135,4 +137,99 @@ export function pastDueDeadline(pastDueSince: Date): Date {
 export function isPastDueGraceExpired(pastDueSince: Date | null | undefined, now: Date = new Date()): boolean {
   if (!pastDueSince) return false;
   return now.getTime() >= pastDueDeadline(pastDueSince).getTime();
+}
+
+// ── Criação da assinatura recorrente (preapproval) ────────────────
+
+export type CreateSubscriptionInput = {
+  /** Plan.id interno (não o slug). */
+  planId: string;
+  companyId: string;
+  /** Token do cartão gerado no FRONT. Nunca recebemos PAN/CVV. */
+  cardTokenId: string;
+  payerEmail: string;
+};
+
+export type CreateSubscriptionResult = {
+  preapprovalId: string;
+  status: string;
+  subscriptionId: string;
+  payerEmail: string;
+};
+
+/**
+ * Converte erros do MP em mensagens amigáveis, SEM vazar detalhes internos.
+ * Importante: nunca recebemos dados de cartão (só o token), então não há PAN/CVV
+ * para vazar; ainda assim evitamos ecoar o erro bruto do MP para o cliente.
+ */
+function toFriendlyMpError(error: unknown): ApiError {
+  const raw =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message: unknown }).message)
+      : "";
+  const lower = raw.toLowerCase();
+
+  if (lower.includes("card") || lower.includes("token") || lower.includes("cvv") || lower.includes("payment_method")) {
+    return new ApiError(402, "Não foi possível autorizar o cartão. Confira os dados ou tente outro cartão.");
+  }
+  // Log enxuto para diagnóstico (sem dados sensíveis — não os temos).
+  console.error("[MercadoPago] Falha ao criar preapproval.");
+  return new ApiError(502, "Falha ao processar o pagamento. Tente novamente em instantes.");
+}
+
+/**
+ * Cria a assinatura recorrente no Mercado Pago (POST /preapproval) a partir do
+ * Plan interno e do card_token gerado no front. Cobrança mensal em BRL.
+ * `external_reference` = id da CompanySubscription, para o webhook (4.3) amarrar
+ * a confirmação. NÃO ativa a assinatura internamente — isso é papel do webhook.
+ */
+export async function createSubscription(input: CreateSubscriptionInput): Promise<CreateSubscriptionResult> {
+  const plan = await prisma.plan.findFirst({ where: { id: input.planId, isActive: true } });
+  if (!plan) throw new ApiError(400, "Plano inválido ou indisponível.");
+
+  const amount = Number(plan.price);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new ApiError(400, "Este plano não está disponível para assinatura paga.");
+  }
+
+  const subscription = await prisma.companySubscription.findFirst({
+    where: { companyId: input.companyId },
+    orderBy: { createdAt: "desc" }
+  });
+  if (!subscription) throw new ApiError(404, "Assinatura da empresa não encontrada.");
+
+  const preapproval = new PreApproval(getMercadoPagoClient());
+
+  let response;
+  try {
+    response = await preapproval.create({
+      body: {
+        reason: `AgendaFlex — Plano ${plan.name}`,
+        external_reference: subscription.id,
+        payer_email: input.payerEmail,
+        card_token_id: input.cardTokenId,
+        status: "authorized",
+        back_url: getMercadoPagoBackUrl(),
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          transaction_amount: amount,
+          currency_id: "BRL"
+        }
+      }
+    });
+  } catch (error) {
+    throw toFriendlyMpError(error);
+  }
+
+  if (!response?.id) {
+    throw new ApiError(502, "Não foi possível criar a assinatura no Mercado Pago. Tente novamente.");
+  }
+
+  return {
+    preapprovalId: response.id,
+    status: response.status ?? "pending",
+    subscriptionId: subscription.id,
+    payerEmail: input.payerEmail
+  };
 }
