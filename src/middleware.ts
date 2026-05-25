@@ -7,13 +7,15 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("agendaflex_token")?.value;
   const isPublic = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
 
-  if (pathname === "/") {
+  // Raiz: usuário logado vai para o app; visitante vê a landing pública (segue
+  // o fluxo abaixo até os headers de segurança, sem redirecionar para /login).
+  if (pathname === "/" && token) {
     const url = request.nextUrl.clone();
-    url.pathname = token ? "/dashboard" : "/login";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  if (!token && !isPublic) {
+  if (!token && !isPublic && pathname !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
