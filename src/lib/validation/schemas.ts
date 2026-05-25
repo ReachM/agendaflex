@@ -15,6 +15,29 @@ export const loginSchema = z.object({
   password: z.string().min(8).max(200)
 });
 
+export const registerSchema = z.object({
+  // Admin user
+  adminName: requiredString(180),
+  adminEmail: z.string().trim().email().max(255),
+  adminPassword: z.string().min(8).max(200),
+  // Aceito por compatibilidade com o formulário, mas NÃO persistido:
+  // User não possui coluna de telefone no schema atual.
+  adminPhone: optionalString(30),
+  // Company
+  companyName: requiredString(180),
+  segment: z.enum([
+    "CLINICA_MEDICA",
+    "OFICINA_MECANICA",
+    "SALAO_BELEZA",
+    "CONSULTORIO",
+    "ASSISTENCIA_TECNICA",
+    "PRESTADOR_SERVICOS",
+    "PERSONALIZADO"
+  ]),
+  document: optionalString(30),
+  companyPhone: optionalString(30)
+});
+
 export const companyCreateSchema = z.object({
   name: requiredString(180),
   tradeName: optionalString(180),

@@ -1,0 +1,82 @@
+import { NextRequest } from "next/server";
+import { created, handleApiError } from "@/lib/api/errors";
+import { audit } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
+import { assertSameOrigin } from "@/lib/security/csrf";
+import { signAuthToken } from "@/lib/security/jwt";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { getRequestIp } from "@/lib/security/request";
+import { provisionTenant } from "@/lib/services/provision-tenant";
+import { registerSchema } from "@/lib/validation/schemas";
+
+export async function POST(request: NextRequest) {
+  try {
+    assertSameOrigin(request);
+    rateLimit(`register:${getRequestIp(request)}`, 5, 60 * 60 * 1000);
+
+    const body = registerSchema.parse(await request.json());
+
+    const result = await prisma.$transaction((tx) =>
+      provisionTenant(tx, {
+        company: {
+          name: body.companyName,
+          document: body.document,
+          phone: body.companyPhone,
+          segment: body.segment
+        },
+        admin: {
+          name: body.adminName,
+          email: body.adminEmail,
+          password: body.adminPassword
+        }
+      })
+    );
+
+    const token = await signAuthToken({
+      sub: result.user.id,
+      role: result.role,
+      companyId: result.company.id
+    });
+
+    const response = created({
+      user: result.user,
+      role: result.role,
+      company: {
+        id: result.company.id,
+        name: result.company.name,
+        slug: result.company.slug,
+        segment: result.company.segment
+      },
+      subscription: {
+        status: result.subscription.status,
+        trialEndsAt: result.subscription.trialEndsAt
+      },
+      redirectTo: "/dashboard"
+    });
+
+    response.cookies.set("agendaflex_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 8
+    });
+
+    await audit(request, null, {
+      action: "auth.register",
+      entityType: "company",
+      entityId: result.company.id,
+      userId: result.user.id,
+      companyId: result.company.id,
+      newValues: {
+        companyName: result.company.name,
+        segment: result.company.segment,
+        subscriptionStatus: result.subscription.status
+      }
+    });
+
+    return response;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
