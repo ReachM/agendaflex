@@ -4,8 +4,8 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-copy">
-        <div className="brand-mark">AF</div>
-        <h1>AgendaFlex</h1>
+        <div className="brand-mark">MF</div>
+        <h1>MarcaiFlex</h1>
         <p>
           Plataforma SaaS multi-tenant para agendamento, clientes, serviços,
           profissionais e campos personalizados por empresa.

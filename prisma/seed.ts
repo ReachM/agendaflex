@@ -237,7 +237,7 @@ async function main() {
   });
 
   // ─── Users ──────────────────────────────────────────
-  const superAdmin = await upsertUser("admin@agendaflex.com", "Super Admin", roles.SUPER_ADMIN.id);
+  const superAdmin = await upsertUser("admin@marcaiflex.com", "Super Admin", roles.SUPER_ADMIN.id);
 
   // ─── Companies ──────────────────────────────────────
   const clinic = await upsertCompany({ name: "Clínica Vida", tradeName: "Clínica Vida", email: "contato@clinicavida.com", phone: "(11) 4000-1000", segment: "CLINICA_MEDICA", slug: "clinica-vida", plan: "pro", publicBookingEnabled: true });
@@ -389,13 +389,13 @@ async function main() {
   await prisma.auditLog.create({
     data: {
       userId: superAdmin.id, action: "seed.executed", entityType: "system",
-      newValues: { message: "Seed v2 do AgendaFlex executado com planos, multi-servico e usuarios por perfil" }
+      newValues: { message: "Seed v2 do MarcaiFlex executado com planos, multi-servico e usuarios por perfil" }
     }
   });
 
   console.log("\n✅ Seed finalizado com sucesso!\n");
   console.log("═══ Credenciais ═══");
-  console.log("Super Admin:      admin@agendaflex.com / Admin@123456");
+  console.log("Super Admin:      admin@marcaiflex.com / Admin@123456");
   console.log("Clínica (Admin):  admin@clinicavida.com / Admin@123456  [Plano Pro]");
   console.log("Clínica (Gerente):gerente@clinicavida.com / Admin@123456");
   console.log("Clínica (Staff):  atendente@clinicavida.com / Admin@123456");

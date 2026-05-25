@@ -15,7 +15,7 @@ export default function FinanceiroPage() {
         <div className="upgrade-banner__text">
           <strong>Funcionalidade em desenvolvimento</strong>
           <span>
-            O módulo financeiro estará disponível em uma versão futura do AgendaFlex.
+            O módulo financeiro estará disponível em uma versão futura do MarcaiFlex.
             Fique atento às atualizações!
           </span>
         </div>

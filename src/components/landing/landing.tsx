@@ -134,10 +134,10 @@ function Header() {
   return (
     <header className="lp-header">
       <div className="lp-container lp-header__inner">
-        <Link href="/" className="lp-logo" aria-label="AgendaFlex, página inicial">
-          <span className="lp-logo__mark">AF</span>
+        <Link href="/" className="lp-logo" aria-label="MarcaiFlex, página inicial">
+          <span className="lp-logo__mark">MF</span>
           <span className="lp-logo__word">
-            Agenda<span>Flex</span>
+            Marcai<span>Flex</span>
           </span>
         </Link>
 
@@ -189,7 +189,7 @@ function HeroMockup() {
         </div>
         <div className="lp-mockup__app">
           <aside className="lp-mockup__side">
-            <div className="lp-mockup__brand">AF</div>
+            <div className="lp-mockup__brand">MF</div>
             <span className="lp-mockup__navitem lp-mockup__navitem--active" />
             <span className="lp-mockup__navitem" />
             <span className="lp-mockup__navitem" />
@@ -446,9 +446,9 @@ export function Landing() {
       <footer id="contato" className="lp-footer">
         <div className="lp-container lp-footer__inner">
           <div className="lp-footer__brand">
-            <span className="lp-logo__mark">AF</span>
+            <span className="lp-logo__mark">MF</span>
             <span className="lp-logo__word">
-              Agenda<span>Flex</span>
+              Marcai<span>Flex</span>
             </span>
             <p>Agendamento online para negócios que vivem de horário.</p>
           </div>
@@ -460,7 +460,7 @@ export function Landing() {
           </nav>
         </div>
         <div className="lp-footer__bar">
-          <span>© {new Date().getFullYear()} AgendaFlex. Todos os direitos reservados.</span>
+          <span>© {new Date().getFullYear()} MarcaiFlex. Todos os direitos reservados.</span>
         </div>
       </footer>
     </div>

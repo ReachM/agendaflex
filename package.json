@@ -1,8 +1,8 @@
 {
-  "name": "agendaflex",
+  "name": "marcaiflex",
   "version": "0.1.0",
   "private": true,
-  "description": "AgendaFlex - SaaS multi-tenant de agendamento e controle de serviços com campos personalizados.",
+  "description": "MarcaiFlex - SaaS multi-tenant de agendamento e controle de serviços com campos personalizados.",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",

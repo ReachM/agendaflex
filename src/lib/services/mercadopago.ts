@@ -188,7 +188,7 @@ export async function createSubscription(input: CreateSubscriptionInput): Promis
   try {
     response = await preapproval.create({
       body: {
-        reason: `AgendaFlex — Plano ${plan.name}`,
+        reason: `MarcaiFlex — Plano ${plan.name}`,
         external_reference: subscription.id,
         payer_email: input.payerEmail,
         card_token_id: input.cardTokenId,

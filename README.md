@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="https://via.placeholder.com/150/0f172a/5eead4?text=AgendaFlex" alt="AgendaFlex Logo" width="120" height="120" style="border-radius: 20px;" />
+  <img src="https://via.placeholder.com/150/0f172a/5eead4?text=MarcaiFlex" alt="MarcaiFlex Logo" width="120" height="120" style="border-radius: 20px;" />
   
-  <h1>AgendaFlex SaaS</h1>
+  <h1>MarcaiFlex SaaS</h1>
   <p><strong>A Plataforma Definitiva de Agendamentos e Gestão para Empresas</strong></p>
 
   <p>
@@ -15,7 +15,7 @@
 
 ---
 
-O **AgendaFlex** evoluiu de um sistema básico de agendamento para um **SaaS Multi-tenant robusto e escalável**. Projetado para atender desde profissionais autônomos até grandes clínicas e oficinas, o AgendaFlex oferece uma gestão completa de múltiplos serviços, fluxo de caixa, emissão de notas fiscais, checklists dinâmicos e páginas públicas de agendamento. Tudo isso garantindo **isolamento total de dados por empresa** e conformidade com a LGPD.
+O **MarcaiFlex** evoluiu de um sistema básico de agendamento para um **SaaS Multi-tenant robusto e escalável**. Projetado para atender desde profissionais autônomos até grandes clínicas e oficinas, o MarcaiFlex oferece uma gestão completa de múltiplos serviços, fluxo de caixa, emissão de notas fiscais, checklists dinâmicos e páginas públicas de agendamento. Tudo isso garantindo **isolamento total de dados por empresa** e conformidade com a LGPD.
 
 ## ✨ Funcionalidades Principais
 
@@ -48,7 +48,7 @@ O projeto utiliza um stack moderno focado em performance, tipagem forte e develo
 
 ## 🏗️ Arquitetura Multi-Tenant e Segurança
 
-A arquitetura do AgendaFlex garante que os dados de uma empresa jamais vazem para outra. 
+A arquitetura do MarcaiFlex garante que os dados de uma empresa jamais vazem para outra. 
 
 1. **Contexto Autenticado:** Todas as operações do backend passam por `requireTenant`, que injeta o `companyId` autenticado diretamente na camada de acesso a dados. Nunca confiamos no `companyId` enviado pelo frontend.
 2. **Plan Guard:** Acesso a rotas e ações (como acessar o módulo financeiro ou criar checklists) é protegido pelo `requirePlanFeature`. O sistema valida em tempo real se a assinatura da empresa contempla o recurso requisitado.
@@ -116,7 +116,7 @@ A arquitetura do AgendaFlex garante que os dados de uma empresa jamais vazem par
 
 Após rodar o seed, o sistema já conta com algumas contas de teste pré-configuradas:
 
-- **Super Administrador (Master):** `admin@agendaflex.com` / `Admin@123456`
+- **Super Administrador (Master):** `admin@marcaiflex.com` / `Admin@123456`
 - **Inquilino Plano Starter:** `admin@clinicavida.com` / `Admin@123456`
 - **Inquilino Plano Pro:** `admin@salaobella.com` / `Admin@123456`
 - **Inquilino Plano Max:** `admin@oficinacentral.com` / `Admin@123456`

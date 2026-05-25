@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@agendaflex.com");
+  const [email, setEmail] = useState("admin@marcaiflex.com");
   const [password, setPassword] = useState("Admin@123456");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,7 +40,7 @@ export function LoginForm() {
       <div className="toolbar">
         <div>
           <h2>Entrar</h2>
-          <p className="muted">AgendaFlex</p>
+          <p className="muted">MarcaiFlex</p>
         </div>
         <CalendarClock size={24} />
       </div>

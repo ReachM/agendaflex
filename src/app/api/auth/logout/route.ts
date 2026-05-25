@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       // Logout must clear the cookie even when the session is already invalid.
     }
 
-    response.cookies.set("agendaflex_token", "", {
+    response.cookies.set("marcaiflex_token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",

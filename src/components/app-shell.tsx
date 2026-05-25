@@ -118,9 +118,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <aside className={`sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="sidebar-header">
-          <div className="brand-mark">AF</div>
+          <div className="brand-mark">MF</div>
           <div>
-            <strong>AgendaFlex</strong>
+            <strong>MarcaiFlex</strong>
             <span>{session?.company?.name ?? "Painel Master"}</span>
           </div>
         </div>

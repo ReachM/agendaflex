@@ -99,7 +99,7 @@ export function TrialExpiredModal() {
         <div className="trial-modal-header">
           <AlertTriangle size={28} className="trial-modal-icon" />
           <h2 id="trial-modal-title">Seu teste grátis terminou</h2>
-          <p>Escolha um plano para continuar usando o AgendaFlex. Seus dados estão salvos.</p>
+          <p>Escolha um plano para continuar usando o MarcaiFlex. Seus dados estão salvos.</p>
         </div>
 
         {loading ? (
