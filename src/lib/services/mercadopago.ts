@@ -1,7 +1,12 @@
-import { MercadoPagoConfig, PreApproval } from "mercadopago";
+import crypto from "node:crypto";
+import { MercadoPagoConfig, Payment, PreApproval } from "mercadopago";
 import type { SubscriptionStatus } from "@prisma/client";
 import { ApiError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+
+// Régua de 7 dias vive em módulo SEM o SDK (usada no caminho de auth). Re-exportada
+// aqui por compatibilidade com quem já importa de "@/lib/services/mercadopago".
+export { PAST_DUE_GRACE_DAYS, pastDueDeadline, isPastDueGraceExpired } from "@/lib/payments/grace";
 
 /**
  * Ponto ÚNICO de integração com o Mercado Pago (produto Assinaturas/preapproval).
@@ -19,11 +24,7 @@ import { prisma } from "@/lib/prisma";
  */
 
 const REQUEST_TIMEOUT_MS = 8_000;
-
-/** Tolerância de cartão recusado: 7 dias em PAST_DUE antes de bloquear o acesso. */
-export const PAST_DUE_GRACE_DAYS = 7;
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+const MP_API_BASE = "https://api.mercadopago.com";
 
 // ── Config / cliente ──────────────────────────────────────────────
 
@@ -122,23 +123,6 @@ export function mapMpStatus(kind: MpEventKind, mpStatus: string): MpStatusMappin
   }
 }
 
-// ── Régua dos 7 dias de PAST_DUE (PURO, testável) ─────────────────
-
-/** Momento em que o período de tolerância (7 dias) termina. */
-export function pastDueDeadline(pastDueSince: Date): Date {
-  return new Date(pastDueSince.getTime() + PAST_DUE_GRACE_DAYS * DAY_MS);
-}
-
-/**
- * A tolerância de cartão recusado já estourou? `true` => deve bloquear o acesso.
- * Dentro dos 7 dias retorna `false` (ainda ativo). Sem pastDueSince => não
- * bloqueia por este motivo.
- */
-export function isPastDueGraceExpired(pastDueSince: Date | null | undefined, now: Date = new Date()): boolean {
-  if (!pastDueSince) return false;
-  return now.getTime() >= pastDueDeadline(pastDueSince).getTime();
-}
-
 // ── Criação da assinatura recorrente (preapproval) ────────────────
 
 export type CreateSubscriptionInput = {
@@ -232,4 +216,130 @@ export async function createSubscription(input: CreateSubscriptionInput): Promis
     subscriptionId: subscription.id,
     payerEmail: input.payerEmail
   };
+}
+
+// ── Webhook: validação de assinatura (x-signature) ────────────────
+
+function parseSignatureHeader(header: string): { ts?: string; v1?: string } {
+  const out: { ts?: string; v1?: string } = {};
+  for (const part of header.split(",")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    const key = part.slice(0, eq).trim();
+    const value = part.slice(eq + 1).trim();
+    if (key === "ts") out.ts = value;
+    else if (key === "v1") out.v1 = value;
+  }
+  return out;
+}
+
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Valida a autenticidade do webhook do Mercado Pago recalculando o HMAC-SHA256.
+ * Manifest (especificação do MP): `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`
+ * O `data.id` alfanumérico é comparado em minúsculas, conforme orientação do MP.
+ * Retorna false se faltar header/secret ou se o hash não bater.
+ */
+export function validateMpWebhookSignature(input: {
+  signatureHeader: string | null | undefined;
+  requestId: string | null | undefined;
+  dataId: string | null | undefined;
+  secret?: string;
+}): boolean {
+  const secret = input.secret ?? process.env.MP_WEBHOOK_SECRET;
+  if (!secret || !input.signatureHeader) return false;
+
+  const { ts, v1 } = parseSignatureHeader(input.signatureHeader);
+  if (!ts || !v1) return false;
+
+  const idPart = input.dataId ? `id:${input.dataId.toLowerCase()};` : "";
+  const reqPart = input.requestId ? `request-id:${input.requestId};` : "";
+  const manifest = `${idPart}${reqPart}ts:${ts};`;
+
+  const expected = crypto.createHmac("sha256", secret).update(manifest).digest("hex");
+  return timingSafeEqualHex(expected, v1);
+}
+
+// ── Webhook: busca do recurso real na API do MP ───────────────────
+
+export type WebhookResource = {
+  kind: MpEventKind;
+  /** status bruto do MP (ex.: authorized, approved, rejected, cancelled). */
+  status: string;
+  preapprovalId: string | null;
+  paymentId: string | null;
+  externalReference: string | null;
+};
+
+async function mpRestGet(path: string): Promise<Record<string, unknown> | null> {
+  const token = requireEnv("MP_ACCESS_TOKEN");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${MP_API_BASE}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Busca o estado REAL do recurso notificado na API do MP (não confiar só no corpo
+ * da notificação) e normaliza para { kind, status, preapprovalId, paymentId,
+ * externalReference }. Cobre preapproval, subscription_authorized_payment e payment.
+ * Retorna null para tipos não tratados.
+ */
+export async function fetchWebhookResource(type: string, dataId: string): Promise<WebhookResource | null> {
+  const t = (type ?? "").toLowerCase();
+
+  if (t.includes("authorized_payment")) {
+    const ap = await mpRestGet(`/authorized_payments/${dataId}`);
+    if (!ap) return null;
+    const payment = (ap.payment ?? {}) as Record<string, unknown>;
+    return {
+      kind: "payment",
+      status: String(payment.status ?? ap.status ?? ""),
+      preapprovalId: ap.preapproval_id ? String(ap.preapproval_id) : null,
+      paymentId: payment.id != null ? String(payment.id) : null,
+      externalReference: ap.external_reference ? String(ap.external_reference) : null
+    };
+  }
+
+  if (t.includes("preapproval") || t.includes("subscription")) {
+    const pre = await new PreApproval(getMercadoPagoClient()).get({ id: dataId });
+    return {
+      kind: "preapproval",
+      status: pre?.status ?? "",
+      preapprovalId: pre?.id ?? dataId,
+      paymentId: null,
+      externalReference: pre?.external_reference ?? null
+    };
+  }
+
+  if (t.includes("payment")) {
+    const pay = await new Payment(getMercadoPagoClient()).get({ id: dataId });
+    return {
+      kind: "payment",
+      status: pay?.status ?? "",
+      preapprovalId: null,
+      paymentId: pay?.id != null ? String(pay.id) : dataId,
+      externalReference: pay?.external_reference ?? null
+    };
+  }
+
+  return null;
 }

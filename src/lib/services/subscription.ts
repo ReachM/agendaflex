@@ -1,5 +1,6 @@
 import type { SubscriptionStatus } from "@prisma/client";
 import { ApiError } from "@/lib/api/errors";
+import { isPastDueGraceExpired } from "@/lib/payments/grace";
 import { prisma } from "@/lib/prisma";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -69,11 +70,16 @@ export async function getSubscriptionState(companyId: string): Promise<Subscript
   const trialDaysLeft =
     isTrial && trialEndsAt && !trialExpired ? Math.max(0, calendarDaysBetween(now, trialEndsAt)) : 0;
 
+  // PAST_DUE só bloqueia DEPOIS dos 7 dias de tolerância (cartão recusado). Dentro
+  // da régua, o acesso continua ativo. EXPIRED/CANCELLED bloqueiam de imediato.
+  const pastDueBlocked =
+    subscription.status === "PAST_DUE" && isPastDueGraceExpired(subscription.pastDueSince, now);
+
   const isBlocked =
     trialExpired ||
     subscription.status === "EXPIRED" ||
     subscription.status === "CANCELLED" ||
-    subscription.status === "PAST_DUE";
+    pastDueBlocked;
 
   return {
     status: subscription.status,

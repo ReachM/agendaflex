@@ -74,6 +74,27 @@ describe("getSubscriptionState", () => {
 
     expect(state.isBlocked).toBe(true);
   });
+
+  it("PAST_DUE dentro dos 7 dias -> ainda ativo (não bloqueia)", async () => {
+    prismaMock.companySubscription.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(sub({ status: "PAST_DUE", trialEndsAt: null, pastDueSince: new Date(Date.now() - 3 * DAY) }));
+
+    const state = await getSubscriptionState("company-1");
+
+    expect(state.status).toBe("PAST_DUE");
+    expect(state.isBlocked).toBe(false);
+  });
+
+  it("PAST_DUE com 7 dias vencidos -> isBlocked true", async () => {
+    prismaMock.companySubscription.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(sub({ status: "PAST_DUE", trialEndsAt: null, pastDueSince: new Date(Date.now() - 8 * DAY) }));
+
+    const state = await getSubscriptionState("company-1");
+
+    expect(state.isBlocked).toBe(true);
+  });
 });
 
 describe("assertSubscriptionActive", () => {
