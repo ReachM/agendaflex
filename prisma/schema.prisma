@@ -236,12 +236,40 @@ model CompanySubscription {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  plan    Plan    @relation(fields: [planId], references: [id])
+  // Mercado Pago — assinatura recorrente (preapproval). Preenchidos a partir da
+  // etapa de checkout/webhook; nulos enquanto a empresa só está no trial.
+  mpPreapprovalId   String?   @unique
+  mpPayerEmail      String?
+  currentPeriodEnd  DateTime?
+  pastDueSince      DateTime?
+  lastPaymentId     String?
+  lastPaymentStatus String?
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan          Plan           @relation(fields: [planId], references: [id])
+  paymentEvents PaymentEvent[]
 
   @@index([companyId])
   @@index([companyId, status])
   @@index([planId])
+}
+
+// Idempotência e auditoria dos webhooks do Mercado Pago. Cada notificação é
+// gravada uma única vez (mpEventId @unique) para nunca ser processada 2x.
+model PaymentEvent {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  mpEventId      String   @unique
+  mpResourceId   String
+  type           String
+  status         String
+  rawType        String
+  processedAt    DateTime @default(now())
+
+  subscription CompanySubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([mpResourceId])
 }
 
 // ═══════════════════════════════════════════════════
