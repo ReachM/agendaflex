@@ -2800,3 +2800,310 @@ tbody tr:hover {
   width: 100%;
   justify-content: center;
 }
+
+/* ═══════════════════════════════════════════════════
+   CADASTRO — fluxo multi-step self-service
+   ═══════════════════════════════════════════════════ */
+
+.register-card {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 28px;
+}
+
+.register-head h2 {
+  margin: 12px 0 2px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.register-steps {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.register-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.register-step__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-muted);
+  font-size: 12px;
+}
+
+.register-step--current .register-step__dot {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.register-step--current .register-step__label {
+  color: var(--text);
+}
+
+.register-step--done .register-step__dot {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary-hover);
+}
+
+.register-body {
+  display: block;
+}
+
+.register-body.grid {
+  display: grid;
+  gap: 14px;
+}
+
+.register-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.register-foot {
+  text-align: center;
+  font-size: 14px;
+  margin: 0;
+}
+
+.register-inline-link {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Password strength meter */
+.password-meter {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.password-meter__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.password-meter__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+  background: var(--danger);
+}
+
+.password-meter--2 .password-meter__bar span { background: var(--warning); }
+.password-meter--3 .password-meter__bar span { background: #16a34a; }
+.password-meter--4 .password-meter__bar span { background: var(--primary); }
+
+.password-meter small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Segment selection cards */
+.segment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.segment-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.segment-card:hover {
+  border-color: var(--border-strong);
+}
+
+.segment-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.segment-card--selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+  background: var(--primary-ghost);
+}
+
+.segment-card strong {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.segment-card span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.segment-card__check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: var(--primary);
+}
+
+/* Trial callout + plan cards in step 4 */
+.trial-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--primary);
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.trial-callout svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.register-plans-loading {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+.register-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.register-plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.register-plan-card:hover {
+  border-color: var(--border-strong);
+}
+
+.register-plan-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.register-plan-card--selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+  background: var(--primary-ghost);
+}
+
+.register-plan-card__name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.register-plan-card__price {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.register-plan-card__price span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+.register-plan-card__desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.register-plan-card__features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.register-plan-card__features li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.register-plan-card__features li svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.register-plan-card__badge {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-hover);
+  background: var(--primary-light);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+@media (max-width: 640px) {
+  .register-card {
+    padding: 20px;
+    box-shadow: none;
+    border: none;
+  }
+  .register-step__label {
+    display: none;
+  }
+}

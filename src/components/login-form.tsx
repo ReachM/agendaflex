@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarClock, LogIn } from "lucide-react";
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -74,6 +75,13 @@ export function LoginForm() {
         <LogIn size={18} />
         {loading ? "Entrando..." : "Entrar"}
       </button>
+
+      <p className="register-foot muted">
+        Não tem uma conta?{" "}
+        <Link href="/cadastro" className="register-inline-link">
+          Criar conta grátis
+        </Link>
+      </p>
     </form>
   );
 }
