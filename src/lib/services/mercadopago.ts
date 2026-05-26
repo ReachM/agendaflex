@@ -211,7 +211,17 @@ export async function createSubscription(input: CreateSubscriptionInput): Promis
         }
       }
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    // Log detalhado pra diagnóstico: mostra a causa real do MP (status, errorData,
+    // cause). Importante quando o MP recusa o preapproval (ex.: payer_email
+    // inválido, plano com valor < mínimo, credencial errada).
+    console.error("[MercadoPago] Falha ao criar preapproval.", {
+      message: error instanceof Error ? error.message : String(error),
+      cause: (error as { cause?: unknown })?.cause,
+      status: (error as { status?: unknown })?.status,
+      errorData:
+        (error as { errorData?: unknown })?.errorData ?? (error as { data?: unknown })?.data
+    });
     throw toFriendlyMpError(error);
   }
 
