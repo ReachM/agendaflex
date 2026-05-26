@@ -22,18 +22,22 @@ import { createSubscription } from "@/lib/services/mercadopago";
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.MP_ACCESS_TOKEN = "TEST-access-token";
-  process.env.MP_BACK_URL = "http://localhost:3000/configuracoes/assinatura";
+  process.env.MP_BACK_URL = "http://localhost:3000/dashboard";
   prismaMock.plan.findFirst.mockResolvedValue({ id: "plan-pro", name: "Pro", price: 99.9, isActive: true });
   prismaMock.companySubscription.findFirst.mockResolvedValue({ id: "sub-1" });
-  createMock.mockResolvedValue({ id: "pre-123", status: "authorized" });
+  // Fluxo redirect: MP devolve { id, status: "pending", init_point } no create.
+  createMock.mockResolvedValue({
+    id: "pre-123",
+    status: "pending",
+    init_point: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_id=pre-123"
+  });
 });
 
-describe("createSubscription", () => {
-  it("monta o payload correto (mensal, BRL, external_reference = subscriptionId)", async () => {
+describe("createSubscription (fluxo redirect — Opção A)", () => {
+  it("monta o payload correto (mensal, BRL, status pending, sem card_token_id)", async () => {
     const result = await createSubscription({
       planId: "plan-pro",
       companyId: "c1",
-      cardTokenId: "tok_abc",
       payerEmail: "a@b.com"
     });
 
@@ -47,26 +51,40 @@ describe("createSubscription", () => {
       currency_id: "BRL"
     });
     expect(body.external_reference).toBe("sub-1");
-    expect(body.card_token_id).toBe("tok_abc");
     expect(body.payer_email).toBe("a@b.com");
-    expect(body.status).toBe("authorized");
-    expect(body.back_url).toBe("http://localhost:3000/configuracoes/assinatura");
+    // Em redirect, MP exige status "pending" (vira "authorized" após o cliente autorizar no init_point)
+    expect(body.status).toBe("pending");
+    expect(body.back_url).toBe("http://localhost:3000/dashboard");
+    // Sem dados de cartão: nada de card_token_id no payload nem no resultado.
+    expect(body).not.toHaveProperty("card_token_id");
 
-    expect(result).toMatchObject({ preapprovalId: "pre-123", status: "authorized", subscriptionId: "sub-1" });
+    expect(result).toMatchObject({
+      preapprovalId: "pre-123",
+      initPoint: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_id=pre-123",
+      status: "pending",
+      subscriptionId: "sub-1"
+    });
   });
 
   it("recusa plano sem valor de cobrança (grátis)", async () => {
     prismaMock.plan.findFirst.mockResolvedValue({ id: "plan-free", name: "Starter", price: 0, isActive: true });
     await expect(
-      createSubscription({ planId: "plan-free", companyId: "c1", cardTokenId: "t", payerEmail: "a@b.com" })
+      createSubscription({ planId: "plan-free", companyId: "c1", payerEmail: "a@b.com" })
     ).rejects.toMatchObject({ status: 400 });
     expect(createMock).not.toHaveBeenCalled();
   });
 
-  it("erro do MP vira mensagem amigável de cartão (402)", async () => {
-    createMock.mockRejectedValue({ message: "invalid card_token_id" });
+  it("falha sem init_point: vira 502 (defensivo, não cliente vê o que houve)", async () => {
+    createMock.mockResolvedValue({ id: "pre-x", status: "pending" }); // sem init_point
     await expect(
-      createSubscription({ planId: "plan-pro", companyId: "c1", cardTokenId: "bad", payerEmail: "a@b.com" })
-    ).rejects.toMatchObject({ status: 402 });
+      createSubscription({ planId: "plan-pro", companyId: "c1", payerEmail: "a@b.com" })
+    ).rejects.toMatchObject({ status: 502 });
+  });
+
+  it("erro genérico do MP vira mensagem amigável de gateway (502)", async () => {
+    createMock.mockRejectedValue({ message: "MP internal error" });
+    await expect(
+      createSubscription({ planId: "plan-pro", companyId: "c1", payerEmail: "a@b.com" })
+    ).rejects.toMatchObject({ status: 502 });
   });
 });

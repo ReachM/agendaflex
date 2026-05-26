@@ -9,14 +9,15 @@ import { createSubscription } from "@/lib/services/mercadopago";
 import { subscriptionCheckoutSchema } from "@/lib/validation/schemas";
 
 /**
- * Inicia a assinatura recorrente (cartão) no Mercado Pago.
+ * Inicia a assinatura recorrente no Mercado Pago — fluxo REDIRECT (Opção A).
  *
  * skipSubscriptionCheck: true — o cliente com trial VENCIDO precisa conseguir
  * pagar; esta é a única escrita liberada mesmo bloqueado.
  *
- * O número do cartão/CVV NUNCA passa por aqui: recebemos apenas o card_token
- * gerado no front. A ativação definitiva (status ACTIVE) é feita pelo WEBHOOK
- * (etapa 4.3), que é a fonte de verdade — aqui só vinculamos o preapproval.
+ * NENHUM dado de cartão passa por aqui: criamos o preapproval com status
+ * "pending" e o cliente é redirecionado para o `init_point` (URL do MP) onde
+ * digita o cartão e autoriza. A ativação definitiva (status ACTIVE) é feita
+ * pelo WEBHOOK (fonte de verdade) — aqui só vinculamos o preapproval.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -49,12 +50,11 @@ export async function POST(request: NextRequest) {
     const result = await createSubscription({
       planId: plan.id,
       companyId: context.companyId,
-      cardTokenId: body.cardTokenId,
       payerEmail
     });
 
     // Vincula o preapproval e o pagador. NÃO viramos status para ACTIVE aqui:
-    // a confirmação é do webhook (4.3).
+    // a confirmação é do webhook.
     await prisma.companySubscription.update({
       where: { id: result.subscriptionId },
       data: {
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Auditoria SEM nenhum dado de cartão (jamais incluir cardTokenId/PAN).
+    // Auditoria SEM dados sensíveis (no fluxo redirect nem existe card token).
     await audit(request, context, {
       action: "subscription.checkout",
       entityType: "subscription",
@@ -76,7 +76,9 @@ export async function POST(request: NextRequest) {
     return ok({
       status: "pending_confirmation",
       preapprovalStatus: result.status,
-      message: "Assinatura criada. A confirmação do pagamento chega em instantes."
+      /** URL para o front redirecionar o cliente (autorização no MP). */
+      checkoutUrl: result.initPoint,
+      message: "Assinatura criada. Conclua a autorização no Mercado Pago."
     });
   } catch (error) {
     return handleApiError(error);

@@ -40,9 +40,8 @@ export const registerSchema = z.object({
 
 export const subscriptionCheckoutSchema = z.object({
   planSlug: requiredString(60),
-  // Token do cartão gerado NO FRONT pelo SDK/Brick do Mercado Pago. O PAN/CVV
-  // nunca chegam ao backend — só este token.
-  cardTokenId: requiredString(120),
+  // Fluxo redirect (Opção A): NÃO recebemos dados de cartão no backend — o
+  // cartão é coletado no ambiente seguro do Mercado Pago, via init_point.
   payerEmail: z.string().trim().email().max(255).optional()
 });
 
