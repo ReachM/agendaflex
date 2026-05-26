@@ -22,7 +22,8 @@
       "Read(//c/c/Users/moise/Downloads/agendaflex/src/app/**)",
       "Bash(cd \"/c/Users/moise/Downloads/agendaflex\" && grep -rn \"@media\" src/app/globals.css src/components/landing/landing.css src/components/checkout-modal.css)",
       "Read(//c/c/Users/moise/Downloads/agendaflex/src/components/landing/**)",
-      "Bash(node -p \"Object.keys\\(require\\('./package.json'\\).devDependencies||{}\\).filter\\(k=>k.includes\\('vitest'\\)||k.includes\\('jsdom'\\)||k.includes\\('testing-library'\\)\\).join\\('\\\\n'\\)\")"
+      "Bash(node -p \"Object.keys\\(require\\('./package.json'\\).devDependencies||{}\\).filter\\(k=>k.includes\\('vitest'\\)||k.includes\\('jsdom'\\)||k.includes\\('testing-library'\\)\\).join\\('\\\\n'\\)\")",
+      "Bash(npm test *)"
     ]
   }
 }

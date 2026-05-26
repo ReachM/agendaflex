@@ -53,6 +53,9 @@ let cachedClient: MercadoPagoConfig | null = null;
  */
 export function getMercadoPagoClient(): MercadoPagoConfig {
   if (!cachedClient) {
+    // Diagnóstico: confirma que o token está realmente disponível em runtime
+    // (não só no build). Loga só na primeira inicialização do processo.
+    console.log("[MercadoPago] Token presente:", !!process.env.MP_ACCESS_TOKEN);
     cachedClient = new MercadoPagoConfig({
       accessToken: requireEnv("MP_ACCESS_TOKEN"),
       options: { timeout: REQUEST_TIMEOUT_MS }
@@ -212,16 +215,37 @@ export async function createSubscription(input: CreateSubscriptionInput): Promis
       }
     });
   } catch (error: unknown) {
-    // Log detalhado pra diagnóstico: mostra a causa real do MP (status, errorData,
-    // cause). Importante quando o MP recusa o preapproval (ex.: payer_email
-    // inválido, plano com valor < mínimo, credencial errada).
-    console.error("[MercadoPago] Falha ao criar preapproval.", {
-      message: error instanceof Error ? error.message : String(error),
-      cause: (error as { cause?: unknown })?.cause,
-      status: (error as { status?: unknown })?.status,
-      errorData:
-        (error as { errorData?: unknown })?.errorData ?? (error as { data?: unknown })?.data
-    });
+    // Log detalhado pra diagnóstico: mostra a causa REAL do MP (status, errorData,
+    // cause, response). Importante quando o MP recusa o preapproval (ex.: payer_email
+    // inválido, plano com valor < mínimo, credencial errada). JSON.stringify dentro
+    // de try/catch porque a resposta do SDK pode conter referência circular.
+    const e = error as {
+      message?: unknown;
+      status?: unknown;
+      cause?: unknown;
+      errorData?: unknown;
+      data?: unknown;
+      error?: unknown;
+      response?: unknown;
+    };
+    try {
+      console.error(
+        "[MercadoPago] Erro detalhado:",
+        JSON.stringify(
+          {
+            message: e?.message,
+            status: e?.status,
+            cause: e?.cause,
+            errorData: e?.errorData ?? e?.data ?? e?.error,
+            response: e?.response
+          },
+          null,
+          2
+        )
+      );
+    } catch {
+      console.error("[MercadoPago] Falha ao criar preapproval (log fallback):", String(e?.message ?? error));
+    }
     throw toFriendlyMpError(error);
   }
 
