@@ -129,13 +129,16 @@ export type CreateSubscriptionInput = {
   /** Plan.id interno (não o slug). */
   planId: string;
   companyId: string;
-  /** Token do cartão gerado no FRONT. Nunca recebemos PAN/CVV. */
-  cardTokenId: string;
   payerEmail: string;
 };
 
 export type CreateSubscriptionResult = {
   preapprovalId: string;
+  /** URL para onde o cliente deve ser redirecionado a fim de autorizar a
+   *  assinatura no ambiente do Mercado Pago (init_point do preapproval). */
+  initPoint: string;
+  /** Status bruto do preapproval no momento da criação — normalmente "pending"
+   *  até o cliente concluir a autorização no init_point. */
   status: string;
   subscriptionId: string;
   payerEmail: string;
@@ -143,8 +146,8 @@ export type CreateSubscriptionResult = {
 
 /**
  * Converte erros do MP em mensagens amigáveis, SEM vazar detalhes internos.
- * Importante: nunca recebemos dados de cartão (só o token), então não há PAN/CVV
- * para vazar; ainda assim evitamos ecoar o erro bruto do MP para o cliente.
+ * No fluxo de redirect o cartão é coletado no MP — nenhum dado sensível passa
+ * por aqui — mas ainda evitamos ecoar o erro bruto do MP para o cliente.
  */
 function toFriendlyMpError(error: unknown): ApiError {
   const raw =
@@ -162,10 +165,15 @@ function toFriendlyMpError(error: unknown): ApiError {
 }
 
 /**
- * Cria a assinatura recorrente no Mercado Pago (POST /preapproval) a partir do
- * Plan interno e do card_token gerado no front. Cobrança mensal em BRL.
- * `external_reference` = id da CompanySubscription, para o webhook (4.3) amarrar
- * a confirmação. NÃO ativa a assinatura internamente — isso é papel do webhook.
+ * Cria a assinatura recorrente no Mercado Pago (POST /preapproval) e devolve
+ * o `init_point` — URL onde o cliente AUTORIZA a assinatura no ambiente do MP.
+ * Esta é a Opção A (redirect): o cartão é digitado no site do Mercado Pago, não
+ * no nosso front. O preapproval é criado com status "pending"; vira "authorized"
+ * quando o cliente autoriza, e o webhook traz essa confirmação.
+ *
+ * `external_reference` = id da CompanySubscription, para o webhook amarrar a
+ * confirmação. NÃO ativamos a assinatura aqui — isso é papel do webhook (fonte
+ * de verdade).
  */
 export async function createSubscription(input: CreateSubscriptionInput): Promise<CreateSubscriptionResult> {
   const plan = await prisma.plan.findFirst({ where: { id: input.planId, isActive: true } });
@@ -191,8 +199,9 @@ export async function createSubscription(input: CreateSubscriptionInput): Promis
         reason: `MarcaiFlex — Plano ${plan.name}`,
         external_reference: subscription.id,
         payer_email: input.payerEmail,
-        card_token_id: input.cardTokenId,
-        status: "authorized",
+        // Sem card_token_id: o cartão é coletado no init_point do MP.
+        // status "pending" é exigido pelo MP para gerar o init_point.
+        status: "pending",
         back_url: getMercadoPagoBackUrl(),
         auto_recurring: {
           frequency: 1,
@@ -209,9 +218,16 @@ export async function createSubscription(input: CreateSubscriptionInput): Promis
   if (!response?.id) {
     throw new ApiError(502, "Não foi possível criar a assinatura no Mercado Pago. Tente novamente.");
   }
+  const initPoint = (response as { init_point?: string }).init_point;
+  if (!initPoint) {
+    // Defensivo: sem init_point não há como redirecionar.
+    console.error("[MercadoPago] Preapproval criado sem init_point.");
+    throw new ApiError(502, "Falha ao iniciar o checkout. Tente novamente em instantes.");
+  }
 
   return {
     preapprovalId: response.id,
+    initPoint,
     status: response.status ?? "pending",
     subscriptionId: subscription.id,
     payerEmail: input.payerEmail

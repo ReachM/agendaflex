@@ -29,6 +29,8 @@ function req(body: unknown) {
   } as any;
 }
 
+const INIT_POINT = "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_id=pre-9";
+
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.user.findUnique.mockResolvedValue({
@@ -45,46 +47,57 @@ beforeEach(() => {
   prismaMock.companySubscription.update.mockResolvedValue({});
   createSubscriptionMock.mockResolvedValue({
     preapprovalId: "pre-9",
-    status: "authorized",
+    initPoint: INIT_POINT,
+    status: "pending",
     subscriptionId: "sub-1",
     payerEmail: "admin@acme.com"
   });
 });
 
-describe("POST /api/subscription/checkout", () => {
-  it("recusa sem cardTokenId (422) e não chama o MP", async () => {
-    const res = await POST(req({ planSlug: "pro" }));
+describe("POST /api/subscription/checkout (fluxo redirect)", () => {
+  it("recusa sem planSlug (422) e não chama o MP", async () => {
+    const res = await POST(req({}));
     expect(res.status).toBe(422);
     expect(createSubscriptionMock).not.toHaveBeenCalled();
   });
 
+  it("não exige cardTokenId (fluxo redirect não recebe dado de cartão)", async () => {
+    const res = await POST(req({ planSlug: "pro" }));
+    expect(res.status).toBe(200);
+    // O serviço foi chamado SEM cardTokenId (campo nem existe mais no contrato).
+    const call = createSubscriptionMock.mock.calls[0][0];
+    expect(call).not.toHaveProperty("cardTokenId");
+    expect(call.planId).toBe("plan-pro");
+  });
+
   it("idempotência: não cria 2ª assinatura se já há preapproval", async () => {
     prismaMock.companySubscription.findFirst.mockResolvedValue({ id: "sub-1", mpPreapprovalId: "pre-existente" });
-    const res = await POST(req({ planSlug: "pro", cardTokenId: "tok_x" }));
+    const res = await POST(req({ planSlug: "pro" }));
     expect(res.status).toBe(409);
     expect(createSubscriptionMock).not.toHaveBeenCalled();
     expect(prismaMock.companySubscription.update).not.toHaveBeenCalled();
   });
 
-  it("sucesso: vincula preapproval SEM ativar (status fica para o webhook)", async () => {
-    const res = await POST(req({ planSlug: "pro", cardTokenId: "tok_secret" }));
+  it("sucesso: vincula preapproval e devolve checkoutUrl (init_point) — SEM ativar", async () => {
+    const res = await POST(req({ planSlug: "pro" }));
     expect(res.status).toBe(200);
+
+    const json = await res.json();
+    expect(json.checkoutUrl).toBe(INIT_POINT);
+    expect(json.status).toBe("pending_confirmation");
 
     const updateData = prismaMock.companySubscription.update.mock.calls[0][0].data;
     expect(updateData.mpPreapprovalId).toBe("pre-9");
     expect(updateData.mpPayerEmail).toBe("admin@acme.com");
-    expect(updateData).not.toHaveProperty("status"); // a virada para ACTIVE é do webhook
+    // A virada para ACTIVE é do webhook — nunca daqui.
+    expect(updateData).not.toHaveProperty("status");
   });
 
-  it("NUNCA loga/retorna dado de cartão", async () => {
-    const res = await POST(req({ planSlug: "pro", cardTokenId: "tok_secret" }));
-    const json = await res.json();
-
-    // O token do cartão não pode aparecer na resposta nem na auditoria.
-    expect(JSON.stringify(json)).not.toContain("tok_secret");
+  it("auditoria não inclui dado sensível (no fluxo redirect nem existe card token)", async () => {
+    await POST(req({ planSlug: "pro" }));
     const auditPayload = auditMock.mock.calls[0]?.[2];
-    expect(JSON.stringify(auditPayload)).not.toContain("tok_secret");
-    // (o token vai apenas para o serviço do MP, como esperado)
-    expect(createSubscriptionMock.mock.calls[0][0].cardTokenId).toBe("tok_secret");
+    const serialized = JSON.stringify(auditPayload);
+    expect(serialized).not.toMatch(/card[_-]?token/i);
+    expect(serialized).not.toMatch(/cvv/i);
   });
 });

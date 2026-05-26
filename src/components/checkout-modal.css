@@ -68,14 +68,97 @@
   font-size: 14px;
 }
 
-.checkout-brick {
-  min-height: 8px;
-}
-
 .checkout-secure {
   margin: 14px 0 0;
   font-size: 12px;
   text-align: center;
+}
+
+/* ─── Tela de transição (Opção A — redirect para o Mercado Pago) ─── */
+.checkout-redirect {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 24px 4px 8px;
+}
+
+.checkout-redirect__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--primary-ghost);
+  color: var(--primary-hover);
+}
+
+.checkout-redirect h3 {
+  margin: 6px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.checkout-redirect p {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 360px;
+  line-height: 1.55;
+}
+
+/* Barra de progresso que sincroniza com o tempo de transição (CHECKOUT_REDIRECT_DELAY_MS) */
+.checkout-redirect__bar {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.checkout-redirect__bar > span {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-hover));
+  animation: checkoutBar var(--checkout-delay, 2000ms) linear forwards;
+}
+
+@keyframes checkoutBar {
+  to {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkout-redirect__bar > span {
+    animation-duration: 1ms;
+    width: 100%;
+  }
+}
+
+.checkout-redirect__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.checkout-redirect__badge svg {
+  color: var(--primary);
 }
 
 .checkout-success {
