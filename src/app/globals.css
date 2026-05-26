@@ -186,7 +186,7 @@ button:disabled {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -230,7 +230,7 @@ button:disabled {
 }
 
 .nav-link {
-  min-height: 42px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -385,7 +385,7 @@ button:disabled {
 
 .button,
 .icon-button {
-  min-height: 40px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -433,9 +433,17 @@ button:disabled {
 }
 
 .icon-button {
-  width: 40px;
+  width: 44px;
   padding: 0;
   border-radius: var(--radius);
+}
+
+/* Foco visível em todos os elementos interativos (acessibilidade touch/teclado) */
+.button:focus-visible,
+.icon-button:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -475,7 +483,7 @@ button:disabled {
 .field select,
 .field textarea {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 12px;
@@ -507,7 +515,7 @@ button:disabled {
   display: flex;
   gap: 10px;
   align-items: center;
-  min-height: 42px;
+  min-height: 44px;
 }
 
 .checkbox-line input[type="checkbox"] {
@@ -521,13 +529,22 @@ button:disabled {
    ═══════════════════════════════════════════════════ */
 
 .table-wrap {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   min-width: 720px;
+}
+
+/* Utilitário: ocultar coluna em telas pequenas (aplicar em th/td via classe).
+   Mantém o mínimo de 2 colunas visíveis — usar com critério. */
+.col-hide-mobile {
+  display: table-cell;
 }
 
 th,
@@ -811,6 +828,18 @@ tbody tr:hover {
   }
 }
 
+/* Entrada estilo bottom-sheet (modais em mobile) */
+@keyframes sheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ═══════════════════════════════════════════════════
    EMPTY STATE
    ═══════════════════════════════════════════════════ */
@@ -826,52 +855,20 @@ tbody tr:hover {
    RESPONSIVE
    ═══════════════════════════════════════════════════ */
 
-@media (max-width: 980px) {
-  .login-page {
-    grid-template-columns: 1fr;
-  }
-
-  .login-copy {
-    padding: 40px 32px;
-  }
-
-  .login-copy h1 {
-    font-size: 34px;
-  }
-
+/* ─── TABLET (≤1024px): sidebar fixa mais estreita, grids em 2 colunas ─── */
+@media (max-width: 1024px) {
   .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: static;
-    height: auto;
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  }
-
-  .nav-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .grid.cols-2,
-  .grid.cols-3,
-  .grid.cols-4,
-  .form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 200px minmax(0, 1fr);
   }
 
   .content {
     padding: 20px;
   }
-}
 
-@media (max-width: 620px) {
-  .nav-list {
-    grid-template-columns: 1fr;
-  }
-
-  .topbar {
-    flex-direction: column;
+  .grid.cols-2,
+  .grid.cols-3,
+  .grid.cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1315,7 +1312,7 @@ tbody tr:hover {
   letter-spacing: -0.5px;
 }
 
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .price-calculator__fields {
     grid-template-columns: 1fr;
   }
@@ -1408,22 +1405,30 @@ tbody tr:hover {
   display: none;
 }
 
-@media (max-width: 980px) {
+/* ─── MOBILE (≤768px): sidebar off-canvas + layout em 1 coluna ─── */
+@media (max-width: 768px) {
+  /* App shell vira coluna única; a sidebar sobrepõe (não comprime o conteúdo) */
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
   .mobile-menu-toggle {
     display: flex;
   }
 
   .sidebar {
     position: fixed;
-    left: -280px;
     top: 0;
+    left: 0;
+    height: 100vh;
+    width: min(86vw, 300px);
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 1050;
-    width: 272px;
-    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .sidebar.open {
-    left: 0;
+    transform: translateX(0);
   }
 
   .sidebar-backdrop {
@@ -1437,16 +1442,88 @@ tbody tr:hover {
   }
 
   .nav-list {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
   }
 
+  /* Conteúdo full-width; offset no topo pro botão hambúrguer fixo */
   .content {
-    padding: 20px;
-    padding-top: 60px;
+    padding: 16px;
+    padding-top: 64px;
   }
 
-  .app-shell {
-    grid-template-columns: 1fr !important;
+  /* Topbar e toolbar empilham; ações ocupam a largura toda */
+  .topbar,
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  /* Grids e formulário em 1 coluna */
+  .grid.cols-2,
+  .grid.cols-3,
+  .grid.cols-4,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Stat cards do dashboard: 2 colunas no mobile (mín. legível) */
+  .grid:has(> .stat-card) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  /* Cards mais compactos */
+  .card {
+    padding: 16px;
+  }
+  .panel,
+  .form-panel {
+    padding: 16px;
+  }
+
+  /* Tabelas: dica visual de que há rolagem horizontal (sombra fixa na direita) */
+  .table-wrap {
+    box-shadow: var(--shadow-sm), inset -18px 0 14px -14px rgba(15, 23, 42, 0.18);
+  }
+  .col-hide-mobile {
+    display: none;
+  }
+
+  /* Login: 1 coluna, sem painel lateral de marketing */
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+  .login-copy {
+    display: none;
+  }
+  .login-panel {
+    padding: 24px;
+  }
+
+  /* Modais viram bottom-sheet (encostado embaixo, raio só no topo) */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-content {
+    width: 100%;
+    max-width: none;
+    max-height: 92vh;
+    border-radius: 20px 20px 0 0;
+    animation: sheetIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Modal de trial/upgrade (componente próprio) — também vira bottom-sheet */
+  .trial-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .trial-modal {
+    max-width: none;
+    max-height: 92vh;
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px;
   }
 }
 
@@ -2234,11 +2311,11 @@ tbody tr:hover {
    RESPONSIVE IMPROVEMENTS
    ═══════════════════════════════════════════════════ */
 
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .stat-card__value { font-size: 22px; }
   .hbar__label { min-width: 80px; font-size: 12px; }
   .search-bar { flex-direction: column; }
-  .search-bar input, .search-bar select { width: 100%; min-width: 0; }
+  .search-bar input, .search-bar select { width: 100%; min-width: 0; min-height: 44px; }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -2675,6 +2752,28 @@ tbody tr:hover {
   color: var(--warning);
 }
 
+.trial-banner__cta {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.trial-banner__cta:hover {
+  background: var(--primary-hover);
+}
+
+.trial-banner--urgent .trial-banner__cta {
+  background: var(--warning);
+}
+
 .content--blocked {
   filter: blur(4px);
   pointer-events: none;
@@ -2694,6 +2793,7 @@ tbody tr:hover {
 }
 
 .trial-modal {
+  position: relative;
   width: 100%;
   max-width: 920px;
   max-height: 90vh;
@@ -2704,6 +2804,30 @@ tbody tr:hover {
   padding: 32px;
 }
 
+/* Botão de fechar — só aparece no modal de upgrade (dispensável), não no
+   modal de bloqueio de trial vencido. */
+.trial-modal__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.trial-modal__close:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
 .trial-modal-header {
   text-align: center;
   margin-bottom: 24px;
@@ -2711,6 +2835,10 @@ tbody tr:hover {
 
 .trial-modal-icon {
   color: var(--warning);
+}
+
+.trial-modal-icon--primary {
+  color: var(--primary);
 }
 
 .trial-modal-header h2 {
@@ -3095,6 +3223,95 @@ tbody tr:hover {
   background: var(--primary-light);
   border-radius: 999px;
   padding: 2px 10px;
+}
+
+/* Passo 4 — opção A (trial em destaque), divisor, CTA dos planos e comparação */
+.register-plans-step {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.register-trial-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 20px;
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-lg);
+  background: var(--primary-ghost, var(--primary-light));
+}
+
+.register-trial-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--primary);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.register-trial-hero h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.register-trial-hero p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.register-trial-hero .button {
+  margin-top: 4px;
+  align-self: stretch;
+  justify-content: center;
+}
+
+.register-plans-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.register-plans-divider::before,
+.register-plans-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.register-plan-card__cta {
+  margin-top: auto;
+  width: 100%;
+  justify-content: center;
+}
+
+.register-compare-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.register-compare-link:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 640px) {

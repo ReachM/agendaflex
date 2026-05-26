@@ -5,7 +5,23 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(Sort-Object)",
       "Bash(Select-Object -First 50)",
-      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\moise\\\\Downloads\\\\AgendaFlex\" -File | Where-Object {$_.Extension -in @\\('.json', '.ts', '.tsx', '.md'\\)} | Select-Object -ExpandProperty Name | Sort-Object)"
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\moise\\\\Downloads\\\\AgendaFlex\" -File | Where-Object {$_.Extension -in @\\('.json', '.ts', '.tsx', '.md'\\)} | Select-Object -ExpandProperty Name | Sort-Object)",
+      "Bash(node node_modules/typescript/bin/tsc --noEmit)",
+      "Bash(node -e \"try{console.log\\(require.resolve\\('typescript/package.json'\\)\\)}catch\\(e\\){console.log\\('typescript NOT installed'\\)}\")",
+      "Bash(node -p \"require\\('./package.json'\\).devDependencies?.typescript || 'not in devDeps'\")",
+      "Bash(node -p \"require\\('./package.json'\\).dependencies?.typescript || 'not in deps'\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(node node_modules/prisma/build/index.js generate)",
+      "Bash(node -e \"let d=require\\('./package.json'\\);console.log\\('scripts:',JSON.stringify\\(d.scripts,null,2\\)\\)\")",
+      "Bash(echo \"TSC EXIT: $?\")",
+      "Read(//c/Users/moise/Downloads/**)",
+      "Bash(git -C \"/c/Users/moise/Downloads/agendaflex\" ls-files)",
+      "Bash(grep -iE \"landing.*\\\\.html|prototype|protótipo|\\\\.html$\")",
+      "Bash(git -C \"/c/Users/moise/Downloads/agendaflex\" status --short)",
+      "Bash(cd \"/c/Users/moise/Downloads/agendaflex\" && grep -n \"max-width: 620px\\\\|max-width: 980px\" src/app/globals.css)",
+      "Read(//c/c/Users/moise/Downloads/agendaflex/src/app/**)",
+      "Bash(cd \"/c/Users/moise/Downloads/agendaflex\" && grep -rn \"@media\" src/app/globals.css src/components/landing/landing.css src/components/checkout-modal.css)",
+      "Read(//c/c/Users/moise/Downloads/agendaflex/src/components/landing/**)"
     ]
   }
 }

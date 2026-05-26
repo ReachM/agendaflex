@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Sparkles, UserPlus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ExternalLink, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -22,6 +22,13 @@ type PublicPlan = {
   features: string[];
 };
 
+/**
+ * Intenção escolhida no passo 4. Em AMBOS os casos a conta nasce em TRIAL (o
+ * backend não muda). No caso "paid", após criar a conta abrimos o checkout do MP
+ * — o trial serve de fallback enquanto o webhook não confirma o pagamento.
+ */
+type RegisterIntent = { type: "trial" } | { type: "paid"; plan: PublicPlan };
+
 const STEP_TITLES = ["Sua conta", "Seu segmento", "Sua empresa", "Seu plano"];
 const TOTAL_STEPS = STEP_TITLES.length;
 
@@ -37,12 +44,16 @@ export function RegisterForm() {
   const [stepError, setStepError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [emailExists, setEmailExists] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // Qual opção do passo 4 está submetendo ("trial" ou o slug do plano pago).
+  // null = nenhuma. Usado para o spinner por botão e para travar os demais.
+  const [submitting, setSubmitting] = useState<string | null>(null);
   const [checkout, setCheckout] = useState<{ slug: string; name: string; amount: number } | null>(null);
 
   const [plans, setPlans] = useState<PublicPlan[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
 
+  const busy = submitting !== null;
+  const paidPlans = plans.filter((p) => p.price > 0);
   const strength = evaluatePasswordStrength(state.adminPassword);
 
   function update<K extends keyof RegisterFormState>(key: K, value: RegisterFormState[K]) {
@@ -51,7 +62,7 @@ export function RegisterForm() {
     setSubmitError("");
   }
 
-  // Carrega os planos públicos ao chegar no passo 4.
+  // Carrega os planos públicos ao chegar no passo 4 (cards dos planos pagos).
   useEffect(() => {
     if (step !== TOTAL_STEPS || plans.length > 0 || plansLoading) return;
     let active = true;
@@ -59,12 +70,7 @@ export function RegisterForm() {
     fetch("/api/plans/public")
       .then((r) => (r.ok ? r.json() : { plans: [] }))
       .then((data) => {
-        if (!active) return;
-        setPlans(data.plans ?? []);
-        // Pré-seleciona o plano de maior valor (Max), liberado no trial.
-        if (!state.planSlug && data.plans?.length) {
-          update("planSlug", data.plans[data.plans.length - 1].slug);
-        }
+        if (active) setPlans(data.plans ?? []);
       })
       .catch(() => active && setPlans([]))
       .finally(() => active && setPlansLoading(false));
@@ -90,25 +96,45 @@ export function RegisterForm() {
     setStep((s) => Math.max(1, s - 1));
   }
 
-  async function onSubmit() {
-    const error = validateStep(TOTAL_STEPS, state);
-    if (error) {
-      setStepError(error);
-      return;
+  // Cria a conta. `intent` decide o que acontece DEPOIS da criação:
+  //  - "trial": segue direto para o dashboard no teste grátis.
+  //  - "paid":  abre o checkout do MP para o plano escolhido (o trial é o
+  //             fallback até o webhook confirmar o pagamento).
+  // Em ambos os casos a rota /register cria a assinatura TRIALING — o backend
+  // (provisionTenant) não muda.
+  async function onSubmit(intent: RegisterIntent) {
+    if (busy) return;
+
+    // Defesa: os passos 1–3 já foram validados pelo goNext, mas revalidamos
+    // antes de criar a conta. (O passo 4 não exige seleção: a opção é o botão.)
+    for (let s = 1; s <= 3; s += 1) {
+      const error = validateStep(s, state);
+      if (error) {
+        setStepError(error);
+        setStep(s);
+        return;
+      }
     }
-    setLoading(true);
+
+    setSubmitting(intent.type === "paid" ? intent.plan.slug : "trial");
     setSubmitError("");
     setEmailExists(false);
 
-    // A conta sempre nasce em TRIAL (a rota /register cria a assinatura TRIALING).
-    const response = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildRegisterBody(state))
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildRegisterBody(state))
+      });
+    } catch {
+      setSubmitting(null);
+      setSubmitError("Falha de conexão. Tente novamente.");
+      return;
+    }
 
-    const data = await response.json();
-    setLoading(false);
+    const data = await response.json().catch(() => ({}));
+    setSubmitting(null);
 
     if (!response.ok) {
       if (response.status === 409) {
@@ -123,11 +149,8 @@ export function RegisterForm() {
     }
 
     // O cookie de sessão é setado pela API (Set-Cookie) — o usuário já está logado.
-    // Se escolheu um plano PAGO, abrimos o checkout para assinar (a ativação real
-    // virá pelo webhook). Se for grátis / só testar, segue direto no trial.
-    const selectedPlan = plans.find((p) => p.slug === state.planSlug);
-    if (selectedPlan && selectedPlan.price > 0) {
-      setCheckout({ slug: selectedPlan.slug, name: selectedPlan.name, amount: selectedPlan.price });
+    if (intent.type === "paid") {
+      setCheckout({ slug: intent.plan.slug, name: intent.plan.name, amount: intent.plan.price });
       return;
     }
 
@@ -325,63 +348,76 @@ export function RegisterForm() {
 
       {/* ── Passo 4: Planos ────────────────────────── */}
       {step === 4 && (
-        <div className="register-body">
-          <div className="trial-callout">
-            <Sparkles size={18} />
-            <span>
-              Comece com <strong>7 dias grátis</strong>. Durante o teste, <strong>todos os recursos
-              ficam liberados</strong> — escolha o plano que pretende manter depois.
+        <div className="register-body register-plans-step">
+          {/* Opção A — Testar grátis (padrão / mais popular). */}
+          <div className="register-trial-hero">
+            <span className="register-trial-hero__badge">
+              <Sparkles size={13} /> Mais popular
             </span>
+            <h3>Testar grátis por 7 dias</h3>
+            <p>Todas as funcionalidades liberadas. Sem cartão agora.</p>
+            <button
+              className="button"
+              type="button"
+              onClick={() => onSubmit({ type: "trial" })}
+              disabled={busy}
+            >
+              {submitting === "trial" ? "Criando conta..." : "Começar teste grátis"}
+            </button>
           </div>
+
+          <div className="register-plans-divider">
+            <span>ou já escolha um plano</span>
+          </div>
+
+          {/* Opção B — Planos pagos (Starter, Pro, Max). */}
           {plansLoading ? (
             <div className="register-plans-loading">
               <div className="loading-spinner" />
             </div>
-          ) : (
-            <div className="register-plan-grid" role="radiogroup" aria-label="Plano">
-              {plans.map((plan) => {
-                const selected = state.planSlug === plan.slug;
-                return (
-                  <div
-                    key={plan.slug}
-                    role="radio"
-                    aria-checked={selected}
-                    tabIndex={0}
-                    className={`register-plan-card ${selected ? "register-plan-card--selected" : ""}`}
-                    onClick={() => update("planSlug", plan.slug)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        update("planSlug", plan.slug);
-                      }
-                    }}
-                  >
-                    <div className="register-plan-card__name">{plan.name}</div>
-                    <div className="register-plan-card__price">
-                      {formatPrice(plan.price)}
-                      {formatPrice(plan.price) !== "Grátis" && <span>/mês após o teste</span>}
-                    </div>
-                    {plan.description && <p className="register-plan-card__desc">{plan.description}</p>}
-                    <ul className="register-plan-card__features">
-                      {plan.features.map((f) => (
-                        <li key={f}>
-                          <Check size={14} /> {f}
-                        </li>
-                      ))}
-                    </ul>
-                    {selected && <span className="register-plan-card__badge">Selecionado</span>}
+          ) : paidPlans.length > 0 ? (
+            <div className="register-plan-grid">
+              {paidPlans.map((plan) => (
+                <div key={plan.slug} className="register-plan-card">
+                  <div className="register-plan-card__name">{plan.name}</div>
+                  <div className="register-plan-card__price">
+                    {formatPrice(plan.price)}
+                    <span>/mês</span>
                   </div>
-                );
-              })}
+                  {plan.description && <p className="register-plan-card__desc">{plan.description}</p>}
+                  <ul className="register-plan-card__features">
+                    {plan.features.map((f) => (
+                      <li key={f}>
+                        <Check size={14} /> {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    className="button secondary register-plan-card__cta"
+                    type="button"
+                    onClick={() => onSubmit({ type: "paid", plan })}
+                    disabled={busy}
+                  >
+                    {submitting === plan.slug ? "Criando conta..." : `Assinar ${plan.name}`}
+                  </button>
+                </div>
+              ))}
             </div>
-          )}
+          ) : null}
+
+          {/* Opção C — Comparação completa (seção de planos da landing). */}
+          <a className="register-compare-link" href="/#planos" target="_blank" rel="noreferrer">
+            Ver comparação completa <ExternalLink size={14} />
+          </a>
         </div>
       )}
 
       {/* ── Navegação ──────────────────────────────── */}
+      {/* No passo 4 cada opção tem seu próprio botão de ação (trial/assinar);
+          aqui só mantemos o "Voltar". */}
       <div className="register-actions">
         {step > 1 ? (
-          <button className="button secondary" type="button" onClick={goBack} disabled={loading}>
+          <button className="button secondary" type="button" onClick={goBack} disabled={busy}>
             <ArrowLeft size={18} /> Voltar
           </button>
         ) : (
@@ -393,10 +429,7 @@ export function RegisterForm() {
             Continuar <ArrowRight size={18} />
           </button>
         ) : (
-          <button className="button" type="button" onClick={onSubmit} disabled={loading}>
-            <UserPlus size={18} />
-            {loading ? "Criando conta..." : "Criar conta e começar teste grátis"}
-          </button>
+          <span />
         )}
       </div>
 

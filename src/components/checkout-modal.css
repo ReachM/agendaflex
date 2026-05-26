@@ -103,3 +103,29 @@
   font-size: 14px;
   color: var(--muted);
 }
+
+/* O Brick do MP renderiza seu próprio botão "Pagar" dentro de um iframe — garante
+   que ocupa toda a largura do container. */
+.checkout-brick {
+  width: 100%;
+}
+
+/* ─── Mobile (≤768px): modal vira bottom-sheet ─── */
+@media (max-width: 768px) {
+  .checkout-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .checkout-modal {
+    width: 100%;
+    max-width: none;
+    max-height: 92vh;
+    border-radius: 20px 20px 0 0;
+    padding: 20px;
+  }
+  /* Botões de ação (ex.: "Atualizar agora") full-width e com alvo de toque ≥48px */
+  .checkout-modal .button {
+    width: 100%;
+    min-height: 48px;
+  }
+}

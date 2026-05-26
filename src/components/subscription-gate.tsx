@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertTriangle, Check, Clock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertTriangle, Check, Clock, Rocket, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { CheckoutModal } from "@/components/checkout-modal";
 
 export type SubscriptionState = {
@@ -29,24 +29,149 @@ type PublicPlan = {
   allowBotIntegration: boolean;
 };
 
+/** Forma do /api/plans/public — features já vêm prontas como string[]. */
+type PublicPlanLite = {
+  name: string;
+  slug: string;
+  description: string | null;
+  price: number;
+  features: string[];
+};
+
 function formatPrice(price: string | number): string {
   const value = typeof price === "string" ? Number(price) : price;
   if (!Number.isFinite(value) || value <= 0) return "Grátis";
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-/** Banner persistente durante o trial (não bloqueado). */
-export function TrialBanner({ daysLeft }: { daysLeft: number }) {
-  const lastDay = daysLeft <= 0;
+/**
+ * Modal de upgrade DISPENSÁVEL, exibido durante o trial (cliente NÃO bloqueado).
+ * Fecha pelo X, clique fora ou Esc — o cliente pode continuar usando no trial.
+ * Consome /api/plans/public e abre o checkout do MP no plano escolhido. O trial
+ * segue como fallback até o webhook confirmar o pagamento.
+ */
+function UpgradeModal({ onClose }: { onClose: () => void }) {
+  const [plans, setPlans] = useState<PublicPlanLite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [checkout, setCheckout] = useState<{ slug: string; name: string; amount: number } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/plans/public")
+      .then((r) => (r.ok ? r.json() : { plans: [] }))
+      .then((data) => {
+        if (active) setPlans((data.plans ?? []).filter((p: PublicPlanLite) => Number(p.price) > 0));
+      })
+      .catch(() => {
+        if (active) setPlans([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Esc fecha o modal (não bloqueante).
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  if (checkout) {
+    return (
+      <CheckoutModal
+        planSlug={checkout.slug}
+        planName={checkout.name}
+        amount={checkout.amount}
+        onClose={() => setCheckout(null)}
+        onSuccess={() => window.location.reload()}
+      />
+    );
+  }
+
   return (
-    <div className={`trial-banner ${lastDay ? "trial-banner--urgent" : ""}`} role="status">
-      <Clock size={16} />
-      <span>
-        {lastDay
-          ? "Seu teste grátis acaba hoje. Assine um plano para não perder o acesso."
-          : `Faltam ${daysLeft} ${daysLeft === 1 ? "dia" : "dias"} do seu teste grátis.`}
-      </span>
+    <div
+      className="trial-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upgrade-modal-title"
+      onClick={onClose}
+    >
+      <div className="trial-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="trial-modal__close" type="button" aria-label="Fechar" onClick={onClose}>
+          <X size={20} />
+        </button>
+        <div className="trial-modal-header">
+          <Rocket size={28} className="trial-modal-icon trial-modal-icon--primary" />
+          <h2 id="upgrade-modal-title">Fazer upgrade do seu plano</h2>
+          <p>
+            Garanta seu acesso depois do teste. Você continua no trial normalmente até a confirmação do
+            pagamento.
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="trial-modal-loading">
+            <div className="loading-spinner" />
+          </div>
+        ) : (
+          <div className="trial-plan-grid">
+            {plans.map((plan) => (
+              <div className="trial-plan-card" key={plan.slug}>
+                <div className="trial-plan-name">{plan.name}</div>
+                <div className="trial-plan-price">
+                  {formatPrice(plan.price)}
+                  {formatPrice(plan.price) !== "Grátis" && <span>/mês</span>}
+                </div>
+                {plan.description && <p className="trial-plan-desc">{plan.description}</p>}
+                <ul className="trial-plan-features">
+                  {plan.features.map((f) => (
+                    <li key={f}>
+                      <Check size={14} /> {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => setCheckout({ slug: plan.slug, name: plan.name, amount: Number(plan.price) })}
+                >
+                  Assinar {plan.name}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** Banner persistente durante o trial (não bloqueado), com CTA de upgrade. */
+export function TrialBanner({ daysLeft }: { daysLeft: number }) {
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const lastDay = daysLeft <= 0;
+  const close = useCallback(() => setShowUpgrade(false), []);
+  return (
+    <>
+      <div className={`trial-banner ${lastDay ? "trial-banner--urgent" : ""}`} role="status">
+        <Clock size={16} />
+        <span>
+          {lastDay
+            ? "Seu teste grátis acaba hoje. Assine um plano para não perder o acesso."
+            : `Faltam ${daysLeft} ${daysLeft === 1 ? "dia" : "dias"} do seu teste grátis.`}
+        </span>
+        <button className="trial-banner__cta" type="button" onClick={() => setShowUpgrade(true)}>
+          Fazer upgrade
+        </button>
+      </div>
+      {showUpgrade && <UpgradeModal onClose={close} />}
+    </>
   );
 }
 

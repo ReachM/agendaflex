@@ -1,32 +1,40 @@
 import type { Metadata } from "next";
 import { Landing } from "@/components/landing/landing";
 
+const SITE_URL = "https://marcaiflex.com.br";
+
 export const metadata: Metadata = {
-  title: "MarcaiFlex — Agendamento online sem fricção para o seu negócio",
+  metadataBase: new URL(SITE_URL),
+  title: "MarcaiFlex — Agenda online com Bot WhatsApp",
   description:
-    "Agenda online, lembretes por WhatsApp, múltiplos profissionais e relatórios em um só lugar. Para clínicas, salões, oficinas e prestadores de serviço. Teste grátis por 7 dias.",
+    "Gerencie sua agenda e deixe o bot responder pelo WhatsApp. Teste grátis por 7 dias.",
   keywords: [
+    "agenda online",
+    "bot whatsapp",
+    "agendamento whatsapp",
     "agendamento online",
-    "agenda para clínicas",
     "agenda para salão",
-    "lembrete whatsapp",
+    "agenda para clínicas",
+    "agenda para barbearia",
+    "lembrete automático whatsapp",
     "software de agendamento",
-    "SaaS agendamento"
+    "marcar horário online"
   ],
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     locale: "pt_BR",
-    title: "MarcaiFlex — Agendamento online sem fricção",
+    url: SITE_URL,
+    title: "MarcaiFlex — Agenda online com Bot WhatsApp",
     description:
-      "Agenda online, lembretes por WhatsApp, múltiplos profissionais e relatórios. Teste grátis por 7 dias.",
+      "Gerencie sua agenda e deixe o bot responder pelo WhatsApp. Teste grátis por 7 dias.",
     siteName: "MarcaiFlex"
   },
   twitter: {
     card: "summary_large_image",
-    title: "MarcaiFlex — Agendamento online sem fricção",
+    title: "MarcaiFlex — Agenda online com Bot WhatsApp",
     description:
-      "Agenda online, lembretes por WhatsApp, múltiplos profissionais e relatórios. Teste grátis por 7 dias."
+      "Gerencie sua agenda e deixe o bot responder pelo WhatsApp. Teste grátis por 7 dias."
   }
 };
 
