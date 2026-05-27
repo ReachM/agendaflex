@@ -1,13 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-// SDK do MP mockado — sem chamadas reais. Capturamos o body do preapproval.create.
-const { createMock } = vi.hoisted(() => ({ createMock: vi.fn() }));
-vi.mock("mercadopago", () => ({
-  MercadoPagoConfig: class {},
-  PreApproval: class {
-    create = createMock;
-  }
-}));
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
@@ -17,74 +8,139 @@ const { prismaMock } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 
-import { createSubscription } from "@/lib/services/mercadopago";
-
+// fetch global é mockado: cada teste injeta a sequência de respostas esperadas.
+const fetchMock = vi.fn();
+const originalFetch = global.fetch;
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.MP_ACCESS_TOKEN = "TEST-access-token";
-  process.env.MP_BACK_URL = "http://localhost:3000/dashboard";
+  process.env.ASAAS_API_KEY = "$aact_TEST_SANDBOX_XXXX";
+  process.env.ASAAS_SANDBOX = "true";
+  global.fetch = fetchMock as unknown as typeof fetch;
   prismaMock.plan.findFirst.mockResolvedValue({ id: "plan-pro", name: "Pro", price: 99.9, isActive: true });
   prismaMock.companySubscription.findFirst.mockResolvedValue({ id: "sub-1" });
-  // Fluxo redirect: MP devolve { id, status: "pending", init_point } no create.
-  createMock.mockResolvedValue({
-    id: "pre-123",
-    status: "pending",
-    init_point: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_id=pre-123"
-  });
+});
+afterEach(() => {
+  global.fetch = originalFetch;
 });
 
-describe("createSubscription (fluxo redirect — Opção A)", () => {
-  it("monta o payload correto (mensal, BRL, status pending, sem card_token_id)", async () => {
+import { createSubscription } from "@/lib/services/asaas";
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+describe("createSubscription (Asaas, fluxo redirect)", () => {
+  it("monta corretamente: busca customer, cria assinatura UNDEFINED, devolve checkoutUrl", async () => {
+    fetchMock
+      // GET /customers?email= -> não existe
+      .mockResolvedValueOnce(jsonResponse({ data: [] }))
+      // POST /customers -> criado
+      .mockResolvedValueOnce(jsonResponse({ id: "cus_99" }))
+      // POST /subscriptions -> ok
+      .mockResolvedValueOnce(jsonResponse({ id: "sub_asaas_1" }))
+      // GET /subscriptions/sub_asaas_1/payments?limit=1 -> primeira cobrança
+      .mockResolvedValueOnce(
+        jsonResponse({ data: [{ id: "pay_1", invoiceUrl: "https://www.asaas.com/i/pay_1" }] })
+      );
+
     const result = await createSubscription({
       planId: "plan-pro",
       companyId: "c1",
+      payerEmail: "a@b.com",
+      payerName: "Acme"
+    });
+
+    expect(result).toMatchObject({
+      subscriptionId: "sub-1",
+      gatewaySubscriptionId: "sub_asaas_1",
+      gatewayCustomerId: "cus_99",
+      checkoutUrl: "https://www.asaas.com/i/pay_1",
       payerEmail: "a@b.com"
     });
 
-    expect(createMock).toHaveBeenCalledTimes(1);
-    const body = createMock.mock.calls[0][0].body;
-
-    expect(body.auto_recurring).toEqual({
-      frequency: 1,
-      frequency_type: "months",
-      transaction_amount: 99.9,
-      currency_id: "BRL"
+    // 4 chamadas no total e o POST /subscriptions traz o payload correto.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const subCall = fetchMock.mock.calls[2];
+    expect(String(subCall[0])).toContain("/subscriptions");
+    const body = JSON.parse(subCall[1].body);
+    expect(body).toMatchObject({
+      customer: "cus_99",
+      billingType: "UNDEFINED",
+      value: 99.9,
+      cycle: "MONTHLY",
+      externalReference: "sub-1"
     });
-    expect(body.external_reference).toBe("sub-1");
-    expect(body.payer_email).toBe("a@b.com");
-    // Em redirect, MP exige status "pending" (vira "authorized" após o cliente autorizar no init_point)
-    expect(body.status).toBe("pending");
-    expect(body.back_url).toBe("http://localhost:3000/dashboard");
-    // Sem dados de cartão: nada de card_token_id no payload nem no resultado.
-    expect(body).not.toHaveProperty("card_token_id");
+    expect(body.description).toContain("Pro");
+    expect(body.nextDueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
-    expect(result).toMatchObject({
-      preapprovalId: "pre-123",
-      initPoint: "https://www.mercadopago.com.br/subscriptions/checkout?preapproval_id=pre-123",
-      status: "pending",
-      subscriptionId: "sub-1"
+    // Header de auth está em TODAS as chamadas.
+    for (const call of fetchMock.mock.calls) {
+      expect(call[1].headers.access_token).toBe("$aact_TEST_SANDBOX_XXXX");
+    }
+  });
+
+  it("usa o customer existente quando o e-mail já está cadastrado", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ data: [{ id: "cus_existing" }] }))
+      .mockResolvedValueOnce(jsonResponse({ id: "sub_asaas_2", paymentLink: "https://www.asaas.com/pl/2" }));
+
+    const result = await createSubscription({
+      planId: "plan-pro",
+      companyId: "c1",
+      payerEmail: "a@b.com",
+      payerName: "Acme"
     });
+
+    expect(result.gatewayCustomerId).toBe("cus_existing");
+    expect(result.checkoutUrl).toBe("https://www.asaas.com/pl/2");
+    // Sem POST /customers, e sem GET /payments (paymentLink veio direto).
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("recusa plano sem valor de cobrança (grátis)", async () => {
     prismaMock.plan.findFirst.mockResolvedValue({ id: "plan-free", name: "Starter", price: 0, isActive: true });
     await expect(
-      createSubscription({ planId: "plan-free", companyId: "c1", payerEmail: "a@b.com" })
+      createSubscription({ planId: "plan-free", companyId: "c1", payerEmail: "a@b.com", payerName: "Acme" })
     ).rejects.toMatchObject({ status: 400 });
-    expect(createMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("falha sem init_point: vira 502 (defensivo, não cliente vê o que houve)", async () => {
-    createMock.mockResolvedValue({ id: "pre-x", status: "pending" }); // sem init_point
+  it("falha ao criar assinatura no Asaas vira 502", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ data: [{ id: "cus_1" }] }))
+      .mockResolvedValueOnce(jsonResponse({ errors: [{ description: "Limite atingido" }] }, 400));
+
     await expect(
-      createSubscription({ planId: "plan-pro", companyId: "c1", payerEmail: "a@b.com" })
+      createSubscription({ planId: "plan-pro", companyId: "c1", payerEmail: "a@b.com", payerName: "Acme" })
     ).rejects.toMatchObject({ status: 502 });
   });
 
-  it("erro genérico do MP vira mensagem amigável de gateway (502)", async () => {
-    createMock.mockRejectedValue({ message: "MP internal error" });
+  it("falha quando não consegue URL de checkout vira 502", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ data: [{ id: "cus_1" }] }))
+      .mockResolvedValueOnce(jsonResponse({ id: "sub_asaas_3" })) // sem paymentLink
+      .mockResolvedValueOnce(jsonResponse({ data: [] })); // sem cobranças
+
     await expect(
-      createSubscription({ planId: "plan-pro", companyId: "c1", payerEmail: "a@b.com" })
+      createSubscription({ planId: "plan-pro", companyId: "c1", payerEmail: "a@b.com", payerName: "Acme" })
     ).rejects.toMatchObject({ status: 502 });
+  });
+
+  it("usa o ambiente de produção quando ASAAS_SANDBOX=false", async () => {
+    process.env.ASAAS_SANDBOX = "false";
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ data: [{ id: "cus_1" }] }))
+      .mockResolvedValueOnce(jsonResponse({ id: "sub_asaas_4", paymentLink: "https://www.asaas.com/pl/4" }));
+
+    await createSubscription({
+      planId: "plan-pro",
+      companyId: "c1",
+      payerEmail: "a@b.com",
+      payerName: "Acme"
+    });
+
+    for (const call of fetchMock.mock.calls) {
+      expect(String(call[0])).toMatch(/^https:\/\/www\.asaas\.com\/api\/v3/);
+    }
   });
 });

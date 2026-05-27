@@ -34,7 +34,7 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
   {
     icon: CreditCard,
     title: "Pagamento online",
-    desc: "Mercado Pago + Pix integrados. Cobre antes ou depois — você decide."
+    desc: "Cartão, Pix e boleto via Asaas. Cobre antes ou depois — você decide."
   },
   {
     icon: CheckSquare,

@@ -1,9 +1,4 @@
-import crypto from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-// SDK do MP em stub (sem rede). fetchWebhookResource é sobrescrito; o resto do
-// módulo (validateMpWebhookSignature, mapMpStatus) é REAL.
-vi.mock("mercadopago", () => ({ MercadoPagoConfig: class {}, PreApproval: class {}, Payment: class {} }));
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
@@ -14,29 +9,15 @@ const { prismaMock } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 
-const { fetchResourceMock } = vi.hoisted(() => ({ fetchResourceMock: vi.fn() }));
-vi.mock("@/lib/services/mercadopago", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/services/mercadopago")>();
-  return { ...actual, fetchWebhookResource: fetchResourceMock };
-});
+import { POST } from "@/app/api/webhooks/asaas/route";
 
-import { POST } from "@/app/api/webhooks/mercadopago/route";
+const TOKEN = "asaas-webhook-secret";
 
-const SECRET = "webhook-secret-de-teste";
-const TS = "1700000000";
-
-function sign(dataId: string, requestId = "req-1", ts = TS): string {
-  const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`;
-  const v1 = crypto.createHmac("sha256", SECRET).update(manifest).digest("hex");
-  return `ts=${ts},v1=${v1}`;
-}
-
-function req(opts: { body: unknown; signature?: string; requestId?: string }) {
+function req(opts: { body: unknown; token?: string | null }) {
   const headers = new Map<string, string>();
-  if (opts.signature !== undefined) headers.set("x-signature", opts.signature);
-  headers.set("x-request-id", opts.requestId ?? "req-1");
+  if (opts.token !== null && opts.token !== undefined) headers.set("asaas-access-token", opts.token);
   return {
-    url: "https://app.test/api/webhooks/mercadopago",
+    url: "https://app.test/api/webhooks/asaas",
     headers: { get: (k: string) => headers.get(k.toLowerCase()) ?? null },
     json: async () => opts.body
   } as any;
@@ -44,42 +25,40 @@ function req(opts: { body: unknown; signature?: string; requestId?: string }) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.MP_WEBHOOK_SECRET = SECRET;
+  process.env.ASAAS_WEBHOOK_TOKEN = TOKEN;
   prismaMock.paymentEvent.findUnique.mockResolvedValue(null);
   prismaMock.paymentEvent.create.mockResolvedValue({});
   prismaMock.companySubscription.update.mockResolvedValue({});
   prismaMock.$transaction.mockImplementation(async (cb: any) => cb(prismaMock));
 });
 
-describe("POST /api/webhooks/mercadopago", () => {
-  it("assinatura inválida -> 401 e não processa", async () => {
+describe("POST /api/webhooks/asaas", () => {
+  it("token inválido -> 401 e não processa", async () => {
     const res = await POST(
-      req({ body: { id: "evt-1", type: "payment", data: { id: "123" } }, signature: "ts=1,v1=deadbeef" })
+      req({ body: { id: "evt-1", event: "PAYMENT_CONFIRMED", payment: { id: "pay-1" } }, token: "errado" })
     );
     expect(res.status).toBe(401);
-    expect(fetchResourceMock).not.toHaveBeenCalled();
     expect(prismaMock.companySubscription.update).not.toHaveBeenCalled();
   });
 
   it("notificação duplicada (mesmo id) -> 200 e não reprocessa", async () => {
     prismaMock.paymentEvent.findUnique.mockResolvedValue({ id: "ja-existe" });
     const res = await POST(
-      req({ body: { id: "evt-1", type: "payment", data: { id: "123" } }, signature: sign("123") })
+      req({
+        body: {
+          id: "evt-1",
+          event: "PAYMENT_CONFIRMED",
+          payment: { id: "pay-1", subscription: "sub-asaas-1", status: "CONFIRMED", externalReference: "sub-1" }
+        },
+        token: TOKEN
+      })
     );
     expect(res.status).toBe(200);
     expect((await res.json()).duplicate).toBe(true);
-    expect(fetchResourceMock).not.toHaveBeenCalled();
     expect(prismaMock.companySubscription.update).not.toHaveBeenCalled();
   });
 
-  it("pagamento aprovado -> ACTIVE, currentPeriodEnd empurrado, pastDueSince limpo", async () => {
-    fetchResourceMock.mockResolvedValue({
-      kind: "payment",
-      status: "approved",
-      preapprovalId: "pre-1",
-      paymentId: "pay-9",
-      externalReference: "sub-1"
-    });
+  it("PAYMENT_CONFIRMED -> ACTIVE, currentPeriodEnd empurrado, pastDueSince limpo", async () => {
     prismaMock.companySubscription.findUnique.mockResolvedValue({
       id: "sub-1",
       pastDueSince: new Date(),
@@ -87,7 +66,14 @@ describe("POST /api/webhooks/mercadopago", () => {
     });
 
     const res = await POST(
-      req({ body: { id: "evt-2", type: "payment", data: { id: "123" } }, signature: sign("123") })
+      req({
+        body: {
+          id: "evt-2",
+          event: "PAYMENT_CONFIRMED",
+          payment: { id: "pay-9", subscription: "sub-asaas-1", status: "CONFIRMED", externalReference: "sub-1" }
+        },
+        token: TOKEN
+      })
     );
     expect(res.status).toBe(200);
     expect(prismaMock.paymentEvent.create).toHaveBeenCalledTimes(1);
@@ -97,17 +83,10 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(data.pastDueSince).toBeNull();
     expect(data.currentPeriodEnd).toBeInstanceOf(Date);
     expect(data.lastPaymentId).toBe("pay-9");
-    expect(data.lastPaymentStatus).toBe("approved");
+    expect(data.lastPaymentStatus).toBe("CONFIRMED");
   });
 
-  it("pagamento recusado -> PAST_DUE com pastDueSince setado", async () => {
-    fetchResourceMock.mockResolvedValue({
-      kind: "payment",
-      status: "rejected",
-      preapprovalId: "pre-1",
-      paymentId: "pay-10",
-      externalReference: "sub-1"
-    });
+  it("PAYMENT_OVERDUE -> PAST_DUE com pastDueSince setado", async () => {
     prismaMock.companySubscription.findUnique.mockResolvedValue({
       id: "sub-1",
       pastDueSince: null,
@@ -115,7 +94,14 @@ describe("POST /api/webhooks/mercadopago", () => {
     });
 
     const res = await POST(
-      req({ body: { id: "evt-3", type: "payment", data: { id: "123" } }, signature: sign("123") })
+      req({
+        body: {
+          id: "evt-3",
+          event: "PAYMENT_OVERDUE",
+          payment: { id: "pay-10", subscription: "sub-asaas-1", status: "OVERDUE", externalReference: "sub-1" }
+        },
+        token: TOKEN
+      })
     );
     expect(res.status).toBe(200);
 
@@ -124,14 +110,32 @@ describe("POST /api/webhooks/mercadopago", () => {
     expect(data.pastDueSince).toBeInstanceOf(Date);
   });
 
-  it("preapproval cancelado -> CANCELLED", async () => {
-    fetchResourceMock.mockResolvedValue({
-      kind: "preapproval",
-      status: "cancelled",
-      preapprovalId: "pre-1",
-      paymentId: null,
-      externalReference: "sub-1"
+  it("SUBSCRIPTION_DELETED -> CANCELLED", async () => {
+    // Sem externalReference: cai no fallback por gatewaySubscriptionId.
+    prismaMock.companySubscription.findFirst.mockResolvedValue({
+      id: "sub-1",
+      pastDueSince: null,
+      currentPeriodEnd: null
     });
+
+    const res = await POST(
+      req({
+        body: {
+          id: "evt-4",
+          event: "SUBSCRIPTION_DELETED",
+          subscription: { id: "sub-asaas-1", status: "INACTIVE" }
+        },
+        token: TOKEN
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(prismaMock.companySubscription.findFirst).toHaveBeenCalledWith({
+      where: { gatewaySubscriptionId: "sub-asaas-1" }
+    });
+    expect(prismaMock.companySubscription.update.mock.calls[0][0].data.status).toBe("CANCELLED");
+  });
+
+  it("evento sem efeito (PAYMENT_DELETED) -> 200, grava PaymentEvent, sem update", async () => {
     prismaMock.companySubscription.findUnique.mockResolvedValue({
       id: "sub-1",
       pastDueSince: null,
@@ -139,18 +143,28 @@ describe("POST /api/webhooks/mercadopago", () => {
     });
 
     const res = await POST(
-      req({ body: { id: "evt-4", type: "preapproval", data: { id: "pre-1" } }, signature: sign("pre-1") })
+      req({
+        body: {
+          id: "evt-5",
+          event: "PAYMENT_DELETED",
+          payment: { id: "pay-x", subscription: "sub-asaas-1", externalReference: "sub-1" }
+        },
+        token: TOKEN
+      })
     );
     expect(res.status).toBe(200);
-    expect(prismaMock.companySubscription.update.mock.calls[0][0].data.status).toBe("CANCELLED");
+    expect(prismaMock.paymentEvent.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.companySubscription.update).not.toHaveBeenCalled();
   });
 
-  it("tipo não tratado -> 200 ignorado, sem atualizar", async () => {
-    fetchResourceMock.mockResolvedValue(null);
+  it("evento não tratado (formato desconhecido) -> 200 ignorado", async () => {
     const res = await POST(
-      req({ body: { id: "evt-5", type: "merchant_order", data: { id: "999" } }, signature: sign("999") })
+      req({
+        body: { id: "evt-6", event: "RANDOM_EVENT" },
+        token: TOKEN
+      })
     );
     expect(res.status).toBe(200);
-    expect(prismaMock.companySubscription.update).not.toHaveBeenCalled();
+    expect(prismaMock.paymentEvent.create).not.toHaveBeenCalled();
   });
 });

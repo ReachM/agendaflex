@@ -7,25 +7,15 @@ import "./checkout-modal.css";
 
 /**
  * ════════════════════════════════════════════════════════════════════
- * Checkout — Opção A (REDIRECT) para o Mercado Pago Assinaturas
+ * Checkout — fluxo REDIRECT para o Asaas
  * ════════════════════════════════════════════════════════════════════
- * O MP Assinaturas (preapproval) suporta dois fluxos:
+ * POST /api/subscription/checkout cria a assinatura no Asaas (billingType
+ * UNDEFINED, o cliente escolhe cartão / pix / boleto no Asaas) e devolve
+ * `checkoutUrl`. Levamos o cliente para essa URL — toda a parte sensível
+ * de coleta de pagamento acontece no ambiente do Asaas. A ativação da
+ * assinatura (status ACTIVE) chega pelo WEBHOOK do Asaas.
  *
- * • Opção A — REDIRECT (esta implementação):
- *   POST /api/subscription/checkout cria o preapproval e devolve o
- *   `init_point` (URL). O cliente é redirecionado pra esse link, digita
- *   o cartão no ambiente do MP, autoriza, e volta via `back_url`. A
- *   ativação (status ACTIVE) chega pelo WEBHOOK.
- *   Vantagem: NENHUM dado de cartão passa pelo nosso domínio.
- *
- * • Opção B — TRANSPARENTE (não usada aqui):
- *   Tokeniza o cartão no front (cardPayment Brick), envia `card_token_id`
- *   ao backend e o preapproval é criado já como "authorized". Sem
- *   redirect — o cliente fica no MarcaiFlex.
- *
- * Trocar A → B no futuro NÃO exige mudar a forma do backend: bastaria
- * voltar a aceitar `cardTokenId` no body do POST /api/subscription/checkout
- * e repassar pro `createSubscription` (campo opcional do payload do MP).
+ * NENHUM dado de cartão passa pelo nosso domínio.
  */
 
 type CheckoutModalProps = {
@@ -34,9 +24,9 @@ type CheckoutModalProps = {
   amount: number;
   /** Fechar/cancelar antes do redirect. */
   onClose: () => void;
-  /** Mantido por compatibilidade com chamadores antigos (cardPayment Brick).
-   *  No fluxo redirect a confirmação chega via webhook quando o cliente volta
-   *  do MP — não chamamos onSuccess. */
+  /** Mantido por compatibilidade com chamadores antigos. No fluxo redirect a
+   *  confirmação chega via webhook quando o cliente termina o pagamento no
+   *  Asaas — este componente não chama onSuccess. */
   onSuccess: () => void;
 };
 
@@ -76,7 +66,7 @@ export function CheckoutModal({ planSlug, planName, amount, onClose, onSuccess }
         return;
       }
       // Mostra a tela de transição por CHECKOUT_REDIRECT_DELAY_MS antes de
-      // jogar o cliente para o MP.
+      // jogar o cliente para o Asaas.
       setStatus("redirecting");
       cancelRef.current = scheduleCheckoutRedirect(data.checkoutUrl);
     })();
@@ -118,10 +108,10 @@ export function CheckoutModal({ planSlug, planName, amount, onClose, onSuccess }
             <div className="checkout-redirect__icon" aria-hidden="true">
               <Lock size={26} />
             </div>
-            <h3>Redirecionando para o Mercado Pago...</h3>
+            <h3>Redirecionando para o Asaas...</h3>
             <p>
-              Você será levado ao ambiente seguro do Mercado Pago para autorizar sua assinatura.
-              Após confirmar, voltará automaticamente para o MarcaiFlex.
+              Você será levado ao ambiente seguro do Asaas para concluir o pagamento.
+              Após pagar, sua assinatura é ativada automaticamente.
             </p>
             <div
               className="checkout-redirect__bar"
@@ -133,7 +123,7 @@ export function CheckoutModal({ planSlug, planName, amount, onClose, onSuccess }
             </div>
             <div className="checkout-redirect__badge">
               <ShieldCheck size={14} />
-              Pagamento 100% seguro pelo Mercado Pago
+              Pagamento 100% seguro pelo Asaas
             </div>
           </div>
         )}

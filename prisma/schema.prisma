@@ -236,14 +236,15 @@ model CompanySubscription {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
-  // Mercado Pago — assinatura recorrente (preapproval). Preenchidos a partir da
+  // Gateway de pagamento (Asaas) — assinatura recorrente. Preenchidos a partir da
   // etapa de checkout/webhook; nulos enquanto a empresa só está no trial.
-  mpPreapprovalId   String?   @unique
-  mpPayerEmail      String?
-  currentPeriodEnd  DateTime?
-  pastDueSince      DateTime?
-  lastPaymentId     String?
-  lastPaymentStatus String?
+  gatewaySubscriptionId String?   @unique
+  gatewayCustomerId     String?
+  payerEmail            String?
+  currentPeriodEnd      DateTime?
+  pastDueSince          DateTime?
+  lastPaymentId         String?
+  lastPaymentStatus     String?
 
   company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   plan          Plan           @relation(fields: [planId], references: [id])
@@ -254,22 +255,23 @@ model CompanySubscription {
   @@index([planId])
 }
 
-// Idempotência e auditoria dos webhooks do Mercado Pago. Cada notificação é
-// gravada uma única vez (mpEventId @unique) para nunca ser processada 2x.
+// Idempotência e auditoria dos webhooks do gateway de pagamento (Asaas). Cada
+// notificação é gravada uma única vez (gatewayEventId @unique) para nunca ser
+// processada 2x.
 model PaymentEvent {
-  id             String   @id @default(cuid())
-  subscriptionId String
-  mpEventId      String   @unique
-  mpResourceId   String
-  type           String
-  status         String
-  rawType        String
-  processedAt    DateTime @default(now())
+  id                String   @id @default(cuid())
+  subscriptionId    String
+  gatewayEventId    String   @unique
+  gatewayResourceId String
+  type              String
+  status            String
+  rawType           String
+  processedAt       DateTime @default(now())
 
   subscription CompanySubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId])
-  @@index([mpResourceId])
+  @@index([gatewayResourceId])
 }
 
 // ═══════════════════════════════════════════════════

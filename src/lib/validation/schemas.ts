@@ -40,8 +40,8 @@ export const registerSchema = z.object({
 
 export const subscriptionCheckoutSchema = z.object({
   planSlug: requiredString(60),
-  // Fluxo redirect (Opção A): NÃO recebemos dados de cartão no backend — o
-  // cartão é coletado no ambiente seguro do Mercado Pago, via init_point.
+  // Fluxo redirect: NÃO recebemos dados de cartão no backend — o cliente é
+  // levado para a página de pagamento do Asaas, onde escolhe o método.
   payerEmail: z.string().trim().email().max(255).optional()
 });
 

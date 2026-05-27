@@ -1,8 +1,8 @@
 /**
- * Régua de tolerância de cartão recusado (PAST_DUE), em módulo PURO e SEM o SDK
- * do Mercado Pago — para poder ser usado pelo caminho de auth/assinatura
- * (subscription.ts -> requireTenant) sem arrastar o SDK para cada request.
- * O mercadopago.ts re-exporta estes símbolos para compatibilidade.
+ * Régua de tolerância de cartão recusado (PAST_DUE), em módulo PURO e SEM
+ * dependência do gateway de pagamento — para poder ser usado pelo caminho de
+ * auth/assinatura (subscription.ts -> requireTenant) sem arrastar a integração
+ * para cada request. O asaas.ts re-exporta estes símbolos para compatibilidade.
  */
 
 /** Tolerância de cartão recusado: 7 dias em PAST_DUE antes de bloquear o acesso. */
