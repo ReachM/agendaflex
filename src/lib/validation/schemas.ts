@@ -34,7 +34,18 @@ export const registerSchema = z.object({
     "PRESTADOR_SERVICOS",
     "PERSONALIZADO"
   ]),
-  document: optionalString(30),
+  document: z
+    .string()
+    .trim()
+    .min(11, "CPF inválido")
+    .max(18)
+    .refine(
+      (val) => {
+        const digits = val.replace(/\D/g, "");
+        return digits.length === 11 || digits.length === 14;
+      },
+      { message: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido." }
+    ),
   companyPhone: optionalString(30)
 });
 

@@ -96,19 +96,22 @@ export function buildRegisterBody(state: RegisterFormState): RegisterBody {
   if (!state.segment) {
     throw new Error("Segmento é obrigatório para montar o cadastro.");
   }
+  /** Retorna o valor limpo ou undefined se vazio. */
   const optional = (value: string) => {
     const trimmed = value.trim();
     return trimmed === "" ? undefined : trimmed;
   };
+  /** Remove tudo que não for dígito. */
+  const digitsOnly = (value: string) => value.replace(/\D/g, "");
 
   return {
     adminName: state.adminName.trim(),
     adminEmail: state.adminEmail.trim().toLowerCase(),
     adminPassword: state.adminPassword,
-    adminPhone: optional(state.adminPhone),
+    adminPhone: optional(digitsOnly(state.adminPhone)),
     companyName: state.companyName.trim(),
-    document: optional(state.document),
-    companyPhone: optional(state.companyPhone),
+    document: optional(digitsOnly(state.document)),
+    companyPhone: optional(digitsOnly(state.companyPhone)),
     segment: state.segment
   };
 }
@@ -130,6 +133,12 @@ export function validateStep(step: number, state: RegisterFormState): string | n
   }
   if (step === 3) {
     if (state.companyName.trim().length < 2) return "Informe o nome da empresa.";
+    const docTrimmed = state.document.trim();
+    if (!docTrimmed) return "CPF ou CNPJ é obrigatório para processar pagamentos.";
+    const docDigits = docTrimmed.replace(/\D/g, "");
+    if (docDigits.length !== 11 && docDigits.length !== 14) {
+      return "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.";
+    }
     return null;
   }
   if (step === 4) {
@@ -137,4 +146,51 @@ export function validateStep(step: number, state: RegisterFormState): string | n
     return null;
   }
   return null;
+}
+
+// ── Máscaras de formatação (apenas UX, sem lib externa) ──────────────────────
+
+/** Remove tudo que não for dígito. */
+export function stripNonDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/**
+ * Formata o valor como CPF (≤11 dígitos) ou CNPJ (12–14 dígitos).
+ * O valor devolvido é a string FORMATADA (pontuação inclusa).
+ */
+export function formatCpfCnpj(raw: string): string {
+  const digits = stripNonDigits(raw).slice(0, 14);
+  if (digits.length <= 11) {
+    // CPF: 000.000.000-00
+    return digits
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  }
+  // CNPJ: 00.000.000/0000-00
+  return digits
+    .replace(/(\d{2})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1/$2")
+    .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+}
+
+/**
+ * Formata o valor como telefone brasileiro:
+ *  - 10 dígitos (fixo):   (00) 0000-0000
+ *  - 11 dígitos (celular): (00) 00000-0000
+ */
+export function formatPhone(raw: string): string {
+  const digits = stripNonDigits(raw).slice(0, 11);
+  if (digits.length <= 10) {
+    // Fixo: (00) 0000-0000
+    return digits
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{4})(\d{1,4})$/, "$1-$2");
+  }
+  // Celular: (00) 00000-0000
+  return digits
+    .replace(/(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{5})(\d{1,4})$/, "$1-$2");
 }

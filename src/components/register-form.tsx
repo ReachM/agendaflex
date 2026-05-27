@@ -8,6 +8,8 @@ import {
   buildRegisterBody,
   EMPTY_REGISTER_STATE,
   evaluatePasswordStrength,
+  formatCpfCnpj,
+  formatPhone,
   SEGMENTS,
   validateStep,
   type RegisterFormState
@@ -247,8 +249,9 @@ export function RegisterForm() {
               id="adminPhone"
               type="tel"
               autoComplete="tel"
+              placeholder="(00) 00000-0000"
               value={state.adminPhone}
-              onChange={(e) => update("adminPhone", e.target.value)}
+              onChange={(e) => update("adminPhone", formatPhone(e.target.value))}
             />
           </div>
           <div className="field">
@@ -326,12 +329,14 @@ export function RegisterForm() {
             />
           </div>
           <div className="field">
-            <label htmlFor="document">CNPJ ou CPF (opcional)</label>
+            <label htmlFor="document">CNPJ ou CPF *</label>
             <input
               id="document"
               type="text"
+              placeholder="000.000.000-00"
               value={state.document}
-              onChange={(e) => update("document", e.target.value)}
+              onChange={(e) => update("document", formatCpfCnpj(e.target.value))}
+              required
             />
           </div>
           <div className="field">
@@ -339,8 +344,9 @@ export function RegisterForm() {
             <input
               id="companyPhone"
               type="tel"
+              placeholder="(00) 00000-0000"
               value={state.companyPhone}
-              onChange={(e) => update("companyPhone", e.target.value)}
+              onChange={(e) => update("companyPhone", formatPhone(e.target.value))}
             />
           </div>
         </div>
