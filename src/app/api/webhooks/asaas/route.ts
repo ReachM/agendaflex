@@ -4,7 +4,7 @@ import { handleApiError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getRequestIp } from "@/lib/security/request";
-import { mapAsaasStatus, parseAsaasWebhook, validateAsaasWebhook } from "@/lib/services/asaas";
+import { loadEnvIfNeeded, mapAsaasStatus, parseAsaasWebhook, validateAsaasWebhook } from "@/lib/services/asaas";
 
 /**
  * Webhook do Asaas — ÚNICA fonte de verdade para ativar/renovar/bloquear a
@@ -37,6 +37,8 @@ function isUniqueViolation(error: unknown): boolean {
 export async function POST(request: NextRequest) {
   try {
     rateLimit(`asaas-webhook:${getRequestIp(request)}`, 600, 60 * 1000);
+
+    loadEnvIfNeeded(); // garante que o .env foi lido (PM2/produção)
 
     if (!process.env.ASAAS_WEBHOOK_TOKEN) {
       console.error(`${LOG_PREFIX} ASAAS_WEBHOOK_TOKEN não configurado.`);

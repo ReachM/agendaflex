@@ -1,6 +1,40 @@
+import fs from "fs";
+import path from "path";
 import type { SubscriptionStatus } from "@prisma/client";
 import { ApiError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+
+/**
+ * Lê o .env manualmente caso process.env não tenha as variáveis do Asaas.
+ * Next.js em produção (especialmente sob PM2) NÃO carrega .env em runtime para
+ * rotas de API — esse fallback garante que as chaves existam.
+ */
+export function loadEnvIfNeeded(): void {
+  if (process.env.ASAAS_API_KEY) return; // já está no env, ok
+  try {
+    const envPath = path.join(process.cwd(), ".env");
+    const content = fs.readFileSync(envPath, "utf8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const idx = trimmed.indexOf("=");
+      if (idx < 0) continue;
+      const key = trimmed.substring(0, idx).trim();
+      let value = trimmed.substring(idx + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      if (key && !process.env[key]) {
+        process.env[key] = value;
+      }
+    }
+  } catch {
+    // silencioso — o erro será capturado abaixo quando ASAAS_API_KEY for undefined
+  }
+}
 
 // Régua de 7 dias vive em módulo PURO (sem SDK / sem fetch). Re-exportada aqui
 // para quem importa de "@/lib/services/asaas".
@@ -37,6 +71,7 @@ export type AsaasClient = {
  * servir uma key fantasma se a env reaparecer depois.
  */
 export function getAsaasClient(): AsaasClient {
+  loadEnvIfNeeded(); // garante que o .env foi lido
   const apiKey = process.env.ASAAS_API_KEY;
   if (!apiKey) {
     throw new Error("Asaas não configurado: defina ASAAS_API_KEY.");
@@ -50,12 +85,12 @@ export function getAsaasClient(): AsaasClient {
   };
 }
 
-async function asaasFetch(path: string, init?: RequestInit): Promise<Response> {
+async function asaasFetch(endpoint: string, init?: RequestInit): Promise<Response> {
   const client = getAsaasClient();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    return await fetch(`${client.baseUrl}${path}`, {
+    return await fetch(`${client.baseUrl}${endpoint}`, {
       ...init,
       headers: {
         access_token: client.apiKey,
@@ -322,6 +357,7 @@ type HasHeaders = { headers: { get(name: string): string | null } };
  * não assina o payload com HMAC; o segredo compartilhado é o mecanismo oficial.
  */
 export function validateAsaasWebhook(request: HasHeaders): boolean {
+  loadEnvIfNeeded(); // garante que o .env foi lido
   const expected = process.env.ASAAS_WEBHOOK_TOKEN;
   if (!expected) return false;
   const received = request.headers.get("asaas-access-token");
