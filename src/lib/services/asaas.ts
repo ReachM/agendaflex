@@ -127,7 +127,8 @@ export type CreateOrGetCustomerInput = {
 
 type AsaasCustomerResponse = {
   id?: string;
-  data?: Array<{ id?: string }>;
+  cpfCnpj?: string | null;
+  data?: Array<{ id?: string; cpfCnpj?: string | null }>;
 };
 
 /**
@@ -135,6 +136,10 @@ type AsaasCustomerResponse = {
  * Retorna o `id` do cliente (formato `cus_...`). Não persiste em lugar nenhum —
  * a responsabilidade de guardar `gatewayCustomerId` em CompanySubscription é
  * de `createSubscription()` (ponto único de escrita).
+ *
+ * Se o customer já existir mas vier sem `cpfCnpj` (ou diferente do que estamos
+ * passando), atualiza via POST /customers/:id — sem isso, a criação posterior
+ * da assinatura falha com "preencha o CPF ou CNPJ do cliente".
  */
 export async function createOrGetCustomer(input: CreateOrGetCustomerInput): Promise<{ id: string }> {
   const email = input.email.trim().toLowerCase();
@@ -144,8 +149,23 @@ export async function createOrGetCustomer(input: CreateOrGetCustomerInput): Prom
   const search = await asaasFetch(`/customers?email=${encodeURIComponent(email)}&limit=1`);
   if (search.ok) {
     const list = (await search.json()) as AsaasCustomerResponse;
-    const existing = list.data?.[0]?.id;
-    if (existing) return { id: existing };
+    const existing = list.data?.[0];
+    if (existing?.id) {
+      const needsUpdate =
+        input.cpfCnpj &&
+        (!existing.cpfCnpj || existing.cpfCnpj.replace(/\D/g, "") !== input.cpfCnpj.replace(/\D/g, ""));
+      if (needsUpdate) {
+        const updated = await asaasFetch(`/customers/${encodeURIComponent(existing.id)}`, {
+          method: "POST",
+          body: JSON.stringify({ cpfCnpj: input.cpfCnpj })
+        });
+        if (!updated.ok) {
+          console.error(`[Asaas] Falha ao atualizar cliente: ${await readAsaasError(updated)}`);
+          throw new ApiError(502, "Falha ao atualizar o cadastro do cliente no Asaas.");
+        }
+      }
+      return { id: existing.id };
+    }
   } else {
     console.warn(`[Asaas] Falha ao consultar cliente por e-mail (status ${search.status}).`);
   }

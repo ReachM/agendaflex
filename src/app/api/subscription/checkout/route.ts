@@ -49,6 +49,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // CPF/CNPJ: prioriza o que veio no body; senão usa Company.document.
+    // Asaas REJEITA a criação do customer sem isso — devolvemos 422 cedo
+    // para evitar um 502 silencioso vindo do gateway.
+    const company = await prisma.company.findUnique({
+      where: { id: context.companyId },
+      select: { document: true }
+    });
+    const cpfCnpj = body.cpfCnpj?.trim() || company?.document?.trim() || undefined;
+    if (!cpfCnpj) {
+      throw new ApiError(
+        422,
+        "CPF ou CNPJ do responsável é obrigatório. Cadastre o documento da empresa nas configurações ou informe-o no checkout."
+      );
+    }
+
     const payerEmail = body.payerEmail?.trim().toLowerCase() || context.user.email;
     const payerName = context.user.name || context.user.email;
 
@@ -56,7 +71,8 @@ export async function POST(request: NextRequest) {
       planId: plan.id,
       companyId: context.companyId,
       payerEmail,
-      payerName
+      payerName,
+      cpfCnpj
     });
 
     // Vincula a assinatura/customer do gateway e o pagador. NÃO viramos status
