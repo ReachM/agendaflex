@@ -16,8 +16,8 @@ export async function register() {
   // ── (1) Garantia de .env em produção ──────────────────────────────
   // Lemos `.env` com path absoluto baseado em process.cwd(), sem sobrescrever
   // envs já existentes (PM2/systemd têm precedência — quem foi setado por fora
-  // vence). Imports sem prefixo `node:` porque o webpack do Next não resolve
-  // esse esquema em imports dinâmicos do instrumentation.ts.
+  // vence). `path` e `fs` estão em `serverExternalPackages` no next.config para
+  // o webpack não tentar bundlar os builtins do Node.
   try {
     const path = await import("path");
     const fs = await import("fs");

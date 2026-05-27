@@ -19,9 +19,18 @@ const nextConfig: NextConfig = {
   // do webpack para ser carregado em runtime (usado pelo agendador interno via
   // src/instrumentation.ts).
   serverExternalPackages: ["node-cron"],
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     if (Array.isArray(config.externals)) {
       config.externals.push({ "node-cron": "commonjs node-cron" });
+    }
+    // No bundle do servidor, deixa builtins do Node (`path`, `fs`, ...) como
+    // externals do CommonJS. Sem isso, o webpack do Next emite warnings ao
+    // processar imports dinâmicos em src/instrumentation.ts.
+    if (isServer) {
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
+        { path: "commonjs path", fs: "commonjs fs" }
+      ];
     }
     return config;
   }
