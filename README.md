@@ -136,6 +136,54 @@ npm run test
 
 ---
 
+## 🚢 Deploy na VPS (PM2 + nginx)
+
+Stack alvo: Ubuntu + Node 20 + PostgreSQL + PM2 + nginx (+ HTTPS via Let's Encrypt).
+
+### Primeira vez na VPS
+
+```bash
+# 1) Clone e dependências
+git clone https://github.com/ReachM/agendaflex /home/deploy/agendaflex
+cd /home/deploy/agendaflex
+npm ci
+
+# 2) Configure .env (copie .env.example e preencha)
+cp .env.example .env
+nano .env
+#   - AUTH_SECRET: openssl rand -hex 32
+#   - DATABASE_URL: aponte para o Postgres da VPS
+#   - ASAAS_*: chaves de produção do gateway
+#   - EVOLUTION_*: chaves do bot WhatsApp
+
+# 3) Aplique migrations e build inicial
+npx prisma migrate deploy
+npm run build
+
+# 4) Suba sob PM2
+npm i -g pm2
+pm2 start ecosystem.config.cjs --env production
+pm2 save
+pm2 startup     # gera o comando de systemd para auto-start no boot
+```
+
+Configure o nginx para fazer reverse proxy de `https://seu-dominio` → `http://127.0.0.1:3000` e o webhook do Asaas para `https://seu-dominio/api/webhooks/asaas` (header `asaas-access-token: $ASAAS_WEBHOOK_TOKEN`).
+
+### Atualizações subsequentes
+
+```bash
+cd /home/deploy/agendaflex
+./scripts/deploy.sh
+```
+
+O script faz `git pull` → `npm ci` → `prisma migrate deploy` → `npm run build` → `pm2 reload`. Para se migration falhar, sem reload (versão antiga continua servindo).
+
+### Variáveis de ambiente
+
+Ver `.env.example`. Em produção, `AUTH_SECRET` é **obrigatório** — sem ele o `signAuthToken` lança no boot. O `.env` é lido tanto pelo Next quanto por um fallback em `src/instrumentation.ts` (garante carga sob PM2 mesmo quando `cwd` não bate com a raiz).
+
+---
+
 ## ⏰ Lembretes automáticos do Bot (agendador interno)
 
 Os lembretes de agendamento via WhatsApp (Evolution API) são disparados por um
