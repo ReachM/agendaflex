@@ -3,6 +3,27 @@
 O webhook é a **única fonte de verdade** para ativar/renovar/bloquear a assinatura.
 Endpoint: `POST /api/webhooks/mercadopago` (rota pública, validada por assinatura).
 
+## Fluxo atual — REDIRECT (Opção A)
+
+O checkout vive em duas etapas claras. **Nenhum dado de cartão passa pelo nosso domínio:**
+
+1. **Criação do preapproval (`POST /api/subscription/checkout`)**
+   - Front envia apenas `{ planSlug }` (e opcionalmente `payerEmail`).
+   - Backend cria o preapproval com `status: "pending"`, `external_reference =
+     CompanySubscription.id`, recebe `init_point` (URL do MP) e responde com
+     `{ checkoutUrl, status: "pending_confirmation" }`.
+   - Backend grava `mpPreapprovalId` na assinatura, mas **não** ativa.
+2. **Autorização no Mercado Pago**
+   - O front redireciona para `checkoutUrl`. Cliente digita o cartão no ambiente do MP.
+   - Após autorizar, MP redireciona o cliente para `MP_BACK_URL`.
+3. **Ativação via webhook**
+   - O MP envia a notificação → o webhook valida a assinatura, busca o estado real
+     na API do MP, aplica `mapMpStatus` e atualiza a assinatura (ver tabela abaixo).
+
+> A Opção B (Brick transparente, com tokenização no front) **não está em uso**.
+> Trocar para B no futuro só exige aceitar `cardTokenId` no body do checkout e
+> repassar para `createSubscription`; o resto do back-end já é compatível.
+
 ## Variáveis de ambiente
 
 No `.env` (use SEMPRE credenciais de **TESTE** primeiro):
@@ -10,8 +31,9 @@ No `.env` (use SEMPRE credenciais de **TESTE** primeiro):
 ```
 MP_ACCESS_TOKEN="TEST-..."      # access token (server)
 MP_WEBHOOK_SECRET="..."         # "Assinatura secreta" do webhook (NÃO commitar valor real)
-MP_BACK_URL="http://localhost:3000/configuracoes/assinatura"
-NEXT_PUBLIC_MP_PUBLIC_KEY="TEST-..."  # public key (front, tokeniza o cartão)
+MP_BACK_URL="https://marcaiflex.com.br/dashboard"
+# Mantida por compatibilidade caso futuramente troquemos para a Opção B (transparente):
+NEXT_PUBLIC_MP_PUBLIC_KEY="TEST-..."
 ```
 
 > O `MP_WEBHOOK_SECRET` é a "assinatura secreta" gerada na configuração do webhook
@@ -44,18 +66,14 @@ ngrok http 3000
 #    https://abcd-1234.ngrok-free.app/api/webhooks/mercadopago
 ```
 
-Depois é só fazer um checkout de teste (cartões de teste do MP). O fluxo:
+Faça um checkout de teste usando os cartões de teste do MP (digitados no
+ambiente do MP, após o redirect). Os efeitos esperados:
 
-1. Front tokeniza o cartão (Brick) → `POST /api/subscription/checkout` cria o
-   preapproval (`external_reference = CompanySubscription.id`) e fica
-   `pending_confirmation` (sem ativar).
-2. O MP envia a notificação → o webhook valida a assinatura, busca o estado real,
-   aplica `mapMpStatus` e atualiza a assinatura:
-   - `authorized` / pagamento `approved` → **ACTIVE**, limpa `pastDueSince`, empurra
-     `currentPeriodEnd` +1 mês, grava `lastPaymentId`/`lastPaymentStatus`;
-   - pagamento `rejected` → **PAST_DUE** (marca `pastDueSince`); o bloqueio só ocorre
-     após **7 dias** de tolerância (régua `isPastDueGraceExpired`);
-   - preapproval `cancelled` → **CANCELLED**.
+- `authorized` / pagamento `approved` → **ACTIVE**, limpa `pastDueSince`, empurra
+  `currentPeriodEnd` +1 mês, grava `lastPaymentId`/`lastPaymentStatus`;
+- pagamento `rejected` → **PAST_DUE** (marca `pastDueSince`); o bloqueio só ocorre
+  após **7 dias** de tolerância (régua `isPastDueGraceExpired`);
+- preapproval `cancelled` → **CANCELLED**.
 
 ## Idempotência
 
@@ -70,3 +88,6 @@ reprocessar. Por isso uma cobrança nunca é aplicada em duplicidade.
   `mpPreapprovalId` não casou com nenhuma `CompanySubscription` (verifique se o
   checkout gravou o `mpPreapprovalId`).
 - Os logs usam o prefixo `[Webhook MercadoPago]` e não incluem dados sensíveis.
+- Se o erro aparecer no momento do **POST /subscription/checkout** (não no webhook),
+  o log do servidor agora detalha a causa com o prefixo `[MercadoPago] Erro
+  detalhado:` (motivo real do MP — campo recusado, status, response).

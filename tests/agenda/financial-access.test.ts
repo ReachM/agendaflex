@@ -5,8 +5,7 @@ import {
   isFinancialFieldKey,
   isClinicalSensitiveFieldKey,
   AGENDA_PRESETS,
-  FINANCIAL_FIELD_KEYS,
-  getAgendaPreset
+  FINANCIAL_FIELD_KEYS
 } from "@/config/agenda-presets";
 import type { PlanFeatures } from "@/lib/security/plan-guard";
 

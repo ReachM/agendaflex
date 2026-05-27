@@ -3,7 +3,6 @@ import {
   hasPermission,
   getVisibleMenuItems,
   TENANT_MENU_ITEMS,
-  ROLE_PERMISSIONS,
   type PermissionKey
 } from "@/lib/security/permissions";
 

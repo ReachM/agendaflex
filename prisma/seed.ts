@@ -308,7 +308,8 @@ async function main() {
   // ─── Customers / Services / Professionals ───────────
   const clinicCustomer = await firstOrCreateCustomer(clinic.id, { name: "Maria Fernanda", email: "maria.fernanda@example.com", phone: "(11) 98888-1000", cpf: "111.222.333-44" });
   const clinicService = await firstOrCreateService(clinic.id, { name: "Consulta médica", description: "Consulta clinica geral", basePrice: "250.00", durationMinutes: 45, isPublic: true });
-  const clinicService2 = await firstOrCreateService(clinic.id, { name: "Retorno", description: "Retorno de consulta", basePrice: "100.00", durationMinutes: 30, isPublic: true });
+  // Serviço extra (apenas para popular o catálogo da clínica — não é referenciado abaixo).
+  await firstOrCreateService(clinic.id, { name: "Retorno", description: "Retorno de consulta", basePrice: "100.00", durationMinutes: 30, isPublic: true });
   const clinicProfessional = await firstOrCreateProfessional(clinic.id, { name: "Dra. Helena Duarte", email: "helena@clinicavida.com", specialty: "Clínica geral" });
 
   const workshopCustomer = await firstOrCreateCustomer(workshop.id, { name: "Carlos Roberto", email: "carlos.roberto@example.com", phone: "(11) 98888-2000" });
@@ -348,7 +349,6 @@ async function main() {
   const workshopEnd = appointmentDate(1, 12);
   let workshopAppointment = await prisma.appointment.findFirst({ where: { companyId: workshop.id, customerId: workshopCustomer.id, startAt: workshopStart } });
   if (!workshopAppointment) {
-    const servicesTotal = 120 + 280 + 180; // 580
     workshopAppointment = await prisma.appointment.create({
       data: {
         companyId: workshop.id, customerId: workshopCustomer.id, serviceId: workshopService1.id,

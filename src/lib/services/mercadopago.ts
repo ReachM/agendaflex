@@ -47,20 +47,36 @@ export function getMercadoPagoBackUrl(): string {
 let cachedClient: MercadoPagoConfig | null = null;
 
 /**
- * Inicializa (uma vez) e retorna o cliente do SDK a partir do MP_ACCESS_TOKEN.
- * Lazy: só lê o env e constrói quando realmente for usar o MP, para não quebrar
- * build/test quando a credencial não está presente.
+ * Inicializa (lazy) e retorna o cliente do SDK a partir do MP_ACCESS_TOKEN.
+ *
+ * IMPORTANTE — validação a cada chamada:
+ * Em produção (PM2/Ubuntu) o processo pode chegar a tocar essa função ANTES das
+ * envs estarem carregadas (ex.: cwd errado gerando ENOTDIR no `.env`). Se a
+ * gente cacheasse um cliente criado nesse estado, todas as chamadas seguintes
+ * usariam um cliente com token ruim e quebrariam com 401 mesmo depois das envs
+ * voltarem. Por isso conferimos `process.env.MP_ACCESS_TOKEN` a CADA chamada e
+ * invalidamos o cache se sumir.
  */
 export function getMercadoPagoClient(): MercadoPagoConfig {
-  if (!cachedClient) {
-    // Diagnóstico: confirma que o token está realmente disponível em runtime
-    // (não só no build). Loga só na primeira inicialização do processo.
-    console.log("[MercadoPago] Token presente:", !!process.env.MP_ACCESS_TOKEN);
-    cachedClient = new MercadoPagoConfig({
-      accessToken: requireEnv("MP_ACCESS_TOKEN"),
-      options: { timeout: REQUEST_TIMEOUT_MS }
-    });
+  // Cache válido só se ainda houver token. Sumindo o token, jogamos fora o
+  // cache e tentamos reconstruir (caso a env tenha sido recarregada no meio).
+  if (cachedClient && process.env.MP_ACCESS_TOKEN) return cachedClient;
+  if (cachedClient) {
+    console.warn("[MercadoPago] MP_ACCESS_TOKEN sumiu em runtime — cache invalidado.");
+    cachedClient = null;
   }
+
+  const token = process.env.MP_ACCESS_TOKEN;
+  if (!token) {
+    console.error("[MercadoPago] Cliente NÃO inicializado: MP_ACCESS_TOKEN ausente em runtime.");
+    throw new Error("Mercado Pago não configurado: defina MP_ACCESS_TOKEN.");
+  }
+
+  cachedClient = new MercadoPagoConfig({
+    accessToken: token,
+    options: { timeout: REQUEST_TIMEOUT_MS }
+  });
+  console.log("[MercadoPago] Cliente inicializado com sucesso (token presente em runtime).");
   return cachedClient;
 }
 
