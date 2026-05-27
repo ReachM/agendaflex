@@ -49,6 +49,16 @@ export function handleApiError(error: unknown) {
     );
   }
 
+  // `request.json()` lança SyntaxError quando o body não é JSON válido. Em
+  // tempo de execução só sobra esse caso — SyntaxError de código já teria
+  // explodido no parse do módulo.
+  if (error instanceof SyntaxError) {
+    return NextResponse.json(
+      { error: "Corpo da requisição inválido: JSON malformado." },
+      { status: 400 }
+    );
+  }
+
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
       return NextResponse.json(
