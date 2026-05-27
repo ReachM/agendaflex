@@ -24,7 +24,8 @@
       "Read(//c/c/Users/moise/Downloads/agendaflex/src/components/landing/**)",
       "Bash(node -p \"Object.keys\\(require\\('./package.json'\\).devDependencies||{}\\).filter\\(k=>k.includes\\('vitest'\\)||k.includes\\('jsdom'\\)||k.includes\\('testing-library'\\)\\).join\\('\\\\n'\\)\")",
       "Bash(npm test *)",
-      "Bash(npx --no-install eslint src --ext .ts,.tsx --max-warnings=999)"
+      "Bash(npx --no-install eslint src --ext .ts,.tsx --max-warnings=999)",
+      "PowerShell(npx tsc --noEmit)"
     ]
   }
 }

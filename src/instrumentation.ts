@@ -14,32 +14,15 @@ export async function register() {
   if (process.env.NODE_ENV !== "production") return;
 
   // ── (1) Garantia de .env em produção ──────────────────────────────
-  // Em PM2/Ubuntu o processo pode iniciar com cwd errado. Quando isso acontece,
-  // o Next.js procura o `.env` em path relativo e o sistema responde com
-  // ENOTDIR (path: '/.../.env/.env'). Aqui:
-  //   a) resolvemos a raiz REAL do projeto via import.meta.url;
-  //   b) chdir() para essa raiz;
-  //   c) lemos `.env` com path absoluto, sem sobrescrever envs já existentes
-  //      (PM2/systemd têm precedência — quem foi setado por fora vence).
+  // Lemos `.env` com path absoluto baseado em process.cwd(), sem sobrescrever
+  // envs já existentes (PM2/systemd têm precedência — quem foi setado por fora
+  // vence). Imports sem prefixo `node:` porque o webpack do Next não resolve
+  // esse esquema em imports dinâmicos do instrumentation.ts.
   try {
-    const path = await import("node:path");
-    const url = await import("node:url");
-    const fs = await import("node:fs");
+    const path = await import("path");
+    const fs = await import("fs");
 
-    // Em produção, este arquivo vira `.next/server/instrumentation.js`.
-    // Subir até a raiz do projeto removendo o sufixo `.next/server/...`.
-    const here = url.fileURLToPath(import.meta.url);
-    const projectRoot = path
-      .dirname(here)
-      .replace(/[\\/]\.next[\\/]server.*$/, "")
-      .replace(/[\\/]src$/, "");
-
-    try {
-      process.chdir(projectRoot);
-    } catch {
-      // não fatal — se as envs já estão no processo (PM2), seguimos
-    }
-
+    const projectRoot = process.cwd();
     const envPath = path.join(projectRoot, ".env");
     try {
       const content = fs.readFileSync(envPath, "utf8");
