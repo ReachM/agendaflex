@@ -1,13 +1,14 @@
 /**
- * Helpers do fluxo de checkout (redirect para o Asaas). Em arquivo separado para
- * ficar facilmente testável sem precisar montar React/CSS no ambiente de teste.
+ * Helpers do fluxo de checkout (redirect para o Mercado Pago). Em arquivo
+ * separado para ficar facilmente testável sem precisar montar React/CSS no
+ * ambiente de teste.
  */
 
 /** Tempo que a tela de transição fica visível antes do redirect. */
 export const CHECKOUT_REDIRECT_DELAY_MS = 2000;
 
 /**
- * Agenda o redirect para a URL de pagamento do Asaas.
+ * Agenda o redirect para a URL de pagamento do Mercado Pago (init_point).
  *
  * - `url`     checkoutUrl devolvido pelo backend
  * - `delayMs` quanto tempo segurar a transição (padrão 2000ms)

@@ -8,13 +8,12 @@ const { prismaMock } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 
-// fetch global é mockado: cada teste injeta a sequência de respostas esperadas.
 const fetchMock = vi.fn();
 const originalFetch = global.fetch;
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.ASAAS_API_KEY = "$aact_TEST_SANDBOX_XXXX";
-  process.env.ASAAS_SANDBOX = "true";
+  process.env.MP_ACCESS_TOKEN = "APP_USR-TEST-TOKEN-XXXX";
+  process.env.MP_BACK_URL = "https://app.test/assinatura";
   global.fetch = fetchMock as unknown as typeof fetch;
   prismaMock.plan.findFirst.mockResolvedValue({ id: "plan-pro", name: "Pro", price: 99.9, isActive: true });
   prismaMock.companySubscription.findFirst.mockResolvedValue({ id: "sub-1" });
@@ -23,25 +22,17 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
-import { createSubscription } from "@/lib/services/asaas";
+import { createSubscription } from "@/lib/services/mercadopago";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-describe("createSubscription (Asaas, fluxo redirect)", () => {
-  it("monta corretamente: busca customer, cria assinatura UNDEFINED, devolve checkoutUrl", async () => {
-    fetchMock
-      // GET /customers?email= -> não existe
-      .mockResolvedValueOnce(jsonResponse({ data: [] }))
-      // POST /customers -> criado
-      .mockResolvedValueOnce(jsonResponse({ id: "cus_99" }))
-      // POST /subscriptions -> ok
-      .mockResolvedValueOnce(jsonResponse({ id: "sub_asaas_1" }))
-      // GET /subscriptions/sub_asaas_1/payments?limit=1 -> primeira cobrança
-      .mockResolvedValueOnce(
-        jsonResponse({ data: [{ id: "pay_1", invoiceUrl: "https://www.asaas.com/i/pay_1" }] })
-      );
+describe("createSubscription (Mercado Pago, fluxo redirect)", () => {
+  it("monta corretamente: POST /preapproval e devolve init_point como checkoutUrl", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ id: "pre_abc", init_point: "https://www.mercadopago.com/auth/pre_abc" })
+    );
 
     const result = await createSubscription({
       planId: "plan-pro",
@@ -52,49 +43,45 @@ describe("createSubscription (Asaas, fluxo redirect)", () => {
 
     expect(result).toMatchObject({
       subscriptionId: "sub-1",
-      gatewaySubscriptionId: "sub_asaas_1",
-      gatewayCustomerId: "cus_99",
-      checkoutUrl: "https://www.asaas.com/i/pay_1",
+      gatewaySubscriptionId: "pre_abc",
+      gatewayCustomerId: "",
+      checkoutUrl: "https://www.mercadopago.com/auth/pre_abc",
       payerEmail: "a@b.com"
     });
 
-    // 4 chamadas no total e o POST /subscriptions traz o payload correto.
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-    const subCall = fetchMock.mock.calls[2];
-    expect(String(subCall[0])).toContain("/subscriptions");
-    const body = JSON.parse(subCall[1].body);
-    expect(body).toMatchObject({
-      customer: "cus_99",
-      billingType: "UNDEFINED",
-      value: 99.9,
-      cycle: "MONTHLY",
-      externalReference: "sub-1"
-    });
-    expect(body.description).toContain("Pro");
-    expect(body.nextDueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe("https://api.mercadopago.com/preapproval");
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer APP_USR-TEST-TOKEN-XXXX");
 
-    // Header de auth está em TODAS as chamadas.
-    for (const call of fetchMock.mock.calls) {
-      expect(call[1].headers.access_token).toBe("$aact_TEST_SANDBOX_XXXX");
-    }
+    const body = JSON.parse(init.body);
+    expect(body).toMatchObject({
+      reason: "MarcaiFlex — Plano Pro",
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: 99.9,
+        currency_id: "BRL"
+      },
+      payer_email: "a@b.com",
+      back_url: "https://app.test/assinatura",
+      status: "pending",
+      external_reference: "sub-1"
+    });
   });
 
-  it("usa o customer existente quando o e-mail já está cadastrado", async () => {
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ data: [{ id: "cus_existing" }] }))
-      .mockResolvedValueOnce(jsonResponse({ id: "sub_asaas_2", paymentLink: "https://www.asaas.com/pl/2" }));
-
+  it("usa sandbox_init_point quando init_point não vem (sandbox)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ id: "pre_sb", sandbox_init_point: "https://sandbox.mercadopago.com/auth/pre_sb" })
+    );
     const result = await createSubscription({
       planId: "plan-pro",
       companyId: "c1",
       payerEmail: "a@b.com",
       payerName: "Acme"
     });
-
-    expect(result.gatewayCustomerId).toBe("cus_existing");
-    expect(result.checkoutUrl).toBe("https://www.asaas.com/pl/2");
-    // Sem POST /customers, e sem GET /payments (paymentLink veio direto).
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.checkoutUrl).toBe("https://sandbox.mercadopago.com/auth/pre_sb");
   });
 
   it("recusa plano sem valor de cobrança (grátis)", async () => {
@@ -105,42 +92,28 @@ describe("createSubscription (Asaas, fluxo redirect)", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("falha ao criar assinatura no Asaas vira 502", async () => {
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ data: [{ id: "cus_1" }] }))
-      .mockResolvedValueOnce(jsonResponse({ errors: [{ description: "Limite atingido" }] }, 400));
+  it("falha ao criar preapproval (HTTP 400) vira 502", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ message: "invalid back_url" }, 400)
+    );
 
     await expect(
       createSubscription({ planId: "plan-pro", companyId: "c1", payerEmail: "a@b.com", payerName: "Acme" })
     ).rejects.toMatchObject({ status: 502 });
   });
 
-  it("falha quando não consegue URL de checkout vira 502", async () => {
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ data: [{ id: "cus_1" }] }))
-      .mockResolvedValueOnce(jsonResponse({ id: "sub_asaas_3" })) // sem paymentLink
-      .mockResolvedValueOnce(jsonResponse({ data: [] })); // sem cobranças
-
+  it("falha quando MP retorna sem init_point vira 502", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "pre_no_url" }));
     await expect(
       createSubscription({ planId: "plan-pro", companyId: "c1", payerEmail: "a@b.com", payerName: "Acme" })
     ).rejects.toMatchObject({ status: 502 });
   });
 
-  it("usa o ambiente de produção quando ASAAS_SANDBOX=false", async () => {
-    process.env.ASAAS_SANDBOX = "false";
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ data: [{ id: "cus_1" }] }))
-      .mockResolvedValueOnce(jsonResponse({ id: "sub_asaas_4", paymentLink: "https://www.asaas.com/pl/4" }));
-
-    await createSubscription({
-      planId: "plan-pro",
-      companyId: "c1",
-      payerEmail: "a@b.com",
-      payerName: "Acme"
-    });
-
-    for (const call of fetchMock.mock.calls) {
-      expect(String(call[0])).toMatch(/^https:\/\/www\.asaas\.com\/api\/v3/);
-    }
+  it("sem MP_BACK_URL configurado -> 500 (config error) e não chama o MP", async () => {
+    delete process.env.MP_BACK_URL;
+    await expect(
+      createSubscription({ planId: "plan-pro", companyId: "c1", payerEmail: "a@b.com", payerName: "Acme" })
+    ).rejects.toMatchObject({ status: 500 });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

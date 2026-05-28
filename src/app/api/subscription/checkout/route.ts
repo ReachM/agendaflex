@@ -5,20 +5,19 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { rateLimit } from "@/lib/security/rate-limit";
-import { createSubscription } from "@/lib/services/asaas";
+import { createSubscription } from "@/lib/services/mercadopago";
 import { subscriptionCheckoutSchema } from "@/lib/validation/schemas";
 
 /**
- * Inicia a assinatura recorrente no Asaas — fluxo REDIRECT.
+ * Inicia a assinatura recorrente no Mercado Pago — fluxo REDIRECT.
  *
  * skipSubscriptionCheck: true — o cliente com trial VENCIDO precisa conseguir
  * pagar; esta é a única escrita liberada mesmo bloqueado.
  *
- * NENHUM dado de cartão passa por aqui: criamos a assinatura no Asaas com
- * billingType=UNDEFINED e o cliente é redirecionado para a página de pagamento
- * do Asaas, onde escolhe o método (cartão / pix / boleto). A ativação definitiva
- * (status ACTIVE) é feita pelo WEBHOOK (fonte de verdade) — aqui só vinculamos
- * a assinatura e o customer.
+ * NENHUM dado de cartão passa por aqui: criamos a preapproval com status=pending
+ * e o cliente é redirecionado para o `init_point` do MP, onde autoriza o
+ * pagamento. A ativação definitiva (status ACTIVE) é feita pelo WEBHOOK
+ * (fonte de verdade) — aqui só vinculamos a assinatura ao gateway.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -49,21 +48,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // CPF/CNPJ: prioriza o que veio no body; senão usa Company.document.
-    // Asaas REJEITA a criação do customer sem isso — devolvemos 422 cedo
-    // para evitar um 502 silencioso vindo do gateway.
-    const company = await prisma.company.findUnique({
-      where: { id: context.companyId },
-      select: { document: true }
-    });
-    const cpfCnpj = body.cpfCnpj?.trim() || company?.document?.trim() || undefined;
-    if (!cpfCnpj) {
-      throw new ApiError(
-        422,
-        "CPF ou CNPJ do responsável é obrigatório. Cadastre o documento da empresa nas configurações ou informe-o no checkout."
-      );
-    }
-
     const payerEmail = body.payerEmail?.trim().toLowerCase() || context.user.email;
     const payerName = context.user.name || context.user.email;
 
@@ -71,8 +55,7 @@ export async function POST(request: NextRequest) {
       planId: plan.id,
       companyId: context.companyId,
       payerEmail,
-      payerName,
-      cpfCnpj
+      payerName
     });
 
     // Vincula a assinatura/customer do gateway e o pagador. NÃO viramos status
@@ -102,9 +85,9 @@ export async function POST(request: NextRequest) {
 
     return ok({
       status: "pending_confirmation",
-      /** URL para o front redirecionar o cliente (página de pagamento do Asaas). */
+      /** init_point: URL para o front redirecionar (autorização no MP). */
       checkoutUrl: result.checkoutUrl,
-      message: "Assinatura criada. Conclua o pagamento na página do Asaas."
+      message: "Assinatura criada. Conclua o pagamento na página do Mercado Pago."
     });
   } catch (error) {
     return handleApiError(error);

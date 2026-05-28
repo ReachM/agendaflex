@@ -7,13 +7,13 @@ import "./checkout-modal.css";
 
 /**
  * ════════════════════════════════════════════════════════════════════
- * Checkout — fluxo REDIRECT para o Asaas
+ * Checkout — fluxo REDIRECT para o Mercado Pago
  * ════════════════════════════════════════════════════════════════════
- * POST /api/subscription/checkout cria a assinatura no Asaas (billingType
- * UNDEFINED, o cliente escolhe cartão / pix / boleto no Asaas) e devolve
- * `checkoutUrl`. Levamos o cliente para essa URL — toda a parte sensível
- * de coleta de pagamento acontece no ambiente do Asaas. A ativação da
- * assinatura (status ACTIVE) chega pelo WEBHOOK do Asaas.
+ * POST /api/subscription/checkout cria a assinatura (preapproval) no
+ * Mercado Pago e devolve `checkoutUrl` (init_point). Levamos o cliente
+ * para essa URL — toda a parte sensível de coleta de pagamento acontece
+ * no ambiente do MP. A ativação da assinatura (status ACTIVE) chega
+ * pelo WEBHOOK do MP.
  *
  * NENHUM dado de cartão passa pelo nosso domínio.
  */
@@ -38,7 +38,8 @@ export function CheckoutModal({ planSlug, planName, amount, onClose, onSuccess }
   const cancelRef = useRef<(() => void) | null>(null);
 
   // Marca onSuccess como referenciada para o TypeScript não reclamar e para
-  // documentar que a prop existe por compat — o ciclo se completa pelo webhook.
+  // documentar que a prop existe por compat — o ciclo se completa pelo webhook
+  // do Mercado Pago.
   void onSuccess;
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export function CheckoutModal({ planSlug, planName, amount, onClose, onSuccess }
         return;
       }
       // Mostra a tela de transição por CHECKOUT_REDIRECT_DELAY_MS antes de
-      // jogar o cliente para o Asaas.
+      // jogar o cliente para o Mercado Pago.
       setStatus("redirecting");
       cancelRef.current = scheduleCheckoutRedirect(data.checkoutUrl);
     })();
@@ -108,9 +109,9 @@ export function CheckoutModal({ planSlug, planName, amount, onClose, onSuccess }
             <div className="checkout-redirect__icon" aria-hidden="true">
               <Lock size={26} />
             </div>
-            <h3>Redirecionando para o Asaas...</h3>
+            <h3>Redirecionando para o Mercado Pago...</h3>
             <p>
-              Você será levado ao ambiente seguro do Asaas para concluir o pagamento.
+              Você será levado ao ambiente seguro do Mercado Pago para concluir o pagamento.
               Após pagar, sua assinatura é ativada automaticamente.
             </p>
             <div
@@ -123,7 +124,7 @@ export function CheckoutModal({ planSlug, planName, amount, onClose, onSuccess }
             </div>
             <div className="checkout-redirect__badge">
               <ShieldCheck size={14} />
-              Pagamento 100% seguro pelo Asaas
+              Pagamento 100% seguro pelo Mercado Pago
             </div>
           </div>
         )}

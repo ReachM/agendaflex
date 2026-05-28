@@ -14,7 +14,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/security/jwt", () => ({
   verifyAuthToken: vi.fn(async () => ({ sub: "u1", role: "COMPANY_ADMIN", companyId: "c1" }))
 }));
-vi.mock("@/lib/services/asaas", () => ({ createSubscription: createSubscriptionMock }));
+vi.mock("@/lib/services/mercadopago", () => ({ createSubscription: createSubscriptionMock }));
 vi.mock("@/lib/audit", () => ({ audit: auditMock }));
 
 import { POST } from "@/app/api/subscription/checkout/route";
@@ -28,7 +28,7 @@ function req(body: unknown) {
   } as any;
 }
 
-const CHECKOUT_URL = "https://www.asaas.com/c/pay_xyz";
+const CHECKOUT_URL = "https://www.mercadopago.com/auth/pre_xyz";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,15 +47,15 @@ beforeEach(() => {
   prismaMock.companySubscription.update.mockResolvedValue({});
   createSubscriptionMock.mockResolvedValue({
     subscriptionId: "sub-1",
-    gatewaySubscriptionId: "sub_asaas_9",
-    gatewayCustomerId: "cus_9",
+    gatewaySubscriptionId: "pre_xyz",
+    gatewayCustomerId: "",
     checkoutUrl: CHECKOUT_URL,
     payerEmail: "admin@acme.com"
   });
 });
 
-describe("POST /api/subscription/checkout (Asaas redirect)", () => {
-  it("recusa sem planSlug (422) e não chama o Asaas", async () => {
+describe("POST /api/subscription/checkout (MP redirect)", () => {
+  it("recusa sem planSlug (422) e não chama o MP", async () => {
     const res = await POST(req({}));
     expect(res.status).toBe(422);
     expect(createSubscriptionMock).not.toHaveBeenCalled();
@@ -70,10 +70,18 @@ describe("POST /api/subscription/checkout (Asaas redirect)", () => {
     expect(call.payerName).toBe("Admin Acme");
   });
 
+  it("não exige CPF/CNPJ (MP não precisa para criar preapproval)", async () => {
+    // Sem cpfCnpj no body e sem Company.document — antes (Asaas) dava 422 aqui.
+    const res = await POST(req({ planSlug: "pro" }));
+    expect(res.status).toBe(200);
+    const call = createSubscriptionMock.mock.calls[0][0];
+    expect(call).not.toHaveProperty("cpfCnpj");
+  });
+
   it("idempotência: não cria 2ª assinatura se já há gatewaySubscriptionId", async () => {
     prismaMock.companySubscription.findFirst.mockResolvedValue({
       id: "sub-1",
-      gatewaySubscriptionId: "sub_asaas_existente"
+      gatewaySubscriptionId: "pre_existente"
     });
     const res = await POST(req({ planSlug: "pro" }));
     expect(res.status).toBe(409);
@@ -81,7 +89,7 @@ describe("POST /api/subscription/checkout (Asaas redirect)", () => {
     expect(prismaMock.companySubscription.update).not.toHaveBeenCalled();
   });
 
-  it("sucesso: vincula gatewaySubscriptionId + gatewayCustomerId e devolve checkoutUrl — SEM ativar", async () => {
+  it("sucesso: vincula gatewaySubscriptionId + devolve checkoutUrl — SEM ativar", async () => {
     const res = await POST(req({ planSlug: "pro" }));
     expect(res.status).toBe(200);
 
@@ -90,8 +98,8 @@ describe("POST /api/subscription/checkout (Asaas redirect)", () => {
     expect(json.status).toBe("pending_confirmation");
 
     const updateData = prismaMock.companySubscription.update.mock.calls[0][0].data;
-    expect(updateData.gatewaySubscriptionId).toBe("sub_asaas_9");
-    expect(updateData.gatewayCustomerId).toBe("cus_9");
+    expect(updateData.gatewaySubscriptionId).toBe("pre_xyz");
+    expect(updateData.gatewayCustomerId).toBe("");
     expect(updateData.payerEmail).toBe("admin@acme.com");
     // A virada para ACTIVE é do webhook — nunca daqui.
     expect(updateData).not.toHaveProperty("status");

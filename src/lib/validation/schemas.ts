@@ -52,11 +52,8 @@ export const registerSchema = z.object({
 export const subscriptionCheckoutSchema = z.object({
   planSlug: requiredString(60),
   // Fluxo redirect: NÃO recebemos dados de cartão no backend — o cliente é
-  // levado para a página de pagamento do Asaas, onde escolhe o método.
-  payerEmail: z.string().trim().email().max(255).optional(),
-  // Asaas exige CPF/CNPJ no customer. Se vier vazio, a rota usa
-  // Company.document como fallback; sem nenhum dos dois, devolve 422.
-  cpfCnpj: optionalString(20)
+  // levado para a página de autorização do Mercado Pago.
+  payerEmail: z.string().trim().email().max(255).optional()
 });
 
 export const companyCreateSchema = z.object({
