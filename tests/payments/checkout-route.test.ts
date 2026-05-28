@@ -43,7 +43,11 @@ beforeEach(() => {
     ]
   });
   prismaMock.plan.findFirst.mockResolvedValue({ id: "plan-pro", slug: "pro" });
-  prismaMock.companySubscription.findFirst.mockResolvedValue({ id: "sub-1", gatewaySubscriptionId: null });
+  prismaMock.companySubscription.findFirst.mockResolvedValue({
+    id: "sub-1",
+    gatewaySubscriptionId: null,
+    status: "TRIALING"
+  });
   prismaMock.companySubscription.update.mockResolvedValue({});
   createSubscriptionMock.mockResolvedValue({
     subscriptionId: "sub-1",
@@ -78,15 +82,40 @@ describe("POST /api/subscription/checkout (MP redirect)", () => {
     expect(call).not.toHaveProperty("cpfCnpj");
   });
 
-  it("idempotência: não cria 2ª assinatura se já há gatewaySubscriptionId", async () => {
+  it("idempotência: 409 quando assinatura ATIVA + gatewaySubscriptionId", async () => {
     prismaMock.companySubscription.findFirst.mockResolvedValue({
       id: "sub-1",
-      gatewaySubscriptionId: "pre_existente"
+      gatewaySubscriptionId: "pre_existente",
+      status: "ACTIVE"
     });
     const res = await POST(req({ planSlug: "pro" }));
     expect(res.status).toBe(409);
     expect(createSubscriptionMock).not.toHaveBeenCalled();
     expect(prismaMock.companySubscription.update).not.toHaveBeenCalled();
+  });
+
+  it("permite refazer checkout quando trial expirou (gatewaySubscriptionId existe mas status != ACTIVE)", async () => {
+    // Cenário: tentativa anterior de pagamento deixou um gatewaySubscriptionId
+    // mas o trial expirou e a assinatura nunca virou ACTIVE. Cliente precisa
+    // conseguir tentar de novo.
+    prismaMock.companySubscription.findFirst.mockResolvedValue({
+      id: "sub-1",
+      gatewaySubscriptionId: "pre_anterior",
+      status: "EXPIRED"
+    });
+    const res = await POST(req({ planSlug: "pro" }));
+    expect(res.status).toBe(200);
+    expect(createSubscriptionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("permite checkout em PAST_DUE (cartão recusado dentro da régua)", async () => {
+    prismaMock.companySubscription.findFirst.mockResolvedValue({
+      id: "sub-1",
+      gatewaySubscriptionId: "pre_anterior",
+      status: "PAST_DUE"
+    });
+    const res = await POST(req({ planSlug: "pro" }));
+    expect(res.status).toBe(200);
   });
 
   it("sucesso: vincula gatewaySubscriptionId + devolve checkoutUrl — SEM ativar", async () => {

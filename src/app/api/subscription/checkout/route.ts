@@ -36,15 +36,18 @@ export async function POST(request: NextRequest) {
     const subscription = await prisma.companySubscription.findFirst({
       where: { companyId: context.companyId },
       orderBy: { createdAt: "desc" },
-      select: { id: true, gatewaySubscriptionId: true }
+      select: { id: true, gatewaySubscriptionId: true, status: true }
     });
     if (!subscription) throw new ApiError(404, "Assinatura da empresa não encontrada.");
 
-    // Idempotência: já existe uma assinatura vinculada -> não cria outra.
-    if (subscription.gatewaySubscriptionId) {
+    // Idempotência: só bloqueia se já existe uma assinatura ATIVA vinculada.
+    // Estados TRIALING/EXPIRED/CANCELLED/PAST_DUE (mesmo com gatewaySubscriptionId
+    // de uma tentativa anterior) PRECISAM poder iniciar/refazer o checkout —
+    // caso contrário o cliente com trial expirado fica preso sem conseguir pagar.
+    if (subscription.gatewaySubscriptionId && subscription.status === "ACTIVE") {
       throw new ApiError(
         409,
-        "Esta empresa já possui uma assinatura. Não é necessário assinar novamente."
+        "Esta empresa já possui uma assinatura ativa."
       );
     }
 

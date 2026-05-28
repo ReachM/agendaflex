@@ -201,9 +201,11 @@ export async function POST(
           }
         });
       } else {
-        // Update customer info if provided
+        // Update customer info if provided. companyId no WHERE é defesa em
+        // profundidade: o findFirst acima já isolou por tenant, mas se em
+        // algum dia o caminho mudar, o update continua tenant-safe.
         await tx.customer.update({
-          where: { id: customer.id },
+          where: { id: customer.id, companyId: company.id },
           data: {
             name,
             ...(email ? { email } : {}),

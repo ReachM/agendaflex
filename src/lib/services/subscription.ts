@@ -3,7 +3,7 @@ import { ApiError } from "@/lib/api/errors";
 import { isPastDueGraceExpired } from "@/lib/payments/grace";
 import { prisma } from "@/lib/prisma";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+export const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type SubscriptionState = {
   status: SubscriptionStatus | "NONE";
@@ -24,17 +24,6 @@ const UNSUBSCRIBED_STATE: SubscriptionState = {
   trialDaysLeft: 0,
   isBlocked: false
 };
-
-/**
- * Diferença em dias de CALENDÁRIO entre duas datas (end - start). Usa os
- * componentes locais de data para que "faltam X dias" não dependa da hora do dia:
- * mesmo dia => 0 ("acaba hoje"), amanhã => 1, etc.
- */
-function calendarDaysBetween(start: Date, end: Date): number {
-  const a = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
-  const b = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
-  return Math.round((b - a) / DAY_MS);
-}
 
 /**
  * Estado atual da assinatura da empresa, calculado em TEMPO REAL.
@@ -67,8 +56,12 @@ export async function getSubscriptionState(companyId: string): Promise<Subscript
   const trialEndsAt = subscription.trialEndsAt;
   const trialExpired = isTrial && trialEndsAt != null && trialEndsAt.getTime() < now.getTime();
 
+  // Math.ceil para "arredondar para cima" — restam 8h => 1 dia, restam 25h => 2 dias.
+  // Math.max garante que nunca devolvemos negativo (trialExpired já trata o caso > 0).
   const trialDaysLeft =
-    isTrial && trialEndsAt && !trialExpired ? Math.max(0, calendarDaysBetween(now, trialEndsAt)) : 0;
+    isTrial && trialEndsAt && !trialExpired
+      ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / DAY_MS))
+      : 0;
 
   // PAST_DUE só bloqueia DEPOIS dos 7 dias de tolerância (cartão recusado). Dentro
   // da régua, o acesso continua ativo. EXPIRED/CANCELLED bloqueiam de imediato.

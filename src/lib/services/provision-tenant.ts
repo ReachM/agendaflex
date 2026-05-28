@@ -2,8 +2,9 @@ import type { BusinessSegment, Prisma, RoleName, SubscriptionStatus } from "@pri
 import { ApiError } from "@/lib/api/errors";
 import { hashPassword } from "@/lib/security/password";
 
-const TRIAL_PLAN_SLUG = "max";
+const TRIAL_PLAN_SLUG = "starter";
 const TRIAL_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type ProvisionTenantInput = {
   company: {
@@ -78,7 +79,11 @@ export async function provisionTenant(
   const planSlug = input.planSlug ?? TRIAL_PLAN_SLUG;
   const plan = await tx.plan.findUnique({ where: { slug: planSlug } });
   if (!plan) {
-    throw new ApiError(500, "Plano indisponível para criação de conta. Tente novamente mais tarde.");
+    // Erro 500 explícito — sem o plano de trial cadastrado, NÃO criamos uma
+    // assinatura sem plano (o schema exige planId NOT NULL e o front depende
+    // do slug para exibir o plano correto na tela).
+    console.error(`[provisionTenant] Plano "${planSlug}" não encontrado no banco.`);
+    throw new ApiError(500, `Plano "${planSlug}" não cadastrado. Rode o seed antes de provisionar tenants.`);
   }
 
   const adminRole = await tx.role.findUniqueOrThrow({ where: { name: "COMPANY_ADMIN" } });
@@ -121,8 +126,13 @@ export async function provisionTenant(
 
   const status: SubscriptionStatus = input.subscriptionStatus ?? "TRIALING";
   const trialDays = input.trialDays ?? TRIAL_DAYS;
+  // Em ms (dias * 24h * 60min * 60s * 1000) — explicitar via DAY_MS evita o
+  // bug clássico de digitar 7*60*60*1000 (= 7 horas) por engano.
   const trialEndsAt =
-    status === "TRIALING" ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000) : null;
+    status === "TRIALING" ? new Date(Date.now() + trialDays * DAY_MS) : null;
+  if (trialEndsAt) {
+    console.log(`[Trial] empresa "${input.company.name}" — trialEndsAt: ${trialEndsAt.toISOString()} (${trialDays} dias)`);
+  }
 
   const subscription = await tx.companySubscription.create({
     data: {
