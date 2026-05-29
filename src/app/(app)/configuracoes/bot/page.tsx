@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, CheckCircle, Loader2, Plus, Save, Send, Trash2 } from "lucide-react";
+import { Bot, CheckCircle, Loader2, MessageCircle, Plus, Save, Send, Trash2, Clock, CalendarDays, HelpCircle, ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
 
@@ -168,296 +168,275 @@ export default function BotSettingsPage() {
   if (blocked) {
     return (
       <>
-        <div className="topbar">
-          <div className="page-title">
+        <div className="page-header">
+          <div>
             <h1>Bot WhatsApp</h1>
-            <p className="muted">Atendimento e agendamento automático pelo WhatsApp</p>
+            <p className="sub">Atendimento e agendamento automático pelo WhatsApp</p>
           </div>
         </div>
 
-        <div className="panel" style={{ textAlign: "center", padding: "48px 24px" }}>
-          <Bot size={48} style={{ color: "var(--muted)", marginBottom: 16 }} />
+        <section className="panel" style={{ textAlign: "center", padding: "60px 32px" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg, rgba(13,148,136,0.12), rgba(13,148,136,0.06))", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <Bot size={28} style={{ color: "var(--primary)" }} />
+          </div>
           <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 700 }}>Recurso indisponível no plano Starter</h2>
-          <p className="muted" style={{ maxWidth: 440, margin: "0 auto 20px", fontSize: 14, lineHeight: 1.7 }}>
+          <p className="muted" style={{ maxWidth: 440, margin: "0 auto 24px", fontSize: 14, lineHeight: 1.7 }}>
             O Bot de WhatsApp está disponível a partir do plano <strong>Pro</strong>. Faça upgrade para automatizar
             atendimento, lembretes e agendamentos pelo WhatsApp.
           </p>
-          <div
-            style={{
-              padding: "12px 20px",
-              background: "var(--warning-light)",
-              borderRadius: "var(--radius)",
-              display: "inline-block",
-              fontSize: 14,
-              color: "var(--warning)"
-            }}
-          >
-            ⚡ Faça upgrade para o plano Pro ou Max para liberar essa funcionalidade.
-          </div>
-        </div>
+          <button className="btn btn-amber" type="button">
+            Fazer upgrade <ArrowRight size={14} />
+          </button>
+        </section>
       </>
     );
   }
 
   return (
     <>
-      <div className="topbar">
-        <div className="page-title">
+      <div className="page-header">
+        <div>
           <h1>Bot WhatsApp</h1>
-          <p className="muted">Atendimento e agendamento automático pelo WhatsApp</p>
+          <p className="sub">Atendimento e agendamento automático pelo WhatsApp</p>
         </div>
       </div>
 
       {error && <div className="error-box">{error}</div>}
+      {success && <div className="success-box"><CheckCircle size={16} />{success}</div>}
 
-      {success && (
-        <div
-          style={{
-            padding: "12px 16px",
-            borderRadius: "var(--radius)",
-            border: "1px solid #bbf7d0",
-            background: "#f0fdf4",
-            color: "#15803d",
-            fontSize: 13,
-            fontWeight: 500,
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 8
-          }}
-        >
-          <CheckCircle size={16} />
-          {success}
-        </div>
-      )}
-
-      {/* On/off switch — Company.botEnabled */}
+      {/* ─── Status + Toggle ─────────────────────────────── */}
       <section className="panel" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: "var(--radius)",
-                background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
-                display: "grid",
-                placeItems: "center",
-                color: "white"
-              }}
-            >
+        <div className="panel__head" style={{ padding: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: "var(--radius-lg)",
+              background: botEnabled
+                ? "linear-gradient(135deg, #059669, #047857)"
+                : "linear-gradient(135deg, var(--border-strong), var(--border))",
+              display: "grid", placeItems: "center", color: "white",
+              transition: "all var(--transition)"
+            }}>
               <Bot size={22} />
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <h2 className="section-title" style={{ marginBottom: 0 }}>Bot de WhatsApp</h2>
-                <span className={`badge ${botEnabled ? "success" : ""}`}>
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: botEnabled ? "#16a34a" : "#94a3b8",
-                      display: "inline-block"
-                    }}
-                  />
+                <span className="panel__title" style={{ margin: 0 }}>Bot de WhatsApp</span>
+                <span className={`pill ${botEnabled ? "pill--success" : "pill--muted"}`}>
+                  <span className="dot-s" />
                   {botEnabled ? "Ativo" : "Inativo"}
                 </span>
               </div>
-              <p className="muted" style={{ margin: 0 }}>
+              <span className="panel__sub">
                 {botEnabled ? "O bot está atendendo seus clientes." : "Ative para o bot começar a atender."}
-              </p>
+              </span>
             </div>
           </div>
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600 }}>
+          <label className="switch">
             <input
               type="checkbox"
               checked={botEnabled}
               onChange={(e) => toggleEnabled(e.target.checked)}
-              style={{ width: 18, height: 18 }}
             />
-            {botEnabled ? "Desativar" : "Ativar"}
+            <span className="switch__track" />
+            <span className="switch__label">{botEnabled ? "Desativar" : "Ativar"}</span>
           </label>
         </div>
       </section>
 
-      {/* Connection / instance */}
-      <section className="panel" style={{ marginBottom: 16 }}>
-        <h3 className="section-title" style={{ marginBottom: 16 }}>Conexão</h3>
-        <div className="form-grid">
-          <div className="field">
-            <label htmlFor="bot-instance">Instância do WhatsApp (Evolution API)</label>
-            <input
-              id="bot-instance"
-              type="text"
-              placeholder="ex: minha-empresa"
-              value={whatsappInstance}
-              onChange={(e) => setWhatsappInstance(e.target.value)}
-              maxLength={100}
-            />
-            <small style={{ color: "var(--muted)", marginTop: 4, display: "block" }}>
-              Nome da instância criada na Evolution API para esta empresa.
-            </small>
-          </div>
-          <div className="field">
-            <label htmlFor="bot-test-phone">Enviar mensagem de teste</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                id="bot-test-phone"
-                type="text"
-                placeholder="55 11 97777-8888"
-                value={testPhone}
-                onChange={(e) => setTestPhone(e.target.value)}
-                maxLength={20}
-              />
-              <button className="button secondary" type="button" onClick={handleTest} disabled={testing}>
-                {testing ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
-                Testar
-              </button>
-            </div>
-            <small style={{ color: "var(--muted)", marginTop: 4, display: "block" }}>
-              Salve a instância antes de testar.
-            </small>
-          </div>
-        </div>
-      </section>
-
-      {/* Behaviour: booking + reminders */}
-      <div className="grid cols-2" style={{ gap: 16, marginBottom: 16 }}>
+      {/* ─── Features Grid ─────────────────────────────── */}
+      <div className="grid cols-3" style={{ marginBottom: 16 }}>
+        {/* Connection */}
         <section className="panel">
-          <h3 className="section-title" style={{ marginBottom: 16 }}>Agendamento</h3>
-          <div className="checkbox-line">
-            <input
-              type="checkbox"
-              id="bot-allow-booking"
-              checked={allowBooking}
-              onChange={(e) => setAllowBooking(e.target.checked)}
-            />
-            <label htmlFor="bot-allow-booking">Permitir que o bot crie agendamentos</label>
+          <div className="panel__head">
+            <div>
+              <div className="panel__title"><MessageCircle size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--primary)" }} />Conexão</div>
+            </div>
           </div>
-          <small style={{ color: "var(--muted)", marginTop: 8, display: "block" }}>
-            Quando ativo, os clientes podem marcar horários direto pela conversa.
-          </small>
+          <div className="panel__body">
+            <div className="field" style={{ marginBottom: 12 }}>
+              <label htmlFor="bot-instance">Instância (Evolution API)</label>
+              <input
+                id="bot-instance"
+                type="text"
+                placeholder="ex: minha-empresa"
+                value={whatsappInstance}
+                onChange={(e) => setWhatsappInstance(e.target.value)}
+                maxLength={100}
+              />
+              <span className="muted" style={{ fontSize: 11 }}>Nome da instância criada na Evolution API.</span>
+            </div>
+            <div className="field">
+              <label htmlFor="bot-test-phone">Testar envio</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  id="bot-test-phone"
+                  type="text"
+                  placeholder="55 11 97777-8888"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  maxLength={20}
+                />
+                <button className="btn btn-ghost btn-sm" type="button" onClick={handleTest} disabled={testing}>
+                  {testing ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+                </button>
+              </div>
+            </div>
+          </div>
         </section>
 
+        {/* Booking */}
         <section className="panel">
-          <h3 className="section-title" style={{ marginBottom: 16 }}>Lembretes automáticos</h3>
-          <div className="checkbox-line">
-            <input
-              type="checkbox"
-              id="bot-reminders-enabled"
-              checked={reminderEnabled}
-              onChange={(e) => setReminderEnabled(e.target.checked)}
-            />
-            <label htmlFor="bot-reminders-enabled">Ativar lembretes</label>
-          </div>
-          {reminderEnabled && (
-            <div style={{ paddingLeft: 28, marginTop: 8, display: "grid", gap: 6 }}>
-              <div className="checkbox-line">
-                <input
-                  type="checkbox"
-                  id="bot-reminder-24h"
-                  checked={send24h}
-                  onChange={(e) => setSend24h(e.target.checked)}
-                />
-                <label htmlFor="bot-reminder-24h">24 horas antes</label>
-              </div>
-              <div className="checkbox-line">
-                <input
-                  type="checkbox"
-                  id="bot-reminder-2h"
-                  checked={send2h}
-                  onChange={(e) => setSend2h(e.target.checked)}
-                />
-                <label htmlFor="bot-reminder-2h">2 horas antes</label>
-              </div>
+          <div className="panel__head">
+            <div>
+              <div className="panel__title"><CalendarDays size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--primary)" }} />Agendamento</div>
             </div>
-          )}
+          </div>
+          <div className="panel__body">
+            <label className="switch" style={{ marginBottom: 12 }}>
+              <input
+                type="checkbox"
+                checked={allowBooking}
+                onChange={(e) => setAllowBooking(e.target.checked)}
+              />
+              <span className="switch__track" />
+              <span className="switch__label">Agendamento pelo bot</span>
+            </label>
+            <p className="muted" style={{ margin: 0, fontSize: 12, lineHeight: 1.6 }}>
+              Quando ativo, os clientes podem marcar horários direto pela conversa.
+            </p>
+          </div>
+        </section>
+
+        {/* Reminders */}
+        <section className="panel">
+          <div className="panel__head">
+            <div>
+              <div className="panel__title"><Clock size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--primary)" }} />Lembretes</div>
+            </div>
+          </div>
+          <div className="panel__body">
+            <label className="switch" style={{ marginBottom: 10 }}>
+              <input
+                type="checkbox"
+                checked={reminderEnabled}
+                onChange={(e) => setReminderEnabled(e.target.checked)}
+              />
+              <span className="switch__track" />
+              <span className="switch__label">Lembretes automáticos</span>
+            </label>
+            {reminderEnabled && (
+              <div style={{ display: "grid", gap: 8, marginTop: 4 }}>
+                <label className="switch">
+                  <input type="checkbox" checked={send24h} onChange={(e) => setSend24h(e.target.checked)} />
+                  <span className="switch__track" />
+                  <span className="switch__label" style={{ fontSize: 12 }}>24h antes</span>
+                </label>
+                <label className="switch">
+                  <input type="checkbox" checked={send2h} onChange={(e) => setSend2h(e.target.checked)} />
+                  <span className="switch__track" />
+                  <span className="switch__label" style={{ fontSize: 12 }}>2h antes</span>
+                </label>
+              </div>
+            )}
+          </div>
         </section>
       </div>
 
-      {/* Texts */}
+      {/* ─── Business Info ─────────────────────────────── */}
       <section className="panel" style={{ marginBottom: 16 }}>
-        <h3 className="section-title" style={{ marginBottom: 16 }}>Informações do negócio</h3>
-        <div className="form-grid">
-          <div className="field full">
-            <label htmlFor="bot-hours">Horário de atendimento</label>
-            <input
-              id="bot-hours"
-              type="text"
-              placeholder="Seg-Sex 8h às 18h, Sáb 8h às 12h"
-              value={businessHours}
-              onChange={(e) => setBusinessHours(e.target.value)}
-              maxLength={500}
-            />
-          </div>
-          <div className="field full">
-            <label htmlFor="bot-cancel-policy">Política de cancelamento</label>
-            <textarea
-              id="bot-cancel-policy"
-              placeholder="Ex: Cancelamentos devem ser feitos com pelo menos 2 horas de antecedência..."
-              value={cancellationPolicy}
-              onChange={(e) => setCancellationPolicy(e.target.value)}
-              maxLength={1000}
-              rows={2}
-            />
+        <div className="panel__head">
+          <div className="panel__title">Informações do negócio</div>
+        </div>
+        <div className="panel__body">
+          <div className="form-grid">
+            <div className="field full">
+              <label htmlFor="bot-hours">Horário de atendimento</label>
+              <input
+                id="bot-hours"
+                type="text"
+                placeholder="Seg-Sex 8h às 18h, Sáb 8h às 12h"
+                value={businessHours}
+                onChange={(e) => setBusinessHours(e.target.value)}
+                maxLength={500}
+              />
+            </div>
+            <div className="field full">
+              <label htmlFor="bot-cancel-policy">Política de cancelamento</label>
+              <textarea
+                id="bot-cancel-policy"
+                placeholder="Ex: Cancelamentos devem ser feitos com pelo menos 2 horas de antecedência..."
+                value={cancellationPolicy}
+                onChange={(e) => setCancellationPolicy(e.target.value)}
+                maxLength={1000}
+                rows={2}
+              />
+            </div>
           </div>
         </div>
       </section>
 
-      {/* FAQ editor */}
+      {/* ─── FAQ ─────────────────────────────────────────── */}
       <section className="panel" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h3 className="section-title" style={{ margin: 0 }}>Perguntas frequentes (FAQ)</h3>
-          <button className="button secondary" type="button" onClick={addFaq}>
-            <Plus size={16} /> Adicionar
+        <div className="panel__head">
+          <div>
+            <div className="panel__title"><HelpCircle size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--primary)" }} />Perguntas frequentes (FAQ)</div>
+            <div className="panel__sub">{faq.length} {faq.length === 1 ? "pergunta" : "perguntas"} cadastradas</div>
+          </div>
+          <button className="btn btn-ghost btn-sm" type="button" onClick={addFaq}>
+            <Plus size={14} /> Adicionar
           </button>
         </div>
-
-        {faq.length === 0 ? (
-          <div className="empty">Nenhuma pergunta cadastrada. O bot usa estas respostas para tirar dúvidas dos clientes.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {faq.map((item, index) => (
-              <div
-                key={index}
-                style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 12, display: "grid", gap: 8 }}
-              >
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <input
-                    type="text"
-                    placeholder="Pergunta"
-                    value={item.pergunta}
-                    onChange={(e) => updateFaq(index, "pergunta", e.target.value)}
-                    maxLength={300}
-                    style={{ flex: 1 }}
+        <div className="panel__body">
+          {faq.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state__icon"><HelpCircle size={24} /></div>
+              <h3>Nenhuma pergunta cadastrada</h3>
+              <p>O bot usa estas respostas para tirar dúvidas dos clientes automaticamente.</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {faq.map((item, index) => (
+                <div
+                  key={index}
+                  style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 14, display: "grid", gap: 8, background: "var(--surface-muted)" }}
+                >
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <span className="pill pill--info" style={{ flexShrink: 0, marginTop: 2 }}>#{index + 1}</span>
+                    <input
+                      type="text"
+                      placeholder="Pergunta do cliente"
+                      value={item.pergunta}
+                      onChange={(e) => updateFaq(index, "pergunta", e.target.value)}
+                      maxLength={300}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      className="btn btn-danger-ghost btn-sm"
+                      type="button"
+                      onClick={() => removeFaq(index)}
+                      title="Remover"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <textarea
+                    placeholder="Resposta automática"
+                    value={item.resposta}
+                    onChange={(e) => updateFaq(index, "resposta", e.target.value)}
+                    maxLength={2000}
+                    rows={2}
                   />
-                  <button
-                    className="icon-button secondary"
-                    type="button"
-                    onClick={() => removeFaq(index)}
-                    title="Remover"
-                    style={{ color: "var(--danger)" }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
                 </div>
-                <textarea
-                  placeholder="Resposta"
-                  value={item.resposta}
-                  onChange={(e) => updateFaq(index, "resposta", e.target.value)}
-                  maxLength={2000}
-                  rows={2}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
+      {/* ─── Save ─────────────────────────────────────── */}
       <div style={{ display: "flex", gap: 8 }}>
-        <button className="button" type="button" onClick={handleSave} disabled={saving}>
+        <button className="btn btn-primary" type="button" onClick={handleSave} disabled={saving}>
           {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
           {saving ? "Salvando..." : "Salvar configurações"}
         </button>

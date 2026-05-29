@@ -10,12 +10,12 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="topbar">
-      <div className="page-title">
+    <div className="page-header">
+      <div>
         <h1>{title}</h1>
-        {subtitle ? <p className="muted">{subtitle}</p> : null}
+        {subtitle ? <p className="sub">{subtitle}</p> : null}
       </div>
-      {actions ? <div className="toolbar">{actions}</div> : null}
+      {actions ? <div className="actions">{actions}</div> : null}
     </div>
   );
 }

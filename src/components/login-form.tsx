@@ -1,9 +1,11 @@
 "use client";
 
-import { CalendarClock, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Mark } from "@/components/brand/Mark";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 export function LoginForm() {
   const router = useRouter();
@@ -37,12 +39,12 @@ export function LoginForm() {
 
   return (
     <form className="login-card grid" onSubmit={onSubmit}>
-      <div className="toolbar">
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+        <Mark size="lg" />
         <div>
-          <h2>Entrar</h2>
-          <p className="muted">MarcaiFlex</p>
+          <Wordmark variant="dark" size="md" />
+          <p className="muted" style={{ margin: "2px 0 0", fontSize: 13 }}>Acesse sua conta</p>
         </div>
-        <CalendarClock size={24} />
       </div>
 
       {error ? <div className="error-box">{error}</div> : null}
@@ -56,6 +58,7 @@ export function LoginForm() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
+          placeholder="seu@email.com"
         />
       </div>
 
@@ -68,10 +71,11 @@ export function LoginForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
+          placeholder="••••••••"
         />
       </div>
 
-      <button className="button" disabled={loading} type="submit">
+      <button className="btn btn-primary" disabled={loading} type="submit" style={{ width: "100%", height: 44, fontSize: 14 }}>
         <LogIn size={18} />
         {loading ? "Entrando..." : "Entrar"}
       </button>

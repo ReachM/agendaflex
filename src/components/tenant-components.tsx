@@ -253,18 +253,22 @@ export function TenantDashboard() {
       {/* ─── Plan Usage ───────────────────────────────── */}
       {data?.plan ? (
         <section className="panel" style={{ marginTop: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <h2 className="section-title" style={{ margin: 0 }}>Uso do plano</h2>
-            <span className={`plan-badge plan-badge--${data.plan.slug}`}>{data.plan.name}</span>
+          <div className="panel__head">
+            <div className="panel__title">Uso do plano</div>
+            <span className={`pill pill--${data.plan.slug === "max" ? "purple" : data.plan.slug === "pro" ? "success" : "muted"}`}>
+              {data.plan.name}
+            </span>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
-            <span style={{ color: "var(--text-secondary)" }}>Agendamentos no mês</span>
-            <strong>{data.plan.usedAppointmentsThisMonth} / {data.plan.maxAppointmentsPerMonth}</strong>
+          <div className="panel__body">
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+              <span style={{ color: "var(--text-secondary)" }}>Agendamentos no mês</span>
+              <strong>{data.plan.usedAppointmentsThisMonth} / {data.plan.maxAppointmentsPerMonth}</strong>
+            </div>
+            <div className="progress-bar">
+              <div className={`progress-bar__fill ${planBarClass}`} style={{ width: `${planUsagePercent}%` }} />
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>{planUsagePercent}% utilizado</div>
           </div>
-          <div className="progress-bar">
-            <div className={`progress-bar__fill ${planBarClass}`} style={{ width: `${planUsagePercent}%` }} />
-          </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>{planUsagePercent}% utilizado</div>
         </section>
       ) : null}
 
@@ -302,35 +306,43 @@ export function TenantDashboard() {
       {/* ─── Bottom Grid ──────────────────────────────── */}
       <div className="grid cols-2" style={{ marginTop: 16 }}>
         <section className="panel">
-          <h2 className="section-title">Serviços mais agendados</h2>
-          {(data?.topServices ?? []).length === 0 ? <div className="empty">Nenhum dado ainda.</div> : (
-            <div className="hbar" style={{ marginTop: 12 }}>
-              {(data?.topServices ?? []).map((svc: AnyRecord) => (
-                <div key={svc.serviceId} className="hbar__item">
-                  <span className="hbar__label">{svc.serviceName}</span>
-                  <div className="hbar__track">
-                    <div className="hbar__fill" style={{ width: `${Math.max((svc.count / topServicesMax) * 100, 8)}%` }}>{svc.count}x</div>
+          <div className="panel__head">
+            <div className="panel__title">Serviços mais agendados</div>
+          </div>
+          <div className="panel__body">
+            {(data?.topServices ?? []).length === 0 ? <div className="empty">Nenhum dado ainda.</div> : (
+              <div className="hbar">
+                {(data?.topServices ?? []).map((svc: AnyRecord) => (
+                  <div key={svc.serviceId} className="hbar__item">
+                    <span className="hbar__label">{svc.serviceName}</span>
+                    <div className="hbar__track">
+                      <div className="hbar__fill" style={{ width: `${Math.max((svc.count / topServicesMax) * 100, 8)}%` }}>{svc.count}x</div>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </section>
         <section className="panel">
-          <h2 className="section-title">Profissionais com agenda hoje</h2>
-          {(data?.todayProfessionals ?? []).length === 0 ? (
-            <div className="empty-state"><div className="empty-state__icon"><Users size={24} /></div><h3>Nenhum profissional com agenda hoje</h3></div>
-          ) : (
-            <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-              {(data?.todayProfessionals ?? []).map((prof: AnyRecord) => (
-                <div key={prof.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
-                  <div className="avatar avatar--sm">{prof.name?.[0] ?? "?"}</div>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>{prof.name}</span>
-                  <span className="status-dot status-dot--active" style={{ marginLeft: "auto" }} />
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="panel__head">
+            <div className="panel__title">Profissionais com agenda hoje</div>
+          </div>
+          <div className="panel__body">
+            {(data?.todayProfessionals ?? []).length === 0 ? (
+              <div className="empty-state"><div className="empty-state__icon"><Users size={24} /></div><h3>Nenhum profissional com agenda hoje</h3></div>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {(data?.todayProfessionals ?? []).map((prof: AnyRecord) => (
+                  <div key={prof.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
+                    <div className="avatar avatar--sm">{prof.name?.[0] ?? "?"}</div>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{prof.name}</span>
+                    <span className="status-dot status-dot--active" style={{ marginLeft: "auto" }} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       </div>
     </>
@@ -1695,23 +1707,31 @@ export function ReportsView() {
 export function SettingsView() {
   const [session, setSession] = useState<AnyRecord | null>(null);
   const [error, setError] = useState("");
+  // Dynamic import to avoid monolith bloat
+  const [SubscriptionSection, setSubComp] = useState<any>(null);
 
   useEffect(() => {
     apiFetch<AnyRecord>("/api/auth/me").then(setSession).catch((err) => setError(err.message));
+    import("@/components/subscription-section").then((mod) => setSubComp(() => mod.SubscriptionSection));
   }, []);
 
   return (
     <>
       <PageHeader title="Configurações" subtitle="Dados gerais da empresa" />
       <ErrorBox error={error} />
-      <section className="panel grid">
-        <h2 className="section-title">{session?.company?.name ?? "Empresa"}</h2>
-        <div className="grid cols-3">
-          <StatCard label="Status" value={session?.company?.status ?? "-"} />
-          <StatCard label="Segmento" value={session?.company?.segment ?? "-"} />
-          <StatCard label="Plano" value={session?.company?.plan ?? "-"} />
+      <section className="panel">
+        <div className="panel__head">
+          <div className="panel__title">{session?.company?.name ?? "Empresa"}</div>
+        </div>
+        <div className="panel__body">
+          <div className="grid cols-3">
+            <StatCard label="Status" value={session?.company?.status ?? "-"} />
+            <StatCard label="Segmento" value={session?.company?.segment ?? "-"} />
+            <StatCard label="Plano" value={session?.company?.plan ?? "-"} />
+          </div>
         </div>
       </section>
+      {SubscriptionSection && <SubscriptionSection />}
     </>
   );
 }

@@ -12,8 +12,8 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  eslint: {
-    ignoreDuringBuilds: true
+  turbopack: {
+    root: import.meta.dirname,
   },
   // node-cron usa APIs nativas do Node (child_process). Mantém fora do bundle
   // do webpack para ser carregado em runtime (usado pelo agendador interno via

@@ -73,9 +73,13 @@ export function MasterDashboard() {
         <StatCard label="Usuários" value={data?.metrics?.users ?? "-"} />
         <StatCard label="Agendamentos" value={data?.metrics?.appointments ?? "-"} />
       </div>
-      <section className="panel grid" style={{ marginTop: 16 }}>
-        <h2 className="section-title">Logs recentes</h2>
-        <LogTable logs={data?.recentLogs ?? []} />
+      <section className="panel" style={{ marginTop: 16 }}>
+        <div className="panel__head">
+          <div className="panel__title">Logs recentes</div>
+        </div>
+        <div className="panel__body panel__body--flush">
+          <LogTable logs={data?.recentLogs ?? []} />
+        </div>
       </section>
     </>
   );
