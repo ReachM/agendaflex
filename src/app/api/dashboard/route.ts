@@ -163,6 +163,37 @@ export async function GET(request: NextRequest) {
       }
     };
 
+    if (planFeatures.allowFinancialControl) {
+      const [dayRevenue, monthRevenue, monthExpense, receivable] = await Promise.all([
+        prisma.financialRecord.aggregate({
+          where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PAID", paidAt: { gte: startOfDay, lt: endOfDay } },
+          _sum: { amount: true }
+        }),
+        prisma.financialRecord.aggregate({
+          where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PAID", paidAt: { gte: startOfMonth, lt: endOfMonth } },
+          _sum: { amount: true }
+        }),
+        prisma.financialRecord.aggregate({
+          where: { companyId: cid, flowType: { in: ["COST", "EXPENSE"] }, paymentStatus: "PAID", paidAt: { gte: startOfMonth, lt: endOfMonth } },
+          _sum: { amount: true }
+        }),
+        prisma.financialRecord.aggregate({
+          where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PENDING" },
+          _sum: { amount: true },
+          _count: { id: true }
+        })
+      ]);
+
+      result.financial = {
+        dayRevenue: Number(dayRevenue._sum.amount ?? 0),
+        monthRevenue: Number(monthRevenue._sum.amount ?? 0),
+        monthExpense: Number(monthExpense._sum.amount ?? 0),
+        monthBalance: Number(monthRevenue._sum.amount ?? 0) - Number(monthExpense._sum.amount ?? 0),
+        receivable: Number(receivable._sum.amount ?? 0),
+        receivableCount: receivable._count.id
+      };
+    }
+
     return ok(result);
   } catch (error) {
     return handleApiError(error);

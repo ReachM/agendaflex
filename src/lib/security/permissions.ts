@@ -45,10 +45,10 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
     "reports:advanced",
     "logs:view",
     "settings:manage",
-    // TODO [MVP-FUTURE] Reativar na v2:
-    // "financial:view",
-    // "financial:manage",
-    // "invoices:manage",
+    "financial:view",
+    "financial:manage",
+    "invoices:manage",
+    // TODO [MVP-FUTURE] Reativar checklists quando os models ChecklistTemplate/Section forem criados:
     // "checklists:manage",
     "public_booking:manage",
     "clinical_notes:view"
@@ -65,9 +65,9 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
     "custom_fields:view",
     "reports:view",
     "logs:view",
-    "settings:manage"
-    // TODO [MVP-FUTURE] Reativar na v2:
-    // "financial:view",
+    "settings:manage",
+    "financial:view"
+    // TODO [MVP-FUTURE] Reativar checklists quando os models forem criados:
     // "checklists:manage",
     // "checklists:view"
   ],
@@ -105,11 +105,9 @@ export const TENANT_MENU_ITEMS: MenuItem[] = [
   { href: "/profissionais", label: "Profissionais", icon: "Briefcase", permission: "professionals:view" },
   { href: "/campos-personalizados", label: "Campos Personalizados", icon: "SlidersHorizontal", permission: "custom_fields:manage" },
   { href: "/usuarios", label: "Usuários", icon: "UserCog", permission: "users:manage" },
-  // TODO [MVP-FUTURE] Financeiro — reativar na v2
-  // { href: "/financeiro", label: "Financeiro", icon: "DollarSign", permission: "financial:view", planFeature: "allowFinancialControl" },
-  // TODO [MVP-FUTURE] Notas Fiscais — reativar na v2
-  // { href: "/notas-fiscais", label: "Notas Fiscais", icon: "FileText", permission: "invoices:manage", planFeature: "allowInvoiceRequest" },
-  // TODO [MVP-FUTURE] Checklists — reativar na v2
+  { href: "/financeiro", label: "Financeiro", icon: "DollarSign", permission: "financial:view", planFeature: "allowFinancialControl" },
+  { href: "/notas-fiscais", label: "Notas Fiscais", icon: "FileText", permission: "invoices:manage", planFeature: "allowInvoiceRequest" },
+  // TODO [MVP-FUTURE] Checklists — reativar quando ChecklistTemplate/Section forem criados na próxima fase
   // { href: "/checklists", label: "Checklists", icon: "CheckSquare", permission: "checklists:manage", planFeature: "allowCustomerChecklist" },
   { href: "/link-agenda", label: "Link de Agenda", icon: "Link2", permission: "public_booking:manage", planFeature: "allowClientSelfScheduling" },
   { href: "/relatorios", label: "Relatórios", icon: "Activity", permission: "reports:view" },

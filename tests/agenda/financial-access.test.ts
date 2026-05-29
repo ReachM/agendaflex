@@ -31,34 +31,47 @@ function makePlan(overrides: Partial<PlanFeatures> = {}): PlanFeatures {
   };
 }
 
-// ═══ MVP: Financial Access Control ══════════════════════════════════
+// ═══ v2: Financial Access Control (reativado 2026-05-29) ════════════
 
-describe("MVP — Financial Access in Agenda", () => {
+describe("v2 — Financial Access in Agenda", () => {
   describe("canAccessAgendaFinancials", () => {
-    it("returns false when plan has allowFinancialControl=false (all MVP plans)", () => {
-      const mvpPlan = makePlan({ allowFinancialControl: false });
-      // Even COMPANY_ADMIN cannot see financial if the plan disables it
-      expect(canAccessAgendaFinancials("COMPANY_ADMIN", mvpPlan)).toBe(false);
-      expect(canAccessAgendaFinancials("MANAGER", mvpPlan)).toBe(false);
-      expect(canAccessAgendaFinancials("STAFF", mvpPlan)).toBe(false);
-      expect(canAccessAgendaFinancials("SUPER_ADMIN", mvpPlan)).toBe(false);
+    it("returns false when plan has allowFinancialControl=false (Starter)", () => {
+      const starter = makePlan({ allowFinancialControl: false });
+      expect(canAccessAgendaFinancials("COMPANY_ADMIN", starter)).toBe(false);
+      expect(canAccessAgendaFinancials("MANAGER", starter)).toBe(false);
+      expect(canAccessAgendaFinancials("STAFF", starter)).toBe(false);
+      expect(canAccessAgendaFinancials("SUPER_ADMIN", starter)).toBe(false);
     });
 
-    it("returns true only when plan AND role BOTH allow financial access", () => {
+    it("returns true for COMPANY_ADMIN/MANAGER/SUPER_ADMIN on Pro/Max plans", () => {
       const financialPlan = makePlan({ allowFinancialControl: true });
-      expect(canAccessAgendaFinancials("COMPANY_ADMIN", financialPlan)).toBe(false);
-      // COMPANY_ADMIN does not have financial:view in MVP ROLE_PERMISSIONS
-      // (it would need to be re-enabled in v2)
+      expect(canAccessAgendaFinancials("COMPANY_ADMIN", financialPlan)).toBe(true);
+      expect(canAccessAgendaFinancials("MANAGER", financialPlan)).toBe(true);
       expect(canAccessAgendaFinancials("SUPER_ADMIN", financialPlan)).toBe(true);
+    });
+
+    it("returns false for STAFF even on plans with financial enabled", () => {
+      const financialPlan = makePlan({ allowFinancialControl: true });
+      expect(canAccessAgendaFinancials("STAFF", financialPlan)).toBe(false);
+      expect(canAccessAgendaFinancials("USER", financialPlan)).toBe(false);
     });
   });
 
   describe("canManageAgendaFinancials", () => {
-    it("returns false for all tenant roles in MVP plans", () => {
-      const mvpPlan = makePlan({ allowFinancialControl: false });
-      expect(canManageAgendaFinancials("COMPANY_ADMIN", mvpPlan)).toBe(false);
-      expect(canManageAgendaFinancials("MANAGER", mvpPlan)).toBe(false);
-      expect(canManageAgendaFinancials("STAFF", mvpPlan)).toBe(false);
+    it("returns false for everyone when plan disables financial", () => {
+      const starter = makePlan({ allowFinancialControl: false });
+      expect(canManageAgendaFinancials("COMPANY_ADMIN", starter)).toBe(false);
+      expect(canManageAgendaFinancials("MANAGER", starter)).toBe(false);
+      expect(canManageAgendaFinancials("STAFF", starter)).toBe(false);
+    });
+
+    it("returns true only for COMPANY_ADMIN/SUPER_ADMIN on plans with financial enabled", () => {
+      const financialPlan = makePlan({ allowFinancialControl: true });
+      expect(canManageAgendaFinancials("COMPANY_ADMIN", financialPlan)).toBe(true);
+      expect(canManageAgendaFinancials("SUPER_ADMIN", financialPlan)).toBe(true);
+      // MANAGER has financial:view but not financial:manage
+      expect(canManageAgendaFinancials("MANAGER", financialPlan)).toBe(false);
+      expect(canManageAgendaFinancials("STAFF", financialPlan)).toBe(false);
     });
   });
 });

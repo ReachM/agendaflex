@@ -171,13 +171,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const subscription = session?.subscription ?? null;
   const showTrialBanner = subscription?.isTrial && !subscription.isBlocked;
   const showBlockingModal = subscription?.isBlocked ?? false;
-  const companyName = session?.company?.name ?? "Painel Master";
+  const isMaster = session?.kind === "super_admin";
+  const companyName = session?.company?.name ?? (isMaster ? "MarcaiFlex Platform" : "Painel Master");
   const companyInitials = getInitials(companyName);
   const userInitials = getInitials(session?.user.name ?? "U");
-  const showUpgradeCard = session?.company && planSlug !== "max";
+  const showUpgradeCard = !isMaster && session?.company && planSlug !== "max";
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isMaster ? "master-shell" : ""}`}>
       {/* Mobile toggle */}
       <button
         className="mobile-menu-toggle"
@@ -193,6 +194,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="sidebar-header">
           <Mark size="md" />
           <Wordmark variant="light" size="md" />
+          {isMaster ? <span className="master-tag">MASTER</span> : null}
         </div>
 
         {/* Tenant Card */}

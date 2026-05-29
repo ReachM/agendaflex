@@ -6,17 +6,13 @@ import {
   type PermissionKey
 } from "@/lib/security/permissions";
 
-// ═══ MVP Permission Tests ════════════════════════════════════════
+// ═══ v2 Permission Tests ═════════════════════════════════════════
+// Financeiro e Notas Fiscais foram reativados em 2026-05-29 (v2).
+// Checklists permanece desativado até ChecklistTemplate/Section serem criados.
 
-describe("MVP — Permissions by Role", () => {
-  // Financial permissions should NOT be assigned to any tenant role in the MVP
-  const financialPermissions: PermissionKey[] = [
-    "financial:view",
-    "financial:manage",
-    "invoices:manage",
-    "checklists:manage",
-    "checklists:view"
-  ];
+describe("v2 — Permissions by Role", () => {
+  // Permissions ainda desativadas em todos os roles de tenant nesta fase.
+  const checklistPermissions: PermissionKey[] = ["checklists:manage", "checklists:view"];
 
   describe("COMPANY_ADMIN", () => {
     it("has core operational permissions", () => {
@@ -32,8 +28,14 @@ describe("MVP — Permissions by Role", () => {
       expect(hasPermission("COMPANY_ADMIN", "clinical_notes:view")).toBe(true);
     });
 
-    it("does NOT have financial/checklist permissions in MVP", () => {
-      for (const perm of financialPermissions) {
+    it("has financial and invoice permissions (v2 reactivation)", () => {
+      expect(hasPermission("COMPANY_ADMIN", "financial:view")).toBe(true);
+      expect(hasPermission("COMPANY_ADMIN", "financial:manage")).toBe(true);
+      expect(hasPermission("COMPANY_ADMIN", "invoices:manage")).toBe(true);
+    });
+
+    it("does NOT have checklist permissions (still pending v2.1)", () => {
+      for (const perm of checklistPermissions) {
         expect(hasPermission("COMPANY_ADMIN", perm)).toBe(false);
       }
     });
@@ -48,8 +50,14 @@ describe("MVP — Permissions by Role", () => {
       expect(hasPermission("MANAGER", "settings:manage")).toBe(true);
     });
 
-    it("does NOT have financial/checklist permissions in MVP", () => {
-      for (const perm of financialPermissions) {
+    it("has financial:view (v2) but not financial:manage", () => {
+      expect(hasPermission("MANAGER", "financial:view")).toBe(true);
+      expect(hasPermission("MANAGER", "financial:manage")).toBe(false);
+      expect(hasPermission("MANAGER", "invoices:manage")).toBe(false);
+    });
+
+    it("does NOT have checklist permissions", () => {
+      for (const perm of checklistPermissions) {
         expect(hasPermission("MANAGER", perm)).toBe(false);
       }
     });
@@ -63,8 +71,11 @@ describe("MVP — Permissions by Role", () => {
       expect(hasPermission("STAFF", "professionals:view")).toBe(true);
     });
 
-    it("does NOT have financial/checklist permissions in MVP", () => {
-      for (const perm of financialPermissions) {
+    it("does NOT have financial or checklist permissions", () => {
+      expect(hasPermission("STAFF", "financial:view")).toBe(false);
+      expect(hasPermission("STAFF", "financial:manage")).toBe(false);
+      expect(hasPermission("STAFF", "invoices:manage")).toBe(false);
+      for (const perm of checklistPermissions) {
         expect(hasPermission("STAFF", perm)).toBe(false);
       }
     });
@@ -87,13 +98,13 @@ describe("MVP — Permissions by Role", () => {
   });
 });
 
-// ═══ MVP Menu Tests ══════════════════════════════════════════════
+// ═══ v2 Menu Tests ═══════════════════════════════════════════════
 
-describe("MVP — Menu Items", () => {
-  it("does NOT include Financeiro in the active menu", () => {
+describe("v2 — Menu Items", () => {
+  it("includes Financeiro and Notas Fiscais (v2), excludes Checklists (pending)", () => {
     const menuHrefs = TENANT_MENU_ITEMS.map((item) => item.href);
-    expect(menuHrefs).not.toContain("/financeiro");
-    expect(menuHrefs).not.toContain("/notas-fiscais");
+    expect(menuHrefs).toContain("/financeiro");
+    expect(menuHrefs).toContain("/notas-fiscais");
     expect(menuHrefs).not.toContain("/checklists");
   });
 
@@ -114,7 +125,7 @@ describe("MVP — Menu Items", () => {
   });
 
   describe("getVisibleMenuItems by role", () => {
-    it("COMPANY_ADMIN sees all MVP items except plan-gated ones without features", () => {
+    it("COMPANY_ADMIN sees core items; Financeiro requires plan feature", () => {
       const items = getVisibleMenuItems("COMPANY_ADMIN");
       const hrefs = items.map((i) => i.href);
       expect(hrefs).toContain("/dashboard");
@@ -125,9 +136,10 @@ describe("MVP — Menu Items", () => {
       expect(hrefs).toContain("/usuarios");
       expect(hrefs).toContain("/relatorios");
       expect(hrefs).toContain("/configuracoes");
-      // Financial should NEVER appear
-      expect(hrefs).not.toContain("/financeiro");
-      expect(hrefs).not.toContain("/notas-fiscais");
+      // Without planFeatures provided, plan-gated items still appear (handled at API layer)
+      expect(hrefs).toContain("/financeiro");
+      expect(hrefs).toContain("/notas-fiscais");
+      // Checklists ainda removido
       expect(hrefs).not.toContain("/checklists");
     });
 
@@ -137,13 +149,14 @@ describe("MVP — Menu Items", () => {
       expect(hrefs).toContain("/dashboard");
       expect(hrefs).toContain("/agenda");
       expect(hrefs).toContain("/clientes");
-      // Staff should NOT see admin-only pages
+      // Staff should NOT see admin-only or financial pages
       expect(hrefs).not.toContain("/usuarios");
       expect(hrefs).not.toContain("/configuracoes");
       expect(hrefs).not.toContain("/financeiro");
+      expect(hrefs).not.toContain("/notas-fiscais");
     });
 
-    it("COMPANY_ADMIN with Starter plan does NOT see Link de Agenda or Bot", () => {
+    it("COMPANY_ADMIN with Starter plan does NOT see Link de Agenda, Bot, Financeiro or Notas", () => {
       const starterFeatures = {
         allowClientSelfScheduling: false,
         allowAdvancedReports: false,
@@ -156,13 +169,15 @@ describe("MVP — Menu Items", () => {
       const hrefs = items.map((i) => i.href);
       expect(hrefs).not.toContain("/link-agenda");
       expect(hrefs).not.toContain("/configuracoes/bot");
+      expect(hrefs).not.toContain("/financeiro");
+      expect(hrefs).not.toContain("/notas-fiscais");
     });
 
-    it("COMPANY_ADMIN with Pro plan sees Link de Agenda and Bot", () => {
+    it("COMPANY_ADMIN with Pro plan sees Link de Agenda, Bot, Financeiro — but not Notas Fiscais", () => {
       const proFeatures = {
         allowClientSelfScheduling: true,
         allowAdvancedReports: true,
-        allowFinancialControl: false,
+        allowFinancialControl: true,
         allowInvoiceRequest: false,
         allowCustomerChecklist: false,
         allowBotIntegration: true
@@ -171,17 +186,30 @@ describe("MVP — Menu Items", () => {
       const hrefs = items.map((i) => i.href);
       expect(hrefs).toContain("/link-agenda");
       expect(hrefs).toContain("/configuracoes/bot");
-      // Even with Pro, financial is not in the menu
-      expect(hrefs).not.toContain("/financeiro");
+      expect(hrefs).toContain("/financeiro");
+      expect(hrefs).not.toContain("/notas-fiscais");
+    });
+
+    it("COMPANY_ADMIN with Max plan sees Notas Fiscais too", () => {
+      const maxFeatures = {
+        allowClientSelfScheduling: true,
+        allowAdvancedReports: true,
+        allowFinancialControl: true,
+        allowInvoiceRequest: true,
+        allowCustomerChecklist: false,
+        allowBotIntegration: true
+      };
+      const items = getVisibleMenuItems("COMPANY_ADMIN", maxFeatures);
+      const hrefs = items.map((i) => i.href);
+      expect(hrefs).toContain("/financeiro");
+      expect(hrefs).toContain("/notas-fiscais");
     });
   });
 });
 
-// ═══ MVP Plan Feature Flags ═════════════════════════════════════
+// ═══ v2 Plan Feature Flags ═══════════════════════════════════════
 
-describe("MVP — Plan Feature Flags (Seed Alignment)", () => {
-  // These represent the expected feature flags per plan in the MVP seed
-
+describe("v2 — Plan Feature Flags (Seed Alignment)", () => {
   const starterFeatures = {
     allowClientSelfScheduling: false,
     allowAdvancedReports: false,
@@ -197,7 +225,7 @@ describe("MVP — Plan Feature Flags (Seed Alignment)", () => {
   const proFeatures = {
     allowClientSelfScheduling: true,
     allowAdvancedReports: true,
-    allowFinancialControl: false,
+    allowFinancialControl: true,
     allowInvoiceRequest: false,
     allowCustomerChecklist: false,
     allowBotIntegration: true,
@@ -209,16 +237,16 @@ describe("MVP — Plan Feature Flags (Seed Alignment)", () => {
   const maxFeatures = {
     allowClientSelfScheduling: true,
     allowAdvancedReports: true,
-    allowFinancialControl: false,    // MVP: disabled even on Max
-    allowInvoiceRequest: false,      // MVP: disabled even on Max
-    allowCustomerChecklist: false,   // MVP: disabled even on Max
+    allowFinancialControl: true,
+    allowInvoiceRequest: true,
+    allowCustomerChecklist: false,
     allowBotIntegration: true,
     allowAuditLogs: true,
     allowCustomFields: true,
     allowMultipleServicesPerAppointment: true
   };
 
-  it("Starter plan has financial features DISABLED", () => {
+  it("Starter plan keeps all paid features DISABLED", () => {
     expect(starterFeatures.allowFinancialControl).toBe(false);
     expect(starterFeatures.allowInvoiceRequest).toBe(false);
     expect(starterFeatures.allowCustomerChecklist).toBe(false);
@@ -226,20 +254,19 @@ describe("MVP — Plan Feature Flags (Seed Alignment)", () => {
     expect(starterFeatures.allowBotIntegration).toBe(false);
   });
 
-  it("Pro plan has self-scheduling and bot enabled, financial DISABLED", () => {
+  it("Pro plan enables financial control and self-scheduling; not invoices/checklists", () => {
     expect(proFeatures.allowClientSelfScheduling).toBe(true);
     expect(proFeatures.allowBotIntegration).toBe(true);
     expect(proFeatures.allowAdvancedReports).toBe(true);
-    expect(proFeatures.allowFinancialControl).toBe(false);
+    expect(proFeatures.allowFinancialControl).toBe(true);
     expect(proFeatures.allowInvoiceRequest).toBe(false);
     expect(proFeatures.allowCustomerChecklist).toBe(false);
   });
 
-  it("Max plan has high limits but financial features DISABLED in MVP", () => {
-    expect(maxFeatures.allowFinancialControl).toBe(false);
-    expect(maxFeatures.allowInvoiceRequest).toBe(false);
+  it("Max plan enables financial and invoices; checklists still pending v2.1", () => {
+    expect(maxFeatures.allowFinancialControl).toBe(true);
+    expect(maxFeatures.allowInvoiceRequest).toBe(true);
     expect(maxFeatures.allowCustomerChecklist).toBe(false);
-    // Everything else active
     expect(maxFeatures.allowClientSelfScheduling).toBe(true);
     expect(maxFeatures.allowBotIntegration).toBe(true);
     expect(maxFeatures.allowAdvancedReports).toBe(true);

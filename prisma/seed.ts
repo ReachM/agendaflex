@@ -46,8 +46,8 @@ const rolePermissions: Record<RoleName, string[]> = {
     "professionals:manage","professionals:view","appointments:manage","appointments:view",
     "custom_fields:manage","custom_fields:view","reports:view","reports:advanced","logs:view",
     "settings:manage",
-    // TODO [MVP-FUTURE] Reativar permissões financeiras na v2
-    // "financial:view","financial:manage","invoices:manage",
+    "financial:view","financial:manage","invoices:manage",
+    // TODO [MVP-FUTURE] Reativar checklists quando ChecklistTemplate/Section forem criados:
     // "checklists:manage","checklists:view",
     "public_booking:manage","clinical_notes:view"
   ],
@@ -55,8 +55,9 @@ const rolePermissions: Record<RoleName, string[]> = {
     "customers:manage","customers:view","services:manage","services:view",
     "professionals:manage","professionals:view","appointments:manage","appointments:view",
     "custom_fields:view","reports:view","logs:view","settings:manage",
-    // TODO [MVP-FUTURE] Reativar permissões financeiras na v2
-    // "financial:view","checklists:manage","checklists:view"
+    "financial:view",
+    // TODO [MVP-FUTURE] Reativar checklists na próxima fase:
+    // "checklists:manage","checklists:view"
   ],
   STAFF: [
     "customers:view","customers:manage","services:view","professionals:view",
@@ -196,15 +197,15 @@ async function main() {
     where: { slug: "pro" },
     update: {
       maxUsers: 10, maxProfessionals: 10, maxCustomers: 5000, maxAppointmentsPerMonth: 2000,
-      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: false,
+      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
       allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true
     },
     create: {
-      name: "Pro", slug: "pro", description: "Tudo do Starter + agendamento público, relatórios intermediários, bot WhatsApp, mais usuários e profissionais.",
+      name: "Pro", slug: "pro", description: "Tudo do Starter + agendamento público, relatórios intermediários, bot WhatsApp, controle financeiro, mais usuários e profissionais.",
       price: 99.90, maxUsers: 10, maxProfessionals: 10, maxCustomers: 5000, maxAppointmentsPerMonth: 2000,
-      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: false,
+      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
       allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true, sortOrder: 2
@@ -216,20 +217,20 @@ async function main() {
     update: {
       maxUsers: 100, maxProfessionals: 100, maxCustomers: 50000, maxAppointmentsPerMonth: 50000,
       allowClientSelfScheduling: true, allowAdvancedReports: true,
-      allowFinancialControl: false,    // TODO [MVP-FUTURE] Ativar na v2
-      allowInvoiceRequest: false,      // TODO [MVP-FUTURE] Ativar na v2
-      allowCustomerChecklist: false,   // TODO [MVP-FUTURE] Ativar na v2
+      allowFinancialControl: true,
+      allowInvoiceRequest: true,
+      allowCustomerChecklist: false,   // TODO [MVP-FUTURE] Ativar quando ChecklistTemplate/Section existirem
       allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true
     },
     create: {
-      name: "Max", slug: "max", description: "Tudo do Pro + limites altos, logs avançados, mais configurações de bot. Financeiro e NF disponíveis em versão futura.",
+      name: "Max", slug: "max", description: "Tudo do Pro + notas fiscais, limites altos, logs avançados, mais configurações de bot.",
       price: 199.90, maxUsers: 100, maxProfessionals: 100, maxCustomers: 50000, maxAppointmentsPerMonth: 50000,
       allowClientSelfScheduling: true, allowAdvancedReports: true,
-      allowFinancialControl: false,    // TODO [MVP-FUTURE] Ativar na v2
-      allowInvoiceRequest: false,      // TODO [MVP-FUTURE] Ativar na v2
-      allowCustomerChecklist: false,   // TODO [MVP-FUTURE] Ativar na v2
+      allowFinancialControl: true,
+      allowInvoiceRequest: true,
+      allowCustomerChecklist: false,   // TODO [MVP-FUTURE] Ativar quando ChecklistTemplate/Section existirem
       allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true, sortOrder: 3
@@ -381,6 +382,69 @@ async function main() {
         appointmentServices: {
           create: { companyId: salon.id, serviceId: salonService.id, serviceNameSnapshot: "Corte e escova", unitPrice: 130, totalPrice: 130 }
         }
+      }
+    });
+  }
+
+  // ─── Financial Categories & Accounts (Pro/Max apenas) ──
+  async function seedFinancialDefaults(companyId: string, segment: "clinic" | "workshop") {
+    const revenueCats = segment === "clinic"
+      ? [{ name: "Consultas" }, { name: "Procedimentos" }]
+      : [{ name: "Serviços" }, { name: "Peças" }];
+    const costCats = segment === "clinic"
+      ? [{ name: "Materiais clínicos" }]
+      : [{ name: "Peças e materiais" }];
+    const expenseCats = [
+      { name: "Aluguel" },
+      { name: "Salários e comissões" },
+      { name: "Marketing" },
+      { name: "Insumos" },
+      { name: "Outros" }
+    ];
+
+    let sortOrder = 0;
+    for (const cat of revenueCats) {
+      const existing = await prisma.financialCategory.findFirst({ where: { companyId, name: cat.name, type: "REVENUE" } });
+      if (!existing) await prisma.financialCategory.create({ data: { companyId, name: cat.name, type: "REVENUE", sortOrder: sortOrder++ } });
+    }
+    sortOrder = 0;
+    for (const cat of costCats) {
+      const existing = await prisma.financialCategory.findFirst({ where: { companyId, name: cat.name, type: "COST" } });
+      if (!existing) await prisma.financialCategory.create({ data: { companyId, name: cat.name, type: "COST", sortOrder: sortOrder++ } });
+    }
+    sortOrder = 0;
+    for (const cat of expenseCats) {
+      const existing = await prisma.financialCategory.findFirst({ where: { companyId, name: cat.name, type: "EXPENSE" } });
+      if (!existing) await prisma.financialCategory.create({ data: { companyId, name: cat.name, type: "EXPENSE", sortOrder: sortOrder++ } });
+    }
+
+    const accounts = [
+      { name: "Conta principal", type: "CHECKING" as const },
+      { name: "Caixa", type: "CASH" as const }
+    ];
+    let acctOrder = 0;
+    for (const acct of accounts) {
+      const existing = await prisma.financialAccount.findFirst({ where: { companyId, name: acct.name } });
+      if (!existing) await prisma.financialAccount.create({ data: { companyId, name: acct.name, type: acct.type, sortOrder: acctOrder++ } });
+    }
+  }
+  await seedFinancialDefaults(clinic.id, "clinic");
+  await seedFinancialDefaults(workshop.id, "workshop");
+
+  // ─── Invoice Config seed (Max - Oficina) ──
+  const existingInvoiceConfig = await prisma.companyInvoiceConfig.findUnique({ where: { companyId: workshop.id } });
+  if (!existingInvoiceConfig) {
+    await prisma.companyInvoiceConfig.create({
+      data: {
+        companyId: workshop.id,
+        cnpj: "00.000.000/0001-00",
+        legalName: "Oficina Central Ltda",
+        municipalRegistration: "123456",
+        issRate: 5.0,
+        serviceCode: "1401",
+        taxRegime: "SIMPLES",
+        autoEmit: false,
+        notes: "Configuração de exemplo. Conecte sua chave NFE.io nas Configurações para emissão automática."
       }
     });
   }

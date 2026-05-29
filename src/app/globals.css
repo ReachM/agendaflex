@@ -3929,3 +3929,627 @@ tbody tr:hover {
 .link-text:hover {
   color: var(--primary);
 }
+
+/* ═══════════════════════════════════════════════════
+   SUPER ADMIN SHELL — Dark + Violet
+   Escopado por .master-shell — sobrescreve tokens e
+   componentes base apenas dentro do painel master.
+   ═══════════════════════════════════════════════════ */
+
+.master-shell {
+  --bg: #0b0e1a;
+  --bg-2: #0f1320;
+  --surface: #151a2d;
+  --surface-2: #1a2036;
+  --surface-muted: #1a2036;
+  --surface-hover: #1e2540;
+  --border: #252c44;
+  --border-strong: #313a58;
+
+  --text: #f1f3fa;
+  --text-secondary: #c3c9de;
+  --muted: #8b92ad;
+  --muted-2: #626a85;
+
+  --primary: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --primary-light: #c4b5fd;
+  --primary-ghost: rgba(139, 92, 246, 0.12);
+
+  --violet: #8b5cf6;
+  --violet-hover: #7c3aed;
+  --violet-light: #c4b5fd;
+  --violet-ghost: rgba(139, 92, 246, 0.12);
+
+  --teal-ms: #2dd4bf;
+  --amber-ms: #fbbf24;
+  --rose-ms: #fb7185;
+  --emerald-ms: #34d399;
+  --sky-ms: #38bdf8;
+
+  --success: #34d399;
+  --success-light: rgba(52, 211, 153, 0.14);
+  --success-ghost: rgba(52, 211, 153, 0.14);
+  --danger: #fb7185;
+  --danger-light: rgba(251, 113, 133, 0.14);
+  --danger-ghost: rgba(251, 113, 133, 0.14);
+  --warning: #fbbf24;
+  --warning-light: rgba(251, 191, 36, 0.14);
+  --warn-ghost: rgba(251, 191, 36, 0.14);
+  --info: #38bdf8;
+  --info-light: rgba(56, 189, 248, 0.14);
+  --info-ghost: rgba(56, 189, 248, 0.14);
+
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Sidebar dark/violet */
+.master-shell .sidebar {
+  background: var(--bg-2);
+  color: var(--text-secondary);
+  border-right: 1px solid var(--border);
+}
+.master-shell .sidebar-header {
+  border-bottom: 1px solid var(--border);
+}
+.master-shell .sidebar-tenant {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.master-shell .sidebar-tenant:hover {
+  background: var(--surface-hover);
+}
+.master-shell .sidebar-tenant .tenant-avatar {
+  background: linear-gradient(135deg, var(--violet), var(--violet-hover));
+  box-shadow: 0 6px 18px -4px rgba(139,92,246,0.5);
+}
+.master-shell .sidebar-tenant .tenant-plan {
+  color: var(--violet-light);
+}
+.master-shell .nav-link {
+  color: var(--text-secondary);
+}
+.master-shell .nav-link svg {
+  color: var(--muted);
+}
+.master-shell .nav-link:hover {
+  background: var(--surface-hover);
+  color: #fff;
+}
+.master-shell .nav-link:hover svg {
+  color: var(--violet-light);
+}
+.master-shell .nav-link.active {
+  background: linear-gradient(135deg, var(--violet-ghost), rgba(139,92,246,0.04));
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(139,92,246,0.3);
+}
+.master-shell .nav-link.active svg {
+  color: var(--violet-light);
+}
+.master-shell .nav-section-label {
+  color: var(--muted-2);
+}
+.master-shell .sidebar-footer {
+  border-top: 1px solid var(--border);
+}
+.master-shell .sidebar-user {
+  background: var(--surface);
+}
+.master-shell .sidebar-user .user-avatar {
+  background: linear-gradient(135deg, var(--violet), var(--violet-hover));
+}
+.master-shell .sidebar-user span {
+  color: var(--violet-light);
+}
+
+/* Topbar dark/blurred */
+.master-shell .topbar-main {
+  background: rgba(11,14,26,0.8);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.master-shell .topbar-main .breadcrumb {
+  color: var(--muted);
+}
+.master-shell .topbar-main .breadcrumb .now {
+  color: #fff;
+}
+.master-shell .topbar-main .breadcrumb .sep {
+  color: var(--border-strong);
+}
+.master-shell .topbar-main .user-chip:hover {
+  background: var(--surface);
+}
+.master-shell .topbar-main .user-chip .chip-avatar {
+  background: linear-gradient(135deg, var(--violet), var(--violet-hover));
+}
+.master-shell .topbar-main .user-chip .chip-name {
+  color: var(--text);
+}
+
+/* Content area + cards */
+.master-shell .content {
+  background: var(--bg);
+}
+.master-shell .panel,
+.master-shell .card,
+.master-shell .table-wrap,
+.master-shell .form-panel {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.master-shell .panel__title {
+  color: #fff;
+}
+.master-shell .panel__sub {
+  color: var(--muted);
+}
+
+/* Forms in dark */
+.master-shell .field label {
+  color: var(--text-secondary);
+}
+.master-shell .input,
+.master-shell .select,
+.master-shell .textarea,
+.master-shell .field input,
+.master-shell .field select,
+.master-shell .field textarea {
+  background: var(--bg-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+.master-shell .input::placeholder,
+.master-shell .textarea::placeholder,
+.master-shell .field input::placeholder,
+.master-shell .field textarea::placeholder {
+  color: var(--muted-2);
+}
+.master-shell .input:focus,
+.master-shell .select:focus,
+.master-shell .textarea:focus,
+.master-shell .field input:focus,
+.master-shell .field select:focus,
+.master-shell .field textarea:focus {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 3px var(--violet-ghost);
+}
+
+/* Tables dark */
+.master-shell table {
+  color: var(--text);
+}
+.master-shell th {
+  background: var(--bg-2);
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.master-shell td {
+  border-bottom: 1px solid var(--border);
+}
+.master-shell tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+/* Buttons dark */
+.master-shell .btn-primary,
+.master-shell .button:not(.secondary):not(.danger) {
+  background: linear-gradient(135deg, var(--violet), var(--violet-hover));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 18px -6px rgba(139,92,246,0.6);
+}
+.master-shell .btn-primary:hover,
+.master-shell .button:not(.secondary):not(.danger):hover {
+  filter: brightness(1.05);
+  box-shadow: 0 10px 24px -6px rgba(139,92,246,0.7);
+}
+.master-shell .btn-ghost,
+.master-shell .button.secondary,
+.master-shell .icon-button.secondary {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.master-shell .btn-ghost:hover,
+.master-shell .button.secondary:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+/* Range pill dark */
+.master-shell .range-pill {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.master-shell .range-pill button {
+  color: var(--muted);
+}
+.master-shell .range-pill button.is-active {
+  background: var(--violet-ghost);
+  color: var(--violet-light);
+}
+.master-shell .range-pill button:hover:not(.is-active) {
+  color: var(--text);
+}
+
+/* Pills (status) dark */
+.master-shell .pill--success {
+  background: var(--success-ghost);
+  color: var(--success);
+}
+.master-shell .pill--danger,
+.master-shell .pill--cancelled {
+  background: var(--danger-ghost);
+  color: var(--danger);
+}
+.master-shell .pill--warn,
+.master-shell .pill--warning,
+.master-shell .pill--scheduled {
+  background: var(--warn-ghost);
+  color: var(--warning);
+}
+.master-shell .pill--info {
+  background: var(--info-ghost);
+  color: var(--info);
+}
+.master-shell .pill--violet,
+.master-shell .pill--purple {
+  background: var(--violet-ghost);
+  color: var(--violet-light);
+}
+.master-shell .pill--muted {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+/* Tabs dark */
+.master-shell .tabs {
+  background: var(--surface-2);
+}
+.master-shell .tab {
+  color: var(--muted);
+}
+.master-shell .tab.active {
+  background: var(--surface);
+  color: #fff;
+}
+
+/* Modal dark */
+.master-shell .modal-overlay {
+  background: rgba(0,0,0,0.6);
+}
+.master-shell .modal-content {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* Upgrade card hides on master shell */
+.master-shell .upgrade-card {
+  display: none;
+}
+
+/* MASTER tag in sidebar header */
+.master-shell .master-tag {
+  font-family: var(--mono, ui-monospace, Menlo, monospace);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--violet-light);
+  background: var(--violet-ghost);
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+/* ─── Master KPI card ─── */
+.master-shell .kpi {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: all var(--transition);
+}
+.master-shell .kpi:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -6px rgba(0,0,0,0.45);
+}
+.master-shell .kpi::after {
+  content: "";
+  position: absolute;
+  right: -30px;
+  bottom: -30px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--violet-ghost), transparent 70%);
+  pointer-events: none;
+}
+.master-shell .kpi__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  position: relative;
+  z-index: 1;
+}
+.master-shell .kpi__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.master-shell .kpi__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--violet-ghost);
+  color: var(--violet-light);
+}
+.master-shell .kpi--teal .kpi__icon { background: rgba(45,212,191,0.14); color: var(--teal-ms); }
+.master-shell .kpi--amber .kpi__icon { background: var(--warn-ghost); color: var(--amber-ms); }
+.master-shell .kpi--rose .kpi__icon { background: var(--danger-ghost); color: var(--rose-ms); }
+.master-shell .kpi--sky .kpi__icon { background: var(--info-ghost); color: var(--sky-ms); }
+.master-shell .kpi--emerald .kpi__icon { background: var(--success-ghost); color: var(--emerald-ms); }
+.master-shell .kpi__value {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1.05;
+  position: relative;
+  z-index: 1;
+  font-variant-numeric: tabular-nums;
+}
+.master-shell .kpi__value .unit {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-right: 3px;
+}
+.master-shell .kpi__foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  position: relative;
+  z-index: 1;
+}
+.master-shell .kpi__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--success-ghost);
+  color: var(--success);
+  font-size: 11.5px;
+}
+.master-shell .kpi__delta--down {
+  background: var(--danger-ghost);
+  color: var(--danger);
+}
+
+/* ─── Master plan tag ─── */
+.master-shell .plan-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.master-shell .plan-tag--max {
+  background: linear-gradient(135deg, var(--amber-ms), #d97706);
+  color: #1a1205;
+}
+.master-shell .plan-tag--pro {
+  background: var(--violet-ghost);
+  color: var(--violet-light);
+}
+.master-shell .plan-tag--starter {
+  background: var(--warn-ghost);
+  color: var(--amber-ms);
+}
+.master-shell .plan-tag--free {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+/* ─── Master health bar ─── */
+.master-shell .health {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.master-shell .health__bar {
+  width: 56px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.master-shell .health__bar > div {
+  height: 100%;
+  border-radius: 999px;
+}
+.master-shell .health__v {
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.master-shell .health--good .health__bar > div { background: var(--success); }
+.master-shell .health--good .health__v { color: var(--success); }
+.master-shell .health--mid .health__bar > div { background: var(--warning); }
+.master-shell .health--mid .health__v { color: var(--warning); }
+.master-shell .health--low .health__bar > div { background: var(--danger); }
+.master-shell .health--low .health__v { color: var(--danger); }
+
+/* ─── Master status dot ─── */
+.master-shell .status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+.master-shell .status-dot .d {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.master-shell .status-dot--active { color: var(--success); }
+.master-shell .status-dot--active .d { background: var(--success); box-shadow: 0 0 0 3px var(--success-ghost); }
+.master-shell .status-dot--trial { color: var(--info); }
+.master-shell .status-dot--trial .d { background: var(--info); box-shadow: 0 0 0 3px var(--info-ghost); }
+.master-shell .status-dot--overdue { color: var(--danger); }
+.master-shell .status-dot--overdue .d { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-ghost); }
+.master-shell .status-dot--churned { color: var(--muted); }
+.master-shell .status-dot--churned .d { background: var(--muted-2); }
+
+/* ─── Master business cell (avatar + name) ─── */
+.master-shell .biz {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.master-shell .biz__avt {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.master-shell .biz__nm {
+  font-weight: 600;
+  color: #fff;
+}
+.master-shell .biz__sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* ─── Env pill (PRODUCTION / TRIAL etc.) ─── */
+.master-shell .env-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--success-ghost);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.master-shell .env-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(52,211,153,0.2);
+}
+
+/* ─── chip-tab (status filter) ─── */
+.master-shell .chip-tab {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.master-shell .chip-tab.is-on {
+  background: var(--violet-ghost);
+  border-color: var(--violet);
+  color: var(--violet-light);
+}
+.master-shell .chip-tab:hover:not(.is-on) {
+  color: var(--text);
+}
+
+/* ─── Stat-card overrides for dark (compat) ─── */
+.master-shell .stat-card {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+.master-shell .stat-card__label { color: var(--muted); }
+.master-shell .stat-card__value { color: #fff; }
+.master-shell .stat-card__icon {
+  background: var(--violet-ghost);
+  color: var(--violet-light);
+}
+.master-shell .stat-card--success .stat-card__icon { background: var(--success-ghost); color: var(--success); }
+.master-shell .stat-card--warning .stat-card__icon { background: var(--warn-ghost); color: var(--warning); }
+.master-shell .stat-card--danger .stat-card__icon { background: var(--danger-ghost); color: var(--danger); }
+.master-shell .stat-card--info .stat-card__icon { background: var(--info-ghost); color: var(--info); }
+
+/* Error/Success box dark */
+.master-shell .error-box {
+  background: var(--danger-ghost);
+  border-color: rgba(251,113,133,0.3);
+  color: var(--danger);
+}
+.master-shell .empty,
+.master-shell .empty-state {
+  color: var(--muted);
+}
+.master-shell .empty-state__icon {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.master-shell .empty-state h3 {
+  color: var(--text);
+}
+
+/* Badge overrides */
+.master-shell .badge.status-active {
+  background: var(--success-ghost);
+  color: var(--success);
+}
+.master-shell .badge.status-suspended,
+.master-shell .badge.status-inactive {
+  background: var(--danger-ghost);
+  color: var(--danger);
+}
+.master-shell .badge-select {
+  background: var(--bg-2);
+  border-color: var(--border);
+  color: var(--text);
+}

@@ -114,9 +114,64 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // TODO [MVP-FUTURE] Relatórios Max (financeiros) — reativar na v2
-    // Seção desabilitada: Ticket Médio, Receita por Mês, Clientes Fiéis por valor gasto
-    // if (features.planSlug === "max") { ... }
+    // ─── Max Reports (financial) ──────────────────────
+    if (features.allowFinancialControl) {
+      const [totalRevenue, totalCosts, totalExpenses, monthlyRevenue, topClientsBySpend] = await Promise.all([
+        prisma.financialRecord.aggregate({
+          where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PAID", ...(hasDateFilter ? { paidAt: dateFilter } : {}) },
+          _sum: { amount: true }
+        }),
+        prisma.financialRecord.aggregate({
+          where: { companyId: cid, flowType: "COST", paymentStatus: "PAID", ...(hasDateFilter ? { paidAt: dateFilter } : {}) },
+          _sum: { amount: true }
+        }),
+        prisma.financialRecord.aggregate({
+          where: { companyId: cid, flowType: "EXPENSE", paymentStatus: "PAID", ...(hasDateFilter ? { paidAt: dateFilter } : {}) },
+          _sum: { amount: true }
+        }),
+        prisma.appointment.aggregate({
+          where: { companyId: cid, status: "COMPLETED", totalValue: { not: null }, ...(hasDateFilter ? { startAt: dateFilter } : {}) },
+          _sum: { totalValue: true },
+          _count: { id: true }
+        }),
+        prisma.appointment.groupBy({
+          by: ["customerId"],
+          where: { companyId: cid, status: "COMPLETED", totalValue: { not: null } },
+          _sum: { totalValue: true },
+          _count: { id: true },
+          orderBy: { _sum: { totalValue: "desc" } },
+          take: 10
+        })
+      ]);
+
+      const customerIds = topClientsBySpend.map(c => c.customerId);
+      const customerMap = customerIds.length > 0
+        ? await prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, name: true } })
+        : [];
+
+      const revenueNum = Number(totalRevenue._sum.amount ?? 0);
+      const costsNum = Number(totalCosts._sum.amount ?? 0);
+      const expensesNum = Number(totalExpenses._sum.amount ?? 0);
+      const profit = revenueNum - costsNum - expensesNum;
+      const avgTicket = (monthlyRevenue._count.id ?? 0) > 0
+        ? Number(monthlyRevenue._sum.totalValue ?? 0) / monthlyRevenue._count.id
+        : 0;
+
+      result.max = {
+        totalRevenue: revenueNum,
+        totalCosts: costsNum,
+        totalExpenses: expensesNum,
+        profit,
+        margin: revenueNum > 0 ? Number(((profit / revenueNum) * 100).toFixed(1)) : 0,
+        avgTicket,
+        topClientsBySpend: topClientsBySpend.map(c => ({
+          customerId: c.customerId,
+          customerName: customerMap.find(cu => cu.id === c.customerId)?.name ?? "-",
+          totalSpent: Number(c._sum.totalValue ?? 0),
+          appointmentCount: c._count.id
+        }))
+      };
+    }
 
     return ok(result);
   } catch (error) {

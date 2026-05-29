@@ -1,11 +1,81 @@
 "use client";
 
-import { Plus, RefreshCcw, Trash2 } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import {
+  Building2,
+  DollarSign,
+  Download,
+  Plus,
+  RefreshCcw,
+  Search,
+  Sparkles,
+  TrendingDown,
+  Trash2,
+  Users
+} from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
-import { PageHeader, StatCard } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 
 type AnyRecord = Record<string, any>;
+
+type MasterCompany = {
+  id: string;
+  name: string;
+  slug: string | null;
+  segment: string;
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+  plan: string;
+  planName: string | null;
+  planSlug: string | null;
+  mrr: number;
+  subStatus: "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELLED" | "EXPIRED" | null;
+  currentPeriodEnd: string | null;
+  usersCount: number;
+  customersCount: number;
+  appointmentsCount: number;
+  health: "good" | "mid" | "low";
+  createdAt: string;
+};
+
+type MasterDashboardData = {
+  metrics: {
+    companies: number;
+    activeCompanies: number;
+    trialingCompanies: number;
+    pastDueCompanies: number;
+    cancelledLast30: number;
+    newCompaniesThisMonth: number;
+    users: number;
+    customers: number;
+    appointments: number;
+    mrr: number;
+    mrrDelta: number;
+    trialCompanies30d: number;
+  };
+  planMix: { planId: string; planName: string; planSlug: string; count: number }[];
+  companies: MasterCompany[];
+  recentLogs: AnyRecord[];
+};
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+}
+
+function planTagClass(planSlug: string | null | undefined): string {
+  if (planSlug === "max") return "plan-tag--max";
+  if (planSlug === "pro") return "plan-tag--pro";
+  if (planSlug === "starter") return "plan-tag--starter";
+  return "plan-tag--free";
+}
+
+function subStatusDot(status: MasterCompany["subStatus"], companyStatus: MasterCompany["status"]) {
+  if (companyStatus === "SUSPENDED") return { cls: "status-dot--churned", label: "Suspensa" };
+  if (status === "ACTIVE") return { cls: "status-dot--active", label: "Ativa" };
+  if (status === "TRIALING") return { cls: "status-dot--trial", label: "Em trial" };
+  if (status === "PAST_DUE") return { cls: "status-dot--overdue", label: "Inadimplente" };
+  if (status === "CANCELLED" || status === "EXPIRED") return { cls: "status-dot--churned", label: "Cancelada" };
+  return { cls: "status-dot--churned", label: "Sem assinatura" };
+}
 
 type CustomField = {
   id: string;
@@ -56,32 +126,283 @@ const fieldTypes: [string, string][] = [
 ];
 
 export function MasterDashboard() {
-  const [data, setData] = useState<AnyRecord | null>(null);
+  const [data, setData] = useState<MasterDashboardData | null>(null);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELLED">("all");
 
-  useEffect(() => {
-    apiFetch<AnyRecord>("/api/master/dashboard").then(setData).catch((err) => setError(err.message));
-  }, []);
+  function load() {
+    apiFetch<MasterDashboardData>("/api/master/dashboard").then(setData).catch((err) => setError(err.message));
+  }
+
+  useEffect(() => { load(); }, []);
+
+  const filteredCompanies = useMemo(() => {
+    if (!data) return [];
+    let rows = data.companies;
+    if (statusFilter !== "all") {
+      rows = rows.filter(c => {
+        if (statusFilter === "ACTIVE") return c.status === "ACTIVE" && c.subStatus === "ACTIVE";
+        if (statusFilter === "TRIALING") return c.subStatus === "TRIALING";
+        if (statusFilter === "PAST_DUE") return c.subStatus === "PAST_DUE";
+        if (statusFilter === "CANCELLED") return c.status !== "ACTIVE" || c.subStatus === "CANCELLED";
+        return true;
+      });
+    }
+    const term = search.trim().toLowerCase();
+    if (term) {
+      rows = rows.filter(c =>
+        c.name.toLowerCase().includes(term) ||
+        (c.slug ?? "").toLowerCase().includes(term) ||
+        c.segment.toLowerCase().includes(term)
+      );
+    }
+    return rows;
+  }, [data, search, statusFilter]);
+
+  const m = data?.metrics;
+  const totalActiveSubs = (data?.planMix ?? []).reduce((acc, p) => acc + p.count, 0);
 
   return (
     <>
-      <PageHeader title="Painel Master" subtitle="Visão geral da plataforma" />
+      <PageHeader
+        title="Visão geral da plataforma"
+        subtitle={`${m?.activeCompanies ?? 0} empresas ativas · ${m?.users ?? 0} usuários`}
+        actions={
+          <>
+            <span className="env-pill"><span className="dot" /> PRODUCTION</span>
+            <button type="button" className="btn btn-ghost" onClick={load}>
+              <RefreshCcw size={15} /> Atualizar
+            </button>
+            <button type="button" className="btn btn-primary">
+              <Plus size={15} /> Nova empresa
+            </button>
+          </>
+        }
+      />
+
       {error ? <div className="error-box">{error}</div> : null}
-      <div className="grid cols-4">
-        <StatCard label="Empresas" value={data?.metrics?.companies ?? "-"} />
-        <StatCard label="Empresas ativas" value={data?.metrics?.activeCompanies ?? "-"} />
-        <StatCard label="Usuários" value={data?.metrics?.users ?? "-"} />
-        <StatCard label="Agendamentos" value={data?.metrics?.appointments ?? "-"} />
-      </div>
-      <section className="panel" style={{ marginTop: 16 }}>
-        <div className="panel__head">
-          <div className="panel__title">Logs recentes</div>
+
+      {!data ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+          <div className="loading-spinner" />
         </div>
-        <div className="panel__body panel__body--flush">
-          <LogTable logs={data?.recentLogs ?? []} />
-        </div>
-      </section>
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="grid cols-4" style={{ marginBottom: 22 }}>
+            <KpiCard
+              variant="default"
+              icon={<DollarSign size={18} />}
+              label="MRR atual"
+              value={formatMoney(m?.mrr ?? 0)}
+              delta={m?.mrrDelta ?? 0}
+            />
+            <KpiCard
+              variant="emerald"
+              icon={<Building2 size={18} />}
+              label="Empresas ativas"
+              value={String(m?.activeCompanies ?? 0)}
+              footHint={`${m?.newCompaniesThisMonth ?? 0} novas no mês`}
+            />
+            <KpiCard
+              variant="sky"
+              icon={<Sparkles size={18} />}
+              label="Trials ativos"
+              value={String(m?.trialingCompanies ?? 0)}
+              footHint={`${m?.trialCompanies30d ?? 0} convertendo`}
+            />
+            <KpiCard
+              variant="rose"
+              icon={<TrendingDown size={18} />}
+              label="Churn 30d"
+              value={String(m?.cancelledLast30 ?? 0)}
+              footHint={`${m?.pastDueCompanies ?? 0} inadimplentes`}
+            />
+          </div>
+
+          {/* Plan distribution + Recent logs */}
+          <div className="grid cols-2" style={{ marginBottom: 20 }}>
+            <div className="panel">
+              <div className="panel__head">
+                <div>
+                  <div className="panel__title">Distribuição por plano</div>
+                  <div className="panel__sub">Assinaturas ativas e em trial</div>
+                </div>
+              </div>
+              <div className="panel__body">
+                {data.planMix.length === 0 ? (
+                  <div className="empty">Sem assinaturas registradas.</div>
+                ) : (
+                  <div className="hbar">
+                    {data.planMix.map(p => {
+                      const pct = totalActiveSubs > 0 ? (p.count / totalActiveSubs) * 100 : 0;
+                      return (
+                        <div key={p.planId} className="hbar__item">
+                          <span className="hbar__label">
+                            <span className={`plan-tag ${planTagClass(p.planSlug)}`}>{p.planName}</span>
+                          </span>
+                          <div className="hbar__track">
+                            <div className="hbar__fill" style={{ width: `${Math.max(pct, 6)}%` }}>{p.count}</div>
+                          </div>
+                          <span className="hbar__value">{pct.toFixed(0)}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel__head">
+                <div>
+                  <div className="panel__title">Atividade recente</div>
+                  <div className="panel__sub">Últimas ações auditadas</div>
+                </div>
+              </div>
+              <div className="panel__body panel__body--flush">
+                <LogTable logs={data.recentLogs} />
+              </div>
+            </div>
+          </div>
+
+          {/* Companies table */}
+          <div className="panel">
+            <div className="panel__head" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <div className="panel__title">Empresas</div>
+                  <div className="panel__sub">{filteredCompanies.length} de {data.companies.length} exibidas</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" className={`chip-tab ${statusFilter === "all" ? "is-on" : ""}`} onClick={() => setStatusFilter("all")}>Todas</button>
+                  <button type="button" className={`chip-tab ${statusFilter === "ACTIVE" ? "is-on" : ""}`} onClick={() => setStatusFilter("ACTIVE")}>Ativas</button>
+                  <button type="button" className={`chip-tab ${statusFilter === "TRIALING" ? "is-on" : ""}`} onClick={() => setStatusFilter("TRIALING")}>Trial</button>
+                  <button type="button" className={`chip-tab ${statusFilter === "PAST_DUE" ? "is-on" : ""}`} onClick={() => setStatusFilter("PAST_DUE")}>Inadimplentes</button>
+                  <button type="button" className={`chip-tab ${statusFilter === "CANCELLED" ? "is-on" : ""}`} onClick={() => setStatusFilter("CANCELLED")}>Canceladas</button>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <div className="inline-search" style={{ flex: 1, minWidth: 240 }}>
+                  <Search size={14} />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Buscar por nome, slug ou segmento..."
+                  />
+                </div>
+                <button type="button" className="btn btn-ghost btn-sm">
+                  <Download size={13} /> Exportar
+                </button>
+              </div>
+            </div>
+            <div className="panel__body panel__body--flush">
+              {filteredCompanies.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-state__icon"><Building2 size={24} /></div>
+                  <h3>Nenhuma empresa no filtro</h3>
+                  <p>Ajuste a busca ou troque o filtro de status.</p>
+                </div>
+              ) : (
+                <div className="table-wrap" style={{ borderRadius: 0, border: 0, boxShadow: "none" }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Empresa</th>
+                        <th>Plano</th>
+                        <th className="col-hide-mobile">Usuários</th>
+                        <th>MRR</th>
+                        <th className="col-hide-mobile">Saúde</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCompanies.map((c, idx) => {
+                        const avtClass = `av-${(idx % 8) + 1}`;
+                        const initials = c.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+                        const status = subStatusDot(c.subStatus, c.status);
+                        return (
+                          <tr key={c.id}>
+                            <td>
+                              <div className="biz">
+                                <span className={`biz__avt ${avtClass}`}>{initials}</span>
+                                <div>
+                                  <div className="biz__nm">{c.name}</div>
+                                  <div className="biz__sub">{c.slug ? `${c.slug} · ` : ""}{c.segment.replaceAll("_", " ").toLowerCase()}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span className={`plan-tag ${planTagClass(c.planSlug ?? c.plan)}`}>
+                                {c.planName ?? c.plan}
+                              </span>
+                            </td>
+                            <td className="col-hide-mobile">
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                <Users size={13} /> {c.usersCount}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: 700 }}>{formatMoney(c.mrr)}</td>
+                            <td className="col-hide-mobile">
+                              <span className={`health health--${c.health}`}>
+                                <span className="health__bar"><div style={{ width: c.health === "good" ? "80%" : c.health === "mid" ? "55%" : "28%" }} /></span>
+                                <span className="health__v">{c.health === "good" ? "OK" : c.health === "mid" ? "MED" : "BAIXA"}</span>
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`status-dot ${status.cls}`}>
+                                <span className="d" /> {status.label}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  icon,
+  variant,
+  delta,
+  footHint
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  variant: "default" | "emerald" | "sky" | "rose" | "amber" | "teal";
+  delta?: number;
+  footHint?: string;
+}) {
+  const variantClass = variant === "default" ? "" : `kpi--${variant}`;
+  return (
+    <div className={`kpi ${variantClass}`}>
+      <div className="kpi__head">
+        <span className="kpi__label">{label}</span>
+        <span className="kpi__icon">{icon}</span>
+      </div>
+      <div className="kpi__value">{value}</div>
+      <div className="kpi__foot">
+        {delta !== undefined ? (
+          <span className={`kpi__delta ${delta < 0 ? "kpi__delta--down" : ""}`}>
+            {delta >= 0 ? "+" : ""}{delta}%
+          </span>
+        ) : null}
+        {footHint ? <span>{footHint}</span> : null}
+      </div>
+    </div>
   );
 }
 
