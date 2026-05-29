@@ -1,8 +1,21 @@
 "use client";
 
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Shield, User } from "lucide-react";
+import {
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  MessageCircle,
+  Moon,
+  Scissors,
+  Shield,
+  Sun,
+  Sunset
+} from "lucide-react";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import "./public-booking.css";
 
 type CompanyInfo = { name: string; tradeName: string; segment: string; isHealthSegment: boolean };
 type Service = { id: string; name: string; description: string; basePrice: string; durationMinutes: number };
@@ -18,19 +31,56 @@ type Settings = {
   requireManualApproval: boolean;
 };
 
+const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const MONTH_SHORT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
 function formatMoney(v?: string | number | null) {
-  if (v === null || v === undefined || v === "") return "-";
+  if (v === null || v === undefined || v === "") return "—";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v));
 }
 
-function formatDateBR(dateStr: string) {
+function formatDateLong(dateStr: string) {
   const d = new Date(`${dateStr}T12:00:00`);
   return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(d);
+}
+
+function toLocalISODate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function buildDateChips(minDate: string, maxDate: string) {
+  const start = new Date(`${minDate}T12:00:00`);
+  const end = new Date(`${maxDate}T12:00:00`);
+  const chips: { value: string; dow: string; num: string; mon: string }[] = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    chips.push({
+      value: toLocalISODate(d),
+      dow: DOW_LABELS[d.getDay()],
+      num: String(d.getDate()).padStart(2, "0"),
+      mon: MONTH_SHORT[d.getMonth()]
+    });
+    if (chips.length >= 21) break;
+  }
+  return chips;
+}
+
+function groupSlots(slots: Slot[]) {
+  const morning: Slot[] = [];
+  const afternoon: Slot[] = [];
+  const evening: Slot[] = [];
+  for (const s of slots) {
+    const hour = Number((s.time ?? "00:00").split(":")[0] ?? 0);
+    if (hour < 12) morning.push(s);
+    else if (hour < 18) afternoon.push(s);
+    else evening.push(s);
+  }
+  return { morning, afternoon, evening };
 }
 
 export default function PublicBookingPage() {
   const params = useParams();
   const slug = params.slug as string;
+
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
@@ -41,39 +91,50 @@ export default function PublicBookingPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [step, setStep] = useState(1);
 
-  // Slots
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [form, setForm] = useState({
-    name: "", phone: "", email: "", notes: "", cpf: "",
-    serviceId: "", professionalId: "", date: "", time: "",
-    startAt: "", endAt: "",
+    name: "",
+    phone: "",
+    email: "",
+    notes: "",
+    cpf: "",
+    serviceId: "",
+    professionalId: "",
+    date: "",
+    time: "",
+    startAt: "",
+    endAt: "",
     lgpdAccepted: false,
-    // Health fields
-    healthInsurance: "", healthInsuranceNumber: "",
-    allergies: "", requiredCare: ""
+    healthInsurance: "",
+    healthInsuranceNumber: "",
+    allergies: "",
+    requiredCare: ""
   });
 
   useEffect(() => {
     fetch(`/api/public/${slug}/book`)
-      .then(async r => {
+      .then(async (r) => {
         if (!r.ok) throw new Error((await r.json()).error ?? "Página não encontrada.");
         return r.json();
       })
-      .then(data => {
+      .then((data) => {
         setCompany(data.company);
         setServices(data.services);
         setProfessionals(data.professionals);
         setSettings(data.settings);
       })
-      .catch(err => setError(err.message))
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [slug]);
 
-  const selectedService = useMemo(() => services.find(s => s.id === form.serviceId), [form.serviceId, services]);
+  const selectedService = useMemo(() => services.find((s) => s.id === form.serviceId), [form.serviceId, services]);
+  const selectedProfessional = useMemo(
+    () => professionals.find((p) => p.id === form.professionalId),
+    [form.professionalId, professionals]
+  );
 
-  // Load slots when date, service and professional are selected
   useEffect(() => {
     if (!form.date || !form.serviceId || !form.professionalId) {
       setSlots([]);
@@ -82,35 +143,55 @@ export default function PublicBookingPage() {
     setLoadingSlots(true);
     setError("");
     fetch(`/api/public/${slug}/slots?date=${form.date}&serviceId=${form.serviceId}&professionalId=${form.professionalId}`)
-      .then(async r => {
+      .then(async (r) => {
         if (!r.ok) throw new Error((await r.json()).error ?? "Erro ao carregar horários.");
         return r.json();
       })
-      .then(data => setSlots(data.slots ?? []))
-      .catch(err => setError(err.message))
+      .then((data) => setSlots(data.slots ?? []))
+      .catch((err) => setError(err.message))
       .finally(() => setLoadingSlots(false));
   }, [form.date, form.serviceId, form.professionalId, slug]);
 
   function selectSlot(slot: Slot) {
+    if (!slot.available) return;
     setForm({ ...form, time: slot.time, startAt: slot.startAt, endAt: slot.endAt });
   }
 
-  const minDate = new Date().toISOString().slice(0, 10);
+  const minDate = useMemo(() => {
+    const noticeMs = (settings?.minNoticeHours ?? 1) * 60 * 60 * 1000;
+    const d = new Date(Date.now() + noticeMs);
+    return toLocalISODate(d);
+  }, [settings]);
+
   const maxDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + (settings?.maxDaysAhead ?? 30));
-    return d.toISOString().slice(0, 10);
+    return toLocalISODate(d);
   }, [settings]);
 
+  const dateChips = useMemo(() => buildDateChips(minDate, maxDate), [minDate, maxDate]);
+  const groupedSlots = useMemo(() => groupSlots(slots), [slots]);
+
   const totalSteps = company?.isHealthSegment ? 5 : 4;
+  const stepLabels = company?.isHealthSegment
+    ? ["Serviço", "Horário", "Seus dados", "Saúde", "Confirmar"]
+    : ["Serviço", "Horário", "Seus dados", "Confirmar"];
 
   function canAdvance(): boolean {
     switch (step) {
       case 1: return !!form.serviceId;
       case 2: return !!form.professionalId && !!form.date && !!form.startAt;
       case 3: return !!form.name && !!form.phone && form.lgpdAccepted;
+      case 4: return true; // health step ou confirmação
       default: return true;
     }
+  }
+
+  function goNext() {
+    if (step === 2 && settings?.allowChooseProfessional === false && professionals.length > 0 && !form.professionalId) {
+      setForm({ ...form, professionalId: professionals[0].id });
+    }
+    setStep(step + 1);
   }
 
   async function submit(e: FormEvent) {
@@ -133,280 +214,517 @@ export default function PublicBookingPage() {
     }
   }
 
+  // ─── Loading state ─────────────────────────────────────────
   if (loading) {
     return (
-      <div className="public-booking">
-        <div className="public-booking__card" style={{ padding: 60, textAlign: "center" }}>
-          <div className="loading-spinner" style={{ margin: "0 auto" }} />
+      <div className="pb">
+        <div className="pb__shell">
+          <div className="pb-loading"><div className="pb-spin" /></div>
         </div>
       </div>
     );
   }
 
+  // ─── Fatal error (company not found) ───────────────────────
   if (error && !company) {
     return (
-      <div className="public-booking">
-        <div className="public-booking__card" style={{ padding: 60, textAlign: "center" }}>
-          <p style={{ color: "var(--danger)", fontWeight: 600 }}>{error}</p>
+      <div className="pb">
+        <div className="pb__shell">
+          <div className="pb-card" style={{ marginTop: 48 }}>
+            <div className="pb-card__head">
+              <h2>Página indisponível</h2>
+              <p>{error}</p>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
+  const companyDisplay = company?.tradeName || company?.name || "Empresa";
+  const initials = companyDisplay
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+  // ─── Success ──────────────────────────────────────────────
   if (success) {
     return (
-      <div className="public-booking">
-        <div className="public-booking__card">
-          <div className="public-booking__header">
-            <h1>{company?.tradeName ?? company?.name}</h1>
-            <p>Agendamento online</p>
-          </div>
-          <div className="public-booking__success">
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg, #22c55e, #16a34a)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" }}>
-              <Check size={32} color="#fff" />
+      <div className="pb">
+        <div className="pb__shell">
+          <Header companyDisplay={companyDisplay} initials={initials} />
+          <div className="pb-card">
+            <div className="pb-success">
+              <div className="pb-success__icon"><Check size={36} /></div>
+              <h2>Agendamento realizado!</h2>
+              <p>{success}</p>
+              {selectedService && (
+                <div className="pb-success__details">
+                  <div><strong>Serviço:</strong> {selectedService.name}</div>
+                  {selectedProfessional && <div><strong>Profissional:</strong> {selectedProfessional.name}</div>}
+                  <div><strong>Data:</strong> {form.date ? formatDateLong(form.date) : "—"}</div>
+                  <div><strong>Horário:</strong> {form.time}</div>
+                  <div><strong>Valor:</strong> {formatMoney(selectedService.basePrice)}</div>
+                </div>
+              )}
             </div>
-            <h2 style={{ marginTop: 16 }}>Agendamento Realizado!</h2>
-            <p style={{ color: "var(--muted)", marginTop: 8 }}>{success}</p>
-            {selectedService && (
-              <div style={{ marginTop: 20, padding: "16px", background: "var(--surface-alt)", borderRadius: "var(--radius)", textAlign: "left", fontSize: 14 }}>
-                <div><strong>Serviço:</strong> {selectedService.name}</div>
-                <div><strong>Data:</strong> {form.date ? formatDateBR(form.date) : "-"}</div>
-                <div><strong>Horário:</strong> {form.time}</div>
-              </div>
-            )}
           </div>
+          <Footer companyDisplay={companyDisplay} />
         </div>
       </div>
     );
   }
 
+  // ─── Main flow ────────────────────────────────────────────
   return (
-    <div className="public-booking">
-      <div className="public-booking__card" style={{ maxWidth: 640 }}>
-        <div className="public-booking__header">
-          <h1>{company?.tradeName ?? company?.name}</h1>
-          <p>Agende seu atendimento de forma rápida e prática</p>
-        </div>
+    <div className="pb">
+      <div className="pb__shell">
+        <Header companyDisplay={companyDisplay} initials={initials} />
 
-        {/* Step indicator */}
-        <div style={{ display: "flex", gap: 4, padding: "0 24px", marginBottom: 8 }}>
-          {Array.from({ length: totalSteps }, (_, i) => (
-            <div key={i} style={{
-              flex: 1, height: 4, borderRadius: 2,
-              background: i + 1 <= step ? "var(--primary)" : "var(--border)",
-              transition: "background 0.3s"
-            }} />
-          ))}
-        </div>
+        <section className="pb-hero">
+          <h1>Agende seu horário em <em>poucos cliques</em></h1>
+          <p>Escolha o serviço e o melhor horário disponível. A confirmação chega na hora.</p>
+        </section>
 
-        {settings?.instructions && step === 1 && (
-          <div style={{ padding: "8px 24px", fontSize: 13, color: "var(--muted)", fontStyle: "italic" }}>
-            {settings.instructions}
-          </div>
-        )}
+        <Stepper labels={stepLabels} current={step} />
 
-        <div className="public-booking__body">
-          {error && <div className="error-box">{error}</div>}
+        {error && <div className="pb-error" role="alert">{error}</div>}
 
-          <form onSubmit={submit}>
-            {/* STEP 1: Service selection */}
-            {step === 1 && (
-              <div>
-                <h3 style={{ marginBottom: 12, fontSize: 16 }}>
-                  <Clock size={16} style={{ verticalAlign: -3 }} /> Escolha o serviço
-                </h3>
-                <div style={{ display: "grid", gap: 8 }}>
-                  {services.map(s => (
-                    <div
-                      key={s.id}
-                      onClick={() => setForm({ ...form, serviceId: s.id })}
-                      style={{
-                        padding: "14px 16px", borderRadius: "var(--radius)", cursor: "pointer",
-                        border: form.serviceId === s.id ? "2px solid var(--primary)" : "1px solid var(--border)",
-                        background: form.serviceId === s.id ? "var(--surface-alt)" : "var(--surface)",
-                        transition: "all 0.2s"
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <strong>{s.name}</strong>
-                        <span style={{ color: "var(--primary)", fontWeight: 600 }}>{formatMoney(s.basePrice)}</span>
-                      </div>
-                      {s.description && <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>{s.description}</div>}
-                      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{s.durationMinutes} min</div>
-                    </div>
-                  ))}
-                </div>
+        <form onSubmit={submit}>
+          {/* ─── Step 1: Serviço ─── */}
+          {step === 1 && (
+            <section className="pb-card">
+              <div className="pb-card__head">
+                <h2>Qual serviço você quer?</h2>
+                <p>Selecione abaixo o serviço desejado.</p>
               </div>
-            )}
-
-            {/* STEP 2: Professional, date, time */}
-            {step === 2 && (
-              <div>
-                <h3 style={{ marginBottom: 12, fontSize: 16 }}>
-                  <CalendarDays size={16} style={{ verticalAlign: -3 }} /> Escolha o horário
-                </h3>
-
-                {settings?.allowChooseProfessional !== false && (
-                  <div className="field" style={{ marginBottom: 16 }}>
-                    <label>Profissional</label>
-                    <select value={form.professionalId} onChange={e => setForm({ ...form, professionalId: e.target.value, date: "", time: "", startAt: "", endAt: "" })}>
-                      <option value="">Selecione o profissional</option>
-                      {professionals.map(p => <option key={p.id} value={p.id}>{p.name}{p.specialty ? ` — ${p.specialty}` : ""}</option>)}
-                    </select>
+              {settings?.instructions && (
+                <div className="pb-warn" style={{ marginBottom: 16 }}>
+                  <Shield size={14} />
+                  <span>{settings.instructions}</span>
+                </div>
+              )}
+              <div className="pb-svc-list">
+                {services.length === 0 && (
+                  <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "var(--muted)", padding: 24 }}>
+                    Nenhum serviço disponível no momento.
                   </div>
                 )}
-
-                <div className="field" style={{ marginBottom: 16 }}>
-                  <label>Data</label>
-                  <input
-                    type="date"
-                    value={form.date}
-                    onChange={e => setForm({ ...form, date: e.target.value, time: "", startAt: "", endAt: "" })}
-                    min={minDate}
-                    max={maxDate}
-                  />
-                  {form.date && <small style={{ color: "var(--muted)", marginTop: 4, display: "block" }}>{formatDateBR(form.date)}</small>}
-                </div>
-
-                {/* Time slots */}
-                {form.date && form.professionalId && (
-                  <div>
-                    <label style={{ display: "block", marginBottom: 8, fontWeight: 500 }}>Horários disponíveis</label>
-                    {loadingSlots ? (
-                      <div style={{ textAlign: "center", padding: 20 }}>
-                        <div className="loading-spinner" style={{ margin: "0 auto", width: 24, height: 24 }} />
+                {services.map((s) => (
+                  <button
+                    type="button"
+                    key={s.id}
+                    className={`pb-svc ${form.serviceId === s.id ? "is-on" : ""}`}
+                    onClick={() => setForm({ ...form, serviceId: s.id })}
+                  >
+                    <div className="pb-svc__top">
+                      <span className="pb-svc__ico"><Scissors size={18} /></span>
+                      <div>
+                        <div className="pb-svc__nm">{s.name}</div>
                       </div>
-                    ) : slots.length === 0 ? (
-                      <div style={{ padding: "16px", textAlign: "center", color: "var(--muted)", background: "var(--surface-alt)", borderRadius: "var(--radius)" }}>
-                        Não há horários disponíveis para esse dia.
-                      </div>
-                    ) : (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 6 }}>
-                        {slots.map(slot => (
-                          <button
-                            key={slot.time}
-                            type="button"
-                            onClick={() => selectSlot(slot)}
-                            style={{
-                              padding: "10px 8px", borderRadius: "var(--radius)", fontSize: 14, fontWeight: 500,
-                              border: form.time === slot.time ? "2px solid var(--primary)" : "1px solid var(--border)",
-                              background: form.time === slot.time ? "var(--primary)" : "var(--surface)",
-                              color: form.time === slot.time ? "#fff" : "var(--text)",
-                              cursor: "pointer", transition: "all 0.2s"
-                            }}
-                          >
-                            {slot.time}
-                          </button>
-                        ))}
+                    </div>
+                    {s.description && <div className="pb-svc__desc">{s.description}</div>}
+                    <div className="pb-svc__foot">
+                      <span className="pb-svc__price">{formatMoney(s.basePrice)}</span>
+                      <span className="pb-svc__dur">
+                        <Clock size={11} /> {s.durationMinutes} min
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ─── Step 2: Profissional + data + horário ─── */}
+          {step === 2 && (
+            <>
+              {settings?.allowChooseProfessional !== false && (
+                <section className="pb-card">
+                  <div className="pb-card__head">
+                    <h2>Com quem você prefere?</h2>
+                    <p>Selecione um profissional disponível.</p>
+                  </div>
+                  <div className="pb-pros">
+                    {professionals.length === 0 && (
+                      <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "var(--muted)", padding: 16 }}>
+                        Nenhum profissional disponível.
                       </div>
                     )}
+                    {professionals.map((p) => {
+                      const initialsP = p.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+                      return (
+                        <button
+                          type="button"
+                          key={p.id}
+                          className={`pb-pro ${form.professionalId === p.id ? "is-on" : ""}`}
+                          onClick={() => setForm({ ...form, professionalId: p.id, date: "", time: "", startAt: "", endAt: "" })}
+                        >
+                          <div className="pb-pro__avt">{initialsP}</div>
+                          <div className="pb-pro__nm">{p.name}</div>
+                          {p.specialty && <div className="pb-pro__role">{p.specialty}</div>}
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* STEP 3: Personal data */}
-            {step === 3 && (
-              <div>
-                <h3 style={{ marginBottom: 12, fontSize: 16 }}>
-                  <User size={16} style={{ verticalAlign: -3 }} /> Seus dados
-                </h3>
-                <div className="form-grid">
-                  <div className="field"><label>Nome completo *</label><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Seu nome completo" /></div>
-                  <div className="field"><label>Telefone/WhatsApp *</label><input required value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="(00) 00000-0000" /></div>
-                  <div className="field"><label>E-mail</label><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="seu@email.com" /></div>
-                  <div className="field"><label>CPF</label><input value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" /></div>
-                  <div className="field full"><label>Observações</label><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Informações adicionais (opcional)" /></div>
-                  <div className="field full">
-                    <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", fontSize: 13, color: "var(--text-secondary)" }}>
-                      <input
-                        type="checkbox"
-                        checked={form.lgpdAccepted}
-                        onChange={e => setForm({ ...form, lgpdAccepted: e.target.checked })}
-                        style={{ marginTop: 2, width: 16, height: 16 }}
-                      />
-                      <span>
-                        <Shield size={14} style={{ verticalAlign: -2 }} /> Aceito a coleta e processamento dos meus dados pessoais conforme a política de privacidade e a Lei Geral de Proteção de Dados (LGPD). *
-                      </span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 4 (Health): Additional clinic fields */}
-            {step === 4 && company?.isHealthSegment && (
-              <div>
-                <h3 style={{ marginBottom: 12, fontSize: 16 }}>Informações adicionais (saúde)</h3>
-                <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>Campos opcionais para facilitar seu atendimento.</p>
-                <div className="form-grid">
-                  <div className="field"><label>Convênio</label><input value={form.healthInsurance} onChange={e => setForm({ ...form, healthInsurance: e.target.value })} placeholder="Nome do convênio" /></div>
-                  <div className="field"><label>Nº da carteirinha</label><input value={form.healthInsuranceNumber} onChange={e => setForm({ ...form, healthInsuranceNumber: e.target.value })} placeholder="Número" /></div>
-                  <div className="field full"><label>Alergias</label><textarea value={form.allergies} onChange={e => setForm({ ...form, allergies: e.target.value })} placeholder="Alergias conhecidas (opcional)" /></div>
-                  <div className="field full"><label>Cuidados necessários</label><textarea value={form.requiredCare} onChange={e => setForm({ ...form, requiredCare: e.target.value })} placeholder="Cuidados especiais (opcional)" /></div>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 4/5: Confirmation */}
-            {step === totalSteps && (
-              <div>
-                <h3 style={{ marginBottom: 12, fontSize: 16 }}>
-                  <Check size={16} style={{ verticalAlign: -3 }} /> Confirmar agendamento
-                </h3>
-                <div style={{ background: "var(--surface-alt)", borderRadius: "var(--radius)", padding: "16px", marginBottom: 16, fontSize: 14 }}>
-                  <div style={{ display: "grid", gap: 6 }}>
-                    <div><strong>Serviço:</strong> {selectedService?.name ?? "-"}</div>
-                    <div><strong>Profissional:</strong> {professionals.find(p => p.id === form.professionalId)?.name ?? "-"}</div>
-                    <div><strong>Data:</strong> {form.date ? formatDateBR(form.date) : "-"}</div>
-                    <div><strong>Horário:</strong> {form.time || "-"}</div>
-                    <div><strong>Duração:</strong> {selectedService?.durationMinutes ?? "-"} min</div>
-                    <div><strong>Valor:</strong> {formatMoney(selectedService?.basePrice)}</div>
-                    <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "8px 0" }} />
-                    <div><strong>Nome:</strong> {form.name}</div>
-                    <div><strong>Telefone:</strong> {form.phone}</div>
-                    {form.email && <div><strong>E-mail:</strong> {form.email}</div>}
-                  </div>
-                </div>
-                {settings?.requireManualApproval && (
-                  <div style={{ padding: "10px 14px", background: "#fef3c7", color: "#92400e", borderRadius: "var(--radius)", fontSize: 13, marginBottom: 16 }}>
-                    ⏳ Seu agendamento ficará pendente até ser aprovado pela empresa.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Navigation buttons */}
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 24, padding: "0" }}>
-              {step > 1 && (
-                <button className="button secondary" type="button" onClick={() => setStep(step - 1)} style={{ flex: 1 }}>
-                  <ChevronLeft size={16} /> Voltar
-                </button>
+                </section>
               )}
-              {step < totalSteps ? (
-                <button
-                  className="button"
-                  type="button"
-                  onClick={() => {
-                    if (step === 2 && !settings?.allowChooseProfessional && professionals.length > 0 && !form.professionalId) {
-                      setForm({ ...form, professionalId: professionals[0].id });
-                    }
-                    setStep(step + 1);
-                  }}
-                  disabled={!canAdvance()}
-                  style={{ flex: step > 1 ? 1 : "auto", marginLeft: step === 1 ? "auto" : 0, minWidth: 160 }}
-                >
-                  Próximo <ChevronRight size={16} />
-                </button>
-              ) : (
-                <button className="button" type="submit" disabled={submitting} style={{ flex: 1, minHeight: 48, fontSize: 15 }}>
-                  {submitting ? "Agendando..." : "Confirmar Agendamento"}
-                </button>
+
+              <section className="pb-card">
+                <div className="pb-card__head">
+                  <h2>Quando você quer vir?</h2>
+                  <p>Escolha uma data nas próximas semanas.</p>
+                </div>
+
+                <div className="pb-dates" role="listbox" aria-label="Escolher data">
+                  {dateChips.map((c) => (
+                    <button
+                      type="button"
+                      key={c.value}
+                      className={`pb-date ${form.date === c.value ? "is-on" : ""}`}
+                      onClick={() => setForm({ ...form, date: c.value, time: "", startAt: "", endAt: "" })}
+                    >
+                      <div className="pb-date__dow">{c.dow}</div>
+                      <div className="pb-date__num">{c.num}</div>
+                      <div className="pb-date__mon">{c.mon}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {!form.professionalId && (
+                  <div className="pb-warn">Selecione um profissional para ver os horários.</div>
+                )}
+
+                {form.date && form.professionalId && (
+                  loadingSlots ? (
+                    <div className="pb-loading"><div className="pb-spin" /></div>
+                  ) : slots.length === 0 ? (
+                    <div className="pb-warn">Não há horários disponíveis nesse dia. Escolha outra data.</div>
+                  ) : (
+                    <SlotGrid groups={groupedSlots} selectedTime={form.time} onSelect={selectSlot} />
+                  )
+                )}
+              </section>
+
+              {form.startAt && selectedService && (
+                <section className="pb-summary">
+                  <div className="pb-summary__col">
+                    <div className="pb-summary__lbl">Seu agendamento</div>
+                    <div className="pb-summary__svc">{selectedService.name}</div>
+                    <div className="pb-summary__when">
+                      {selectedProfessional && <>com <strong>{selectedProfessional.name}</strong></>}
+                      {form.date && <><span className="pip" /> <strong>{formatDateLong(form.date)}</strong></>}
+                      {form.time && <><span className="pip" /> <strong>{form.time}</strong></>}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div className="pb-summary__price">{formatMoney(selectedService.basePrice)}</div>
+                    <div className="pb-summary__hint">pagamento no local</div>
+                  </div>
+                </section>
               )}
+            </>
+          )}
+
+          {/* ─── Step 3: Dados pessoais ─── */}
+          {step === 3 && (
+            <section className="pb-card">
+              <div className="pb-card__head">
+                <h2>Seus dados</h2>
+                <p>Para confirmar e te avisar sobre o atendimento.</p>
+              </div>
+              <div className="pb-grid-2">
+                <div className="pb-field">
+                  <label htmlFor="pb-name">Nome completo *</label>
+                  <input
+                    id="pb-name"
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Seu nome completo"
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="pb-field">
+                  <label htmlFor="pb-phone">Telefone/WhatsApp *</label>
+                  <input
+                    id="pb-phone"
+                    required
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    placeholder="(00) 00000-0000"
+                    autoComplete="tel"
+                    inputMode="tel"
+                  />
+                </div>
+                <div className="pb-field">
+                  <label htmlFor="pb-email">E-mail</label>
+                  <input
+                    id="pb-email"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="seu@email.com"
+                    autoComplete="email"
+                  />
+                </div>
+                <div className="pb-field">
+                  <label htmlFor="pb-cpf">CPF</label>
+                  <input
+                    id="pb-cpf"
+                    value={form.cpf}
+                    onChange={(e) => setForm({ ...form, cpf: e.target.value })}
+                    placeholder="000.000.000-00"
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="pb-field full">
+                  <label htmlFor="pb-notes">Observações</label>
+                  <textarea
+                    id="pb-notes"
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                    placeholder="Informações adicionais (opcional)"
+                  />
+                </div>
+                <label className="pb-consent" style={{ gridColumn: "1 / -1" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.lgpdAccepted}
+                    onChange={(e) => setForm({ ...form, lgpdAccepted: e.target.checked })}
+                  />
+                  <span>
+                    <strong><Shield size={13} style={{ verticalAlign: -2, marginRight: 4 }} />LGPD:</strong>{" "}
+                    Aceito a coleta e processamento dos meus dados pessoais conforme a política de privacidade
+                    e a Lei Geral de Proteção de Dados.
+                  </span>
+                </label>
+              </div>
+            </section>
+          )}
+
+          {/* ─── Step 4 (saúde) ─── */}
+          {step === 4 && company?.isHealthSegment && (
+            <section className="pb-card">
+              <div className="pb-card__head">
+                <h2>Informações de saúde</h2>
+                <p>Campos opcionais que ajudam o profissional a se preparar para o atendimento.</p>
+              </div>
+              <div className="pb-grid-2">
+                <div className="pb-field">
+                  <label htmlFor="pb-insurance">Convênio</label>
+                  <input
+                    id="pb-insurance"
+                    value={form.healthInsurance}
+                    onChange={(e) => setForm({ ...form, healthInsurance: e.target.value })}
+                    placeholder="Nome do convênio"
+                  />
+                </div>
+                <div className="pb-field">
+                  <label htmlFor="pb-insurance-n">Nº da carteirinha</label>
+                  <input
+                    id="pb-insurance-n"
+                    value={form.healthInsuranceNumber}
+                    onChange={(e) => setForm({ ...form, healthInsuranceNumber: e.target.value })}
+                    placeholder="Número"
+                  />
+                </div>
+                <div className="pb-field full">
+                  <label htmlFor="pb-allergies">Alergias</label>
+                  <textarea
+                    id="pb-allergies"
+                    value={form.allergies}
+                    onChange={(e) => setForm({ ...form, allergies: e.target.value })}
+                    placeholder="Alergias conhecidas (opcional)"
+                  />
+                </div>
+                <div className="pb-field full">
+                  <label htmlFor="pb-care">Cuidados necessários</label>
+                  <textarea
+                    id="pb-care"
+                    value={form.requiredCare}
+                    onChange={(e) => setForm({ ...form, requiredCare: e.target.value })}
+                    placeholder="Cuidados especiais (opcional)"
+                  />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ─── Step final: Confirmação ─── */}
+          {step === totalSteps && (
+            <section className="pb-card">
+              <div className="pb-card__head">
+                <h2>Confirmar agendamento</h2>
+                <p>Revise os dados antes de finalizar.</p>
+              </div>
+
+              <div className="pb-success__details" style={{ margin: 0, maxWidth: "none" }}>
+                <div><strong>Serviço:</strong> {selectedService?.name ?? "—"}</div>
+                {selectedProfessional && <div><strong>Profissional:</strong> {selectedProfessional.name}</div>}
+                <div><strong>Data:</strong> {form.date ? formatDateLong(form.date) : "—"}</div>
+                <div><strong>Horário:</strong> {form.time || "—"}</div>
+                <div><strong>Duração:</strong> {selectedService?.durationMinutes ?? "—"} min</div>
+                <div><strong>Valor:</strong> {formatMoney(selectedService?.basePrice)}</div>
+                <hr style={{ border: 0, borderTop: "1px solid var(--pb-border)", margin: "8px 0" }} />
+                <div><strong>Nome:</strong> {form.name}</div>
+                <div><strong>Telefone:</strong> {form.phone}</div>
+                {form.email && <div><strong>E-mail:</strong> {form.email}</div>}
+              </div>
+
+              {settings?.requireManualApproval && (
+                <div className="pb-warn" style={{ marginTop: 14 }}>
+                  <Clock size={14} />
+                  <span>Seu agendamento ficará pendente até ser aprovado pela empresa.</span>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ─── Navegação ─── */}
+          <div className="pb-nav">
+            {step > 1 ? (
+              <button type="button" className="pb-cta-secondary" onClick={() => setStep(step - 1)}>
+                <ChevronLeft size={16} /> Voltar
+              </button>
+            ) : <span />}
+
+            {step < totalSteps ? (
+              <button type="button" className="pb-cta" onClick={goNext} disabled={!canAdvance()}>
+                Continuar <ChevronRight size={16} />
+              </button>
+            ) : (
+              <button type="submit" className="pb-cta" disabled={submitting}>
+                {submitting ? "Agendando…" : "Confirmar agendamento"}
+                {!submitting && <Check size={16} />}
+              </button>
+            )}
+          </div>
+        </form>
+
+        {/* ─── Info bar (estática, sem dados sensíveis) ─── */}
+        <section className="pb-info" aria-label="Informações">
+          <div className="pb-info-card">
+            <div className="pb-info-card__ico"><MessageCircle size={16} /></div>
+            <div>
+              <div className="t">Confirmação rápida</div>
+              <div className="s">Você recebe um aviso assim que o agendamento for processado.</div>
             </div>
-          </form>
-        </div>
+          </div>
+          <div className="pb-info-card">
+            <div className="pb-info-card__ico"><Calendar size={16} /></div>
+            <div>
+              <div className="t">Reagendamento fácil</div>
+              <div className="s">Caso precise mudar, entre em contato com a empresa.</div>
+            </div>
+          </div>
+          <div className="pb-info-card">
+            <div className="pb-info-card__ico"><Shield size={16} /></div>
+            <div>
+              <div className="t">Seus dados protegidos</div>
+              <div className="s">Tratamos suas informações conforme a LGPD.</div>
+            </div>
+          </div>
+        </section>
+
+        <Footer companyDisplay={companyDisplay} />
       </div>
     </div>
+  );
+}
+
+/* ─── Subcomponentes locais ─── */
+
+function Header({ companyDisplay, initials }: { companyDisplay: string; initials: string }) {
+  return (
+    <header className="pb-head">
+      <div className="pb-brand">
+        <span className="pb-brand__logo">{initials}</span>
+        <div>
+          <div className="pb-brand__name">{companyDisplay}</div>
+          <div className="pb-brand__slogan">Agendamento online</div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function Footer({ companyDisplay }: { companyDisplay: string }) {
+  return (
+    <footer className="pb-footer">
+      {companyDisplay}
+      <br />
+      <span className="pb-powered">
+        <span className="m">M</span>
+        Powered by <strong>MarcaiFlex</strong>
+      </span>
+    </footer>
+  );
+}
+
+function Stepper({ labels, current }: { labels: string[]; current: number }) {
+  return (
+    <nav className="pb-stepper" aria-label="Etapas do agendamento">
+      <div className="pb-stepper__list">
+        {labels.map((label, i) => {
+          const num = i + 1;
+          const done = num < current;
+          const on = num === current;
+          return (
+            <span key={label} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+              {i > 0 && <span className="pb-step__sep">›</span>}
+              <span className={`pb-step ${done ? "is-done" : ""} ${on ? "is-on" : ""}`}>
+                <span className="pb-step__num">{done ? <Check size={11} /> : num}</span>
+                {label}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function SlotGrid({
+  groups,
+  selectedTime,
+  onSelect
+}: {
+  groups: { morning: Slot[]; afternoon: Slot[]; evening: Slot[] };
+  selectedTime: string;
+  onSelect: (slot: Slot) => void;
+}) {
+  const sections: { label: string; icon: React.ReactNode; slots: Slot[] }[] = [
+    { label: "Manhã", icon: <Sun size={13} />, slots: groups.morning },
+    { label: "Tarde", icon: <Sunset size={13} />, slots: groups.afternoon },
+    { label: "Noite", icon: <Moon size={13} />, slots: groups.evening }
+  ];
+
+  return (
+    <>
+      {sections.map((sec) =>
+        sec.slots.length === 0 ? null : (
+          <div className="pb-slot-group" key={sec.label}>
+            <div className="pb-slot-group__lbl">{sec.icon}{sec.label}</div>
+            <div className="pb-slots">
+              {sec.slots.map((slot) => (
+                <button
+                  type="button"
+                  key={slot.time}
+                  className={`pb-slot ${selectedTime === slot.time ? "is-on" : ""} ${!slot.available ? "is-off" : ""}`}
+                  onClick={() => onSelect(slot)}
+                  disabled={!slot.available}
+                  aria-label={`Horário ${slot.time}${slot.available ? "" : " indisponível"}`}
+                >
+                  {slot.time}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      )}
+    </>
   );
 }

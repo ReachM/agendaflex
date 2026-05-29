@@ -518,7 +518,7 @@ export function CustomerManager() {
             <Input label="CPF" value={f.cpf} onChange={(cpf) => setter({ ...f, cpf })} />
             <Input label="RG" value={f.rg} onChange={(rg) => setter({ ...f, rg })} />
             <Input label="Data de nascimento" type="date" value={f.birthDate} onChange={(birthDate) => setter({ ...f, birthDate })} />
-            {f.birthDate && <div className="field"><label>Idade</label><input readOnly value={calculateAge(f.birthDate)} tabIndex={-1} style={{ background: "var(--surface-alt)" }} /></div>}
+            {f.birthDate && <div className="field"><label>Idade</label><input readOnly value={calculateAge(f.birthDate)} tabIndex={-1} style={{ background: "var(--surface-muted)" }} /></div>}
             <div className="field">
               <label>Sexo</label>
               <select value={f.gender} onChange={(e) => setter({ ...f, gender: e.target.value })}>
@@ -1812,7 +1812,7 @@ export function BookingSettingsManager() {
           <p style={{ color: "var(--muted)", marginBottom: 24, maxWidth: 440, margin: "0 auto 24px" }}>
             Crie um link público para seus clientes agendarem online. Disponível nos planos Pro e Max.
           </p>
-          <div style={{ padding: "12px 20px", background: "var(--surface-alt)", borderRadius: "var(--radius)", display: "inline-block", fontSize: 14, color: "var(--warning)" }}>
+          <div style={{ padding: "12px 20px", background: "var(--surface-muted)", borderRadius: "var(--radius)", display: "inline-block", fontSize: 14, color: "var(--warning)" }}>
             ⚡ Faça upgrade para o plano Pro ou Max para liberar essa funcionalidade.
           </div>
         </section>
@@ -1847,7 +1847,7 @@ export function BookingSettingsManager() {
         </div>
 
         {settings?.enabled && (
-          <div style={{ background: "var(--surface-alt)", padding: "14px 16px", borderRadius: "var(--radius)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ background: "var(--surface-muted)", padding: "14px 16px", borderRadius: "var(--radius)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <input
               type="text"
               readOnly
@@ -1985,7 +1985,7 @@ export function BookingSettingsManager() {
           ) : (
             <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
               {services.map((svc) => (
-                <label key={svc.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", background: svc.isPublic ? "var(--surface-alt)" : "var(--surface)" }}>
+                <label key={svc.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", background: svc.isPublic ? "var(--surface-muted)" : "var(--surface)" }}>
                   <input
                     type="checkbox"
                     checked={svc.isPublic}
@@ -2011,7 +2011,7 @@ export function BookingSettingsManager() {
           ) : (
             <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
               {professionals.map((prof) => (
-                <label key={prof.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", background: prof.isPublic ? "var(--surface-alt)" : "var(--surface)" }}>
+                <label key={prof.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", cursor: "pointer", background: prof.isPublic ? "var(--surface-muted)" : "var(--surface)" }}>
                   <input
                     type="checkbox"
                     checked={prof.isPublic}
