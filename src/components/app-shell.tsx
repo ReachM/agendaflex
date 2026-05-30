@@ -9,6 +9,7 @@ import {
   CalendarDays,
   CheckSquare,
   ClipboardList,
+  Clock,
   CreditCard,
   DollarSign,
   FileClock,
@@ -20,6 +21,7 @@ import {
   Menu,
   Settings,
   SlidersHorizontal,
+  ToggleLeft,
   UserCog,
   Users,
   X
@@ -44,7 +46,8 @@ type Session = {
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard, CalendarDays, Users, ClipboardList, Briefcase,
   SlidersHorizontal, UserCog, DollarSign, FileText, CheckSquare,
-  Activity, FileClock, Settings, Building2, CreditCard, Link2, Bot
+  Activity, FileClock, Settings, Building2, CreditCard, Link2, Bot,
+  Clock, ToggleLeft
 };
 
 const roleLabels: Record<string, string> = {
@@ -84,10 +87,17 @@ function groupMenuItems<T extends MenuItemBase>(items: T[] | undefined) {
     "/usuarios": "Configuração",
     "/logs": "Configuração",
     // Master
-    "/master": "Master",
-    "/master/empresas": "Master",
-    "/master/planos": "Master",
-    "/master/campos": "Master",
+    "/master": "Visão geral",
+    "/master/empresas": "Tenants",
+    "/master/usuarios": "Tenants",
+    "/master/assinaturas": "Receita",
+    "/master/planos": "Receita",
+    "/master/saude": "Operação",
+    "/master/instancias": "Operação",
+    "/master/filas": "Operação",
+    "/master/notas-fiscais": "Operação",
+    "/master/feature-flags": "Plataforma",
+    "/master/campos": "Plataforma"
   };
 
   const groups: { section: string; items: T[] }[] = [];

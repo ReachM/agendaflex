@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Ban,
   Building2,
   DollarSign,
   Download,
@@ -10,7 +11,8 @@ import {
   Sparkles,
   TrendingDown,
   Trash2,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
@@ -406,11 +408,289 @@ function KpiCard({
   );
 }
 
+type MasterCompanyRow = {
+  id: string;
+  name: string;
+  tradeName: string | null;
+  email: string;
+  phone: string | null;
+  slug: string | null;
+  document: string | null;
+  segment: string;
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+  plan: string;
+  createdAt: string;
+  counts: { users: number; customers: number; appointments: number; professionals: number; services: number };
+  subscription: {
+    status: "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELLED" | "EXPIRED";
+    trialEndsAt: string | null;
+    currentPeriodEnd: string | null;
+    canceledAt: string | null;
+    planName: string | null;
+    planSlug: string | null;
+    price: number;
+  } | null;
+  mrr: number;
+  health: "good" | "mid" | "low";
+};
+
+type StatusFilter = "all" | "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELLED";
+
 export function CompanyManager() {
-  const [companies, setCompanies] = useState<AnyRecord[]>([]);
+  const [companies, setCompanies] = useState<MasterCompanyRow[]>([]);
   const [plans, setPlans] = useState<AnyRecord[]>([]);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loadingList, setLoadingList] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [planFilter, setPlanFilter] = useState<string>("all");
+  const [createOpen, setCreateOpen] = useState(false);
+
+  async function load() {
+    setError("");
+    setLoadingList(true);
+    try {
+      const [companyData, planData] = await Promise.all([
+        apiFetch<{ companies: MasterCompanyRow[] }>("/api/companies"),
+        apiFetch<{ plans: AnyRecord[] }>("/api/plans").catch(() => ({ plans: [] }))
+      ]);
+      setCompanies(companyData.companies);
+      setPlans(planData.plans.filter((p: AnyRecord) => p.isActive));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoadingList(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function updateStatus(company: MasterCompanyRow, status: string) {
+    try {
+      await apiFetch(`/api/companies/${company.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status })
+      });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function updatePlan(company: MasterCompanyRow, plan: string) {
+    try {
+      await apiFetch(`/api/companies/${company.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ plan })
+      });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  const filtered = useMemo(() => {
+    let rows = companies;
+    if (statusFilter !== "all") {
+      rows = rows.filter(c => {
+        if (statusFilter === "ACTIVE") return c.status === "ACTIVE" && c.subscription?.status === "ACTIVE";
+        if (statusFilter === "TRIALING") return c.subscription?.status === "TRIALING";
+        if (statusFilter === "PAST_DUE") return c.subscription?.status === "PAST_DUE";
+        if (statusFilter === "CANCELLED") return c.status !== "ACTIVE" || c.subscription?.status === "CANCELLED";
+        return true;
+      });
+    }
+    if (planFilter !== "all") {
+      rows = rows.filter(c => (c.subscription?.planSlug ?? c.plan) === planFilter);
+    }
+    const term = search.trim().toLowerCase();
+    if (term) {
+      rows = rows.filter(c =>
+        c.name.toLowerCase().includes(term) ||
+        (c.slug ?? "").toLowerCase().includes(term) ||
+        c.email.toLowerCase().includes(term) ||
+        (c.document ?? "").toLowerCase().includes(term)
+      );
+    }
+    return rows;
+  }, [companies, statusFilter, planFilter, search]);
+
+  const totalMrr = useMemo(() => companies.reduce((acc, c) => acc + c.mrr, 0), [companies]);
+
+  return (
+    <>
+      <PageHeader
+        title="Empresas"
+        subtitle={`${companies.length} tenants · MRR total ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalMrr)}`}
+        actions={
+          <>
+            <span className="env-pill"><span className="dot" /> PRODUCTION</span>
+            <button type="button" className="btn btn-ghost" onClick={() => load()} disabled={loadingList}>
+              <RefreshCcw size={15} /> Atualizar
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
+              <Plus size={15} /> Nova empresa
+            </button>
+          </>
+        }
+      />
+
+      {error ? <div className="error-box">{error}</div> : null}
+
+      <section className="panel">
+        <div className="panel__head" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className={`chip-tab ${statusFilter === "all" ? "is-on" : ""}`} onClick={() => setStatusFilter("all")}>Todas</button>
+            <button type="button" className={`chip-tab ${statusFilter === "ACTIVE" ? "is-on" : ""}`} onClick={() => setStatusFilter("ACTIVE")}>Ativas</button>
+            <button type="button" className={`chip-tab ${statusFilter === "TRIALING" ? "is-on" : ""}`} onClick={() => setStatusFilter("TRIALING")}>Trial</button>
+            <button type="button" className={`chip-tab ${statusFilter === "PAST_DUE" ? "is-on" : ""}`} onClick={() => setStatusFilter("PAST_DUE")}>Inadimplentes</button>
+            <button type="button" className={`chip-tab ${statusFilter === "CANCELLED" ? "is-on" : ""}`} onClick={() => setStatusFilter("CANCELLED")}>Canceladas/Suspensas</button>
+            <select className="chip-tab" value={planFilter} onChange={e => setPlanFilter(e.target.value)} style={{ marginLeft: "auto" }}>
+              <option value="all">Todos os planos</option>
+              {plans.map(p => <option key={p.id} value={p.slug}>{p.name}</option>)}
+            </select>
+          </div>
+          <div className="inline-search">
+            <Search size={14} />
+            <input
+              type="search"
+              placeholder="Buscar por nome, slug, e-mail ou documento..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="panel__body panel__body--flush">
+          {filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state__icon"><Building2 size={24} /></div>
+              <h3>Nenhuma empresa no filtro</h3>
+              <p>Ajuste a busca, troque o filtro de status ou crie uma nova empresa.</p>
+            </div>
+          ) : (
+            <div className="table-wrap" style={{ borderRadius: 0, border: 0, boxShadow: "none" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Empresa</th>
+                    <th>Plano</th>
+                    <th className="col-hide-mobile">Usuários</th>
+                    <th>MRR</th>
+                    <th className="col-hide-mobile">Saúde</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((c, idx) => {
+                    const avtClass = `av-${(idx % 8) + 1}`;
+                    const initials = c.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+                    const subStatus = c.subscription?.status ?? null;
+                    let statusCls = "status-dot--churned";
+                    let statusLabel = "Sem assinatura";
+                    if (c.status === "SUSPENDED") {
+                      statusCls = "status-dot--churned"; statusLabel = "Suspensa";
+                    } else if (subStatus === "ACTIVE") {
+                      statusCls = "status-dot--active"; statusLabel = "Ativa";
+                    } else if (subStatus === "TRIALING") {
+                      statusCls = "status-dot--trial"; statusLabel = "Trial";
+                    } else if (subStatus === "PAST_DUE") {
+                      statusCls = "status-dot--overdue"; statusLabel = "Inadimplente";
+                    } else if (subStatus === "CANCELLED" || subStatus === "EXPIRED") {
+                      statusCls = "status-dot--churned"; statusLabel = "Cancelada";
+                    }
+                    const planSlug = c.subscription?.planSlug ?? c.plan;
+                    const planTagCls = planSlug === "max" ? "plan-tag--max" : planSlug === "pro" ? "plan-tag--pro" : planSlug === "starter" ? "plan-tag--starter" : "plan-tag--free";
+                    return (
+                      <tr key={c.id}>
+                        <td>
+                          <div className="biz">
+                            <span className={`biz__avt ${avtClass}`}>{initials}</span>
+                            <div>
+                              <div className="biz__nm">{c.name}</div>
+                              <div className="biz__sub">{c.slug ? `${c.slug} · ` : ""}{c.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <select
+                            className="badge-select"
+                            value={c.plan}
+                            onChange={e => updatePlan(c, e.target.value)}
+                            title={`Mudar plano de ${c.name}`}
+                          >
+                            {plans.length > 0 ? (
+                              plans.map(p => <option key={p.id} value={p.slug}>{p.name}</option>)
+                            ) : (
+                              <>
+                                <option value="starter">Starter</option>
+                                <option value="pro">Pro</option>
+                                <option value="max">Max</option>
+                              </>
+                            )}
+                          </select>
+                          <span className={`plan-tag ${planTagCls}`} style={{ marginLeft: 8 }}>{c.subscription?.planName ?? c.plan}</span>
+                        </td>
+                        <td className="col-hide-mobile">
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <Users size={13} /> {c.counts.users}
+                          </span>
+                        </td>
+                        <td style={{ fontWeight: 700 }}>
+                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(c.mrr)}
+                        </td>
+                        <td className="col-hide-mobile">
+                          <span className={`health health--${c.health}`}>
+                            <span className="health__bar"><div style={{ width: c.health === "good" ? "80%" : c.health === "mid" ? "55%" : "28%" }} /></span>
+                            <span className="health__v">{c.health === "good" ? "OK" : c.health === "mid" ? "MED" : "BAIXA"}</span>
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-dot ${statusCls}`}>
+                            <span className="d" /> {statusLabel}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          {c.status === "ACTIVE" ? (
+                            <button type="button" className="btn btn-sm btn-danger-ghost" onClick={() => updateStatus(c, "SUSPENDED")}>
+                              <Ban size={12} /> Suspender
+                            </button>
+                          ) : (
+                            <button type="button" className="btn btn-sm btn-ghost" onClick={() => updateStatus(c, "ACTIVE")}>
+                              Reativar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {createOpen ? (
+        <NewCompanyModal
+          plans={plans}
+          onClose={() => setCreateOpen(false)}
+          onSaved={() => { setCreateOpen(false); load(); }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function NewCompanyModal({
+  plans,
+  onClose,
+  onSaved
+}: {
+  plans: AnyRecord[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [form, setForm] = useState({
     name: "",
     tradeName: "",
@@ -424,192 +704,75 @@ export function CompanyManager() {
     adminEmail: "",
     adminPassword: "Admin@123456"
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  async function load() {
-    setError("");
-    const [companyData, planData] = await Promise.all([
-      apiFetch<{ companies: AnyRecord[] }>("/api/companies"),
-      apiFetch<{ plans: AnyRecord[] }>("/api/plans").catch(() => ({ plans: [] }))
-    ]);
-    setCompanies(companyData.companies);
-    setPlans(planData.plans.filter((p: AnyRecord) => p.isActive));
-  }
-
-  useEffect(() => {
-    load().catch((err) => setError(err.message));
-  }, []);
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoading(true);
+    setSaving(true);
     setError("");
     try {
-      await apiFetch("/api/companies", {
-        method: "POST",
-        body: JSON.stringify(form)
-      });
-      setForm({
-        name: "",
-        tradeName: "",
-        email: "",
-        phone: "",
-        document: "",
-        segment: "PERSONALIZADO",
-        status: "ACTIVE",
-        plan: "starter",
-        adminName: "",
-        adminEmail: "",
-        adminPassword: "Admin@123456"
-      });
-      await load();
+      await apiFetch("/api/companies", { method: "POST", body: JSON.stringify(form) });
+      onSaved();
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
-  async function updateStatus(company: AnyRecord, status: string) {
-    await apiFetch(`/api/companies/${company.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ status })
-    });
-    await load();
-  }
-
-  async function updatePlan(company: AnyRecord, plan: string) {
-    await apiFetch(`/api/companies/${company.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ plan })
-    });
-    await load();
-  }
-
   return (
-    <>
-      <PageHeader
-        title="Empresas"
-        subtitle="Cadastro e status dos tenants"
-        actions={
-          <button className="button secondary" onClick={() => load()} type="button">
-            <RefreshCcw size={16} />
-            Atualizar
-          </button>
-        }
-      />
-      {error ? <div className="error-box">{error}</div> : null}
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 720 }}>
+        <div className="preview-modal__header">
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Nova empresa</h2>
+          <button type="button" className="icon-button secondary" onClick={onClose} aria-label="Fechar"><X size={16} /></button>
+        </div>
 
-      <section className="form-panel grid">
-        <h2 className="section-title">Nova empresa</h2>
-        <form className="form-grid" onSubmit={onSubmit}>
-          <Input label="Nome da empresa" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
-          <Input label="Nome fantasia" value={form.tradeName} onChange={(tradeName) => setForm({ ...form, tradeName })} />
-          <Input label="E-mail" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
-          <Input label="Telefone" value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
-          <Input label="CNPJ/CPF" value={form.document} onChange={(document) => setForm({ ...form, document })} />
-          <div className="field">
-            <label>Segmento</label>
-            <select value={form.segment} onChange={(event) => setForm({ ...form, segment: event.target.value })}>
-              {segments.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Plano</label>
-            <select value={form.plan} onChange={(event) => setForm({ ...form, plan: event.target.value })}>
-              {plans.length > 0 ? (
-                plans.map((plan) => (
-                  <option key={plan.id} value={plan.slug}>
-                    {plan.name} — {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(plan.price ?? 0))}/mês
+        {error ? <div className="error-box" style={{ marginTop: 16 }}>{error}</div> : null}
+
+        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 16, marginTop: 16 }}>
+          <div className="form-grid">
+            <Input label="Razão social *" value={form.name} onChange={(name) => setForm({ ...form, name })} required />
+            <Input label="Nome fantasia" value={form.tradeName} onChange={(tradeName) => setForm({ ...form, tradeName })} />
+            <Input label="E-mail *" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} required />
+            <Input label="Telefone" value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
+            <Input label="CNPJ / CPF" value={form.document} onChange={(document) => setForm({ ...form, document })} />
+            <div className="field">
+              <label>Segmento</label>
+              <select value={form.segment} onChange={e => setForm({ ...form, segment: e.target.value })}>
+                {segments.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Plano inicial</label>
+              <select value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value })}>
+                {plans.length > 0 ? plans.map(p => (
+                  <option key={p.id} value={p.slug}>
+                    {p.name} — {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(p.price ?? 0))}/mês
                   </option>
-                ))
-              ) : (
-                <>
-                  <option value="starter">Starter</option>
-                  <option value="pro">Profissional</option>
-                  <option value="max">Max</option>
-                </>
-              )}
-            </select>
+                )) : (
+                  <>
+                    <option value="starter">Starter</option>
+                    <option value="pro">Pro</option>
+                    <option value="max">Max</option>
+                  </>
+                )}
+              </select>
+            </div>
+            <Input label="Admin nome" value={form.adminName} onChange={(adminName) => setForm({ ...form, adminName })} />
+            <Input label="Admin e-mail" type="email" value={form.adminEmail} onChange={(adminEmail) => setForm({ ...form, adminEmail })} />
+            <Input label="Admin senha" value={form.adminPassword} onChange={(adminPassword) => setForm({ ...form, adminPassword })} />
           </div>
-          <Input label="Admin nome" value={form.adminName} onChange={(adminName) => setForm({ ...form, adminName })} />
-          <Input label="Admin e-mail" type="email" value={form.adminEmail} onChange={(adminEmail) => setForm({ ...form, adminEmail })} />
-          <Input label="Admin senha" value={form.adminPassword} onChange={(adminPassword) => setForm({ ...form, adminPassword })} />
-          <div className="field full">
-            <button className="button" disabled={loading} type="submit">
-              <Plus size={16} />
-              Criar empresa
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              <Plus size={14} /> {saving ? "Criando..." : "Criar empresa"}
             </button>
           </div>
         </form>
-      </section>
-
-      <section className="table-wrap" style={{ marginTop: 16 }}>
-        <table>
-          <thead>
-            <tr>
-              <th>Empresa</th>
-              <th>Segmento</th>
-              <th>Plano</th>
-              <th>Status</th>
-              <th>Uso</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {companies.map((company) => (
-              <tr key={company.id}>
-                <td>
-                  <strong>{company.name}</strong>
-                  <br />
-                  <span className="muted">{company.email}</span>
-                </td>
-                <td>{company.segment}</td>
-                <td>
-                  <select
-                    className="badge-select"
-                    value={company.plan ?? "starter"}
-                    onChange={(e) => updatePlan(company, e.target.value)}
-                  >
-                    {plans.length > 0 ? (
-                      plans.map((plan) => (
-                        <option key={plan.id} value={plan.slug}>{plan.name}</option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="starter">Starter</option>
-                        <option value="pro">Profissional</option>
-                        <option value="max">Max</option>
-                      </>
-                    )}
-                  </select>
-                </td>
-                <td>
-                  <span className={`badge ${company.status === "ACTIVE" ? "status-active" : company.status === "SUSPENDED" ? "status-suspended" : "status-inactive"}`}>{company.status === "ACTIVE" ? "Ativa" : company.status === "SUSPENDED" ? "Suspensa" : "Inativa"}</span>
-                </td>
-                <td>
-                  {company._count?.users ?? 0} usuários, {company._count?.customers ?? 0} clientes,{" "}
-                  {company._count?.appointments ?? 0} agendamentos
-                </td>
-                <td>
-                  <div className="toolbar">
-                    <button className="button secondary" onClick={() => updateStatus(company, "ACTIVE")} type="button">
-                      Ativar
-                    </button>
-                    <button className="button danger" onClick={() => updateStatus(company, "SUSPENDED")} type="button">
-                      Suspender
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-    </>
+      </div>
+    </div>
   );
 }
 

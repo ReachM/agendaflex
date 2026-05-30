@@ -17,10 +17,58 @@ export async function GET(request: NextRequest) {
           select: {
             users: true,
             customers: true,
-            appointments: true
+            appointments: true,
+            professionals: true,
+            services: true
+          }
+        },
+        subscriptions: {
+          where: { status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            status: true,
+            trialEndsAt: true,
+            currentPeriodEnd: true,
+            canceledAt: true,
+            plan: { select: { id: true, name: true, slug: true, price: true } }
           }
         }
       }
+    });
+
+    const enriched = companies.map(c => {
+      const sub = c.subscriptions[0] ?? null;
+      const appts = c._count.appointments;
+      const health: "good" | "mid" | "low" =
+        sub?.status === "PAST_DUE" ? "low" :
+        appts > 50 ? "good" :
+        appts > 5 ? "mid" : "low";
+      return {
+        id: c.id,
+        name: c.name,
+        tradeName: c.tradeName,
+        email: c.email,
+        phone: c.phone,
+        slug: c.slug,
+        document: c.document,
+        segment: c.segment,
+        status: c.status,
+        plan: c.plan,
+        createdAt: c.createdAt,
+        counts: c._count,
+        subscription: sub ? {
+          status: sub.status,
+          trialEndsAt: sub.trialEndsAt,
+          currentPeriodEnd: sub.currentPeriodEnd,
+          canceledAt: sub.canceledAt,
+          planName: sub.plan?.name ?? null,
+          planSlug: sub.plan?.slug ?? null,
+          price: Number(sub.plan?.price ?? 0)
+        } : null,
+        mrr: Number(sub?.plan?.price ?? 0),
+        health
+      };
     });
 
     await audit(request, context, {
@@ -28,7 +76,7 @@ export async function GET(request: NextRequest) {
       entityType: "company"
     });
 
-    return ok({ companies });
+    return ok({ companies: enriched });
   } catch (error) {
     return handleApiError(error);
   }

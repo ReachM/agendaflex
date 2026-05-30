@@ -114,11 +114,18 @@ export const TENANT_MENU_ITEMS: MenuItem[] = [
 ];
 
 export const MASTER_MENU_ITEMS: MenuItem[] = [
-  { href: "/master", label: "Dashboard Master", icon: "LayoutDashboard" },
+  { href: "/master", label: "Visão geral", icon: "LayoutDashboard" },
   { href: "/master/empresas", label: "Empresas", icon: "Building2" },
-  { href: "/master/planos", label: "Planos", icon: "CreditCard" },
-  { href: "/master/campos", label: "Campos", icon: "SlidersHorizontal" },
-  { href: "/logs", label: "Logs Globais", icon: "FileClock" }
+  { href: "/master/usuarios", label: "Usuários", icon: "Users" },
+  { href: "/master/assinaturas", label: "Assinaturas & MRR", icon: "CreditCard" },
+  { href: "/master/saude", label: "Saúde do sistema", icon: "Activity" },
+  { href: "/master/instancias", label: "Instâncias WhatsApp", icon: "Bot" },
+  { href: "/master/notas-fiscais", label: "Notas fiscais", icon: "FileText" },
+  { href: "/master/filas", label: "Filas & jobs", icon: "Clock" },
+  { href: "/master/planos", label: "Planos & preços", icon: "DollarSign" },
+  { href: "/master/feature-flags", label: "Feature flags", icon: "ToggleLeft" },
+  { href: "/master/campos", label: "Campos personalizados", icon: "SlidersHorizontal" },
+  { href: "/logs", label: "Logs & auditoria", icon: "FileClock" }
 ];
 
 export function hasPermission(roleName: RoleName, permission: PermissionKey) {
