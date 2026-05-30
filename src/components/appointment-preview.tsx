@@ -3,18 +3,24 @@
 import {
   Ban,
   CalendarPlus,
+  Camera,
   Check,
   CheckCircle,
+  CheckSquare,
   ChevronRight,
   Clock,
   Edit2,
+  ListChecks,
+  Plus,
   Printer,
   Play,
   RefreshCcw,
+  StickyNote,
   User,
   X
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/client-api";
 
 type AnyRecord = Record<string, any>;
 
@@ -56,7 +62,7 @@ export function AppointmentPreviewModal({
   onStatusChange,
   onRefresh,
   role,
-  planFeatures: _planFeatures
+  planFeatures
 }: {
   appointment: AnyRecord;
   onClose: () => void;
@@ -75,6 +81,8 @@ export function AppointmentPreviewModal({
   const canManage = !role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"].includes(role);
   const canChangeStatus = !role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER", "STAFF"].includes(role);
   const isTerminal = status === "CANCELLED" || status === "COMPLETED" || status === "NO_SHOW";
+  const checklistAllowed = planFeatures?.allowCustomerChecklist === true;
+  const hasChecklist = (appointment.checklists ?? []).length > 0;
 
   async function handleStatus(newStatus: string, reason?: string) {
     setLoading(true);
@@ -210,22 +218,13 @@ export function AppointmentPreviewModal({
           </div>
         )}
 
-        {/* TODO [MVP-FUTURE] Reativar checklist summary na v2 */}
-        {/* {checklistAllowed && (appointment.checklists ?? []).length > 0 && (
-          <div className="preview-checklist-summary" style={{ marginTop: 12 }}>
-            <strong className="preview-section-label">Checklist</strong>
-            {(appointment.checklists as AnyRecord[]).map((cl: AnyRecord) => (
-              <div key={cl.id} className="preview-checklist-badge">
-                <CheckCircle size={14} />
-                <span>{cl.title ?? "Checklist"}</span>
-                <span className="muted">({cl._count?.items ?? cl.items?.length ?? 0} itens)</span>
-                <span className={`badge ${cl.status === "completed" ? "success" : "warning"}`}>
-                  {cl.status === "completed" ? "Completo" : "Em andamento"}
-                </span>
-              </div>
-            ))}
-          </div>
-        )} */}
+        {checklistAllowed && canManage ? (
+          <AppointmentChecklistSection
+            appointmentId={appointment.id}
+            checklists={appointment.checklists ?? []}
+            onChanged={onRefresh}
+          />
+        ) : null}
 
         {/* Action Buttons */}
         <div className="preview-actions" style={{ marginTop: 20 }}>
@@ -255,12 +254,11 @@ export function AppointmentPreviewModal({
             </div>
           )}
 
-          {/* TODO [MVP-FUTURE] Reativar botão de imprimir checklist na v2 */}
-          {/* {checklistAllowed && (isInProgress || isCompleted) && (appointment.checklists ?? []).length > 0 && (
+          {checklistAllowed && hasChecklist ? (
             <button className="button secondary" onClick={() => setShowChecklist(true)} type="button">
               <Printer size={16} /> Imprimir checklist
             </button>
-          )} */}
+          ) : null}
 
           <button className="button secondary" onClick={onClose} type="button">
             <Edit2 size={16} /> Fechar
@@ -509,5 +507,320 @@ export function TodayAppointments({
         />
       )}
     </>
+  );
+}
+
+// ─── Appointment Checklist Section ─────────────────────────
+type ChecklistTemplateLite = { id: string; name: string; status: "DRAFT" | "ACTIVE" | "PAUSED" };
+
+type ChecklistItem = {
+  id: string;
+  description: string;
+  itemType: "CHECKBOX" | "NOTE" | "PHOTO";
+  isChecked: boolean;
+  noteValue: string | null;
+  photoUrl: string | null;
+  sortOrder: number;
+};
+
+type Checklist = {
+  id: string;
+  title: string;
+  status: string;
+  notes: string | null;
+  completedAt: string | null;
+  items: ChecklistItem[];
+  template?: { id: string; name: string } | null;
+};
+
+function AppointmentChecklistSection({
+  appointmentId,
+  checklists,
+  onChanged
+}: {
+  appointmentId: string;
+  checklists: AnyRecord[];
+  onChanged: () => void;
+}) {
+  const [local, setLocal] = useState<Checklist[]>(checklists as unknown as Checklist[]);
+  const [templates, setTemplates] = useState<ChecklistTemplateLite[]>([]);
+  const [showStart, setShowStart] = useState(false);
+  const [busyAction, setBusyAction] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setLocal(checklists as unknown as Checklist[]);
+  }, [checklists]);
+
+  async function loadTemplates() {
+    try {
+      const data = await apiFetch<{ templates: ChecklistTemplateLite[] }>("/api/checklists/templates?status=ACTIVE");
+      setTemplates(data.templates ?? []);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function startFromTemplate(templateId: string) {
+    setBusyAction(true);
+    setError("");
+    try {
+      const result = await apiFetch<{ checklist: Checklist }>("/api/checklists", {
+        method: "POST",
+        body: JSON.stringify({ appointmentId, templateId })
+      });
+      setLocal(prev => [...prev, result.checklist]);
+      setShowStart(false);
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
+  async function startBlank() {
+    setBusyAction(true);
+    setError("");
+    try {
+      const result = await apiFetch<{ checklist: Checklist }>("/api/checklists", {
+        method: "POST",
+        body: JSON.stringify({
+          appointmentId,
+          title: "Checklist do atendimento",
+          items: [{ description: "Novo item", itemType: "CHECKBOX" }]
+        })
+      });
+      setLocal(prev => [...prev, result.checklist]);
+      setShowStart(false);
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
+  async function updateItem(checklistId: string, itemId: string, patch: Partial<ChecklistItem>) {
+    setLocal(prev => prev.map(c =>
+      c.id === checklistId
+        ? { ...c, items: c.items.map(i => i.id === itemId ? { ...i, ...patch } : i) }
+        : c
+    ));
+    try {
+      await apiFetch(`/api/checklists/${checklistId}/items/${itemId}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch)
+      });
+    } catch (err) {
+      setError((err as Error).message);
+      onChanged();
+    }
+  }
+
+  async function completeChecklist(checklistId: string) {
+    setBusyAction(true);
+    setError("");
+    try {
+      await apiFetch(`/api/checklists/${checklistId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "completed" })
+      });
+      setLocal(prev => prev.map(c => c.id === checklistId ? { ...c, status: "completed", completedAt: new Date().toISOString() } : c));
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <strong className="preview-section-label">
+          <ListChecks size={13} style={{ display: "inline", marginRight: 4, verticalAlign: "-2px" }} />
+          Checklist do atendimento
+        </strong>
+        <button
+          className="btn btn-sm btn-ghost"
+          type="button"
+          onClick={() => { setShowStart(s => !s); if (!showStart) void loadTemplates(); }}
+        >
+          <Plus size={12} /> {local.length === 0 ? "Iniciar checklist" : "Novo checklist"}
+        </button>
+      </div>
+
+      {error ? <div className="error-box" style={{ marginBottom: 8 }}>{error}</div> : null}
+
+      {showStart ? (
+        <div style={{ padding: 12, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface-muted)", marginBottom: 8 }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Selecione um template ativo ou comece em branco:</div>
+          {templates.length === 0 ? (
+            <div className="empty" style={{ padding: 8, fontSize: 12 }}>
+              Nenhum template ativo. <a href="/checklists" style={{ color: "var(--primary)", fontWeight: 600 }}>Criar templates</a>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+              {templates.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  style={{ justifyContent: "flex-start", textAlign: "left" }}
+                  onClick={() => startFromTemplate(t.id)}
+                  disabled={busyAction}
+                >
+                  <CheckSquare size={12} /> {t.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6 }}>
+            <button type="button" className="btn btn-sm btn-primary" onClick={startBlank} disabled={busyAction}>
+              <Plus size={12} /> Em branco
+            </button>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setShowStart(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {local.length === 0 && !showStart ? (
+        <div className="empty" style={{ padding: 12, fontSize: 12 }}>
+          Nenhum checklist iniciado. Use os templates de Checklists para padronizar atendimentos.
+        </div>
+      ) : null}
+
+      {local.map(cl => (
+        <ChecklistCard
+          key={cl.id}
+          checklist={cl}
+          onItemChange={(itemId, patch) => updateItem(cl.id, itemId, patch)}
+          onComplete={() => completeChecklist(cl.id)}
+          busy={busyAction}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ChecklistCard({
+  checklist,
+  onItemChange,
+  onComplete,
+  busy
+}: {
+  checklist: Checklist;
+  onItemChange: (itemId: string, patch: Partial<ChecklistItem>) => void;
+  onComplete: () => void;
+  busy: boolean;
+}) {
+  const checkedCount = checklist.items.filter(i => i.isChecked).length;
+  const total = checklist.items.length;
+  const pct = total > 0 ? Math.round((checkedCount / total) * 100) : 0;
+  const isCompleted = checklist.status === "completed";
+
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 14px", borderBottom: total > 0 ? "1px solid var(--border)" : 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <strong style={{ fontSize: 13 }}>{checklist.title}</strong>
+          {checklist.template ? (
+            <div style={{ fontSize: 11, color: "var(--muted)" }}>Baseado em: {checklist.template.name}</div>
+          ) : null}
+        </div>
+        <span className={`pill ${isCompleted ? "pill--success" : pct > 0 ? "pill--info" : "pill--muted"}`}>
+          {isCompleted ? <CheckCircle size={11} /> : null}
+          {checkedCount}/{total}
+        </span>
+      </div>
+
+      {total > 0 ? (
+        <div style={{ height: 4, background: "var(--surface-muted)" }}>
+          <div style={{ height: "100%", width: `${pct}%`, background: isCompleted ? "var(--success)" : "var(--primary)", transition: "width 0.2s" }} />
+        </div>
+      ) : null}
+
+      <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        {checklist.items.length === 0 ? (
+          <div className="empty" style={{ padding: 8, fontSize: 12 }}>Checklist vazio.</div>
+        ) : (
+          checklist.items.map(item => (
+            <ChecklistItemRow
+              key={item.id}
+              item={item}
+              disabled={isCompleted}
+              onChange={(patch) => onItemChange(item.id, patch)}
+            />
+          ))
+        )}
+
+        {!isCompleted && total > 0 ? (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={onComplete}
+              disabled={busy || checkedCount === 0}
+              title={checkedCount === 0 ? "Marque ao menos 1 item antes de concluir" : undefined}
+            >
+              <CheckCircle size={12} /> Concluir checklist
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ChecklistItemRow({
+  item,
+  disabled,
+  onChange
+}: {
+  item: ChecklistItem;
+  disabled: boolean;
+  onChange: (patch: Partial<ChecklistItem>) => void;
+}) {
+  const icon = item.itemType === "PHOTO" ? <Camera size={12} /> : item.itemType === "NOTE" ? <StickyNote size={12} /> : <CheckSquare size={12} />;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: item.isChecked ? "var(--success-light, #dcfce7)" : "var(--surface)" }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: disabled ? "default" : "pointer", fontSize: 13 }}>
+        <input
+          type="checkbox"
+          checked={item.isChecked}
+          onChange={e => onChange({ isChecked: e.target.checked })}
+          disabled={disabled}
+          style={{ width: 16, height: 16 }}
+        />
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--muted)", fontSize: 10 }}>{icon}</span>
+        <span style={{ flex: 1, textDecoration: item.isChecked ? "line-through" : "none", color: item.isChecked ? "var(--muted)" : "var(--text)" }}>
+          {item.description}
+        </span>
+      </label>
+      {item.itemType === "NOTE" ? (
+        <textarea
+          placeholder="Anotação..."
+          value={item.noteValue ?? ""}
+          onChange={e => onChange({ noteValue: e.target.value })}
+          disabled={disabled}
+          rows={2}
+          style={{ width: "100%", padding: 6, border: "1px solid var(--border)", borderRadius: 6, fontSize: 12, fontFamily: "inherit", resize: "vertical" }}
+        />
+      ) : null}
+      {item.itemType === "PHOTO" ? (
+        <input
+          type="url"
+          placeholder="URL da foto (cole link do drive ou storage)"
+          value={item.photoUrl ?? ""}
+          onChange={e => onChange({ photoUrl: e.target.value || null })}
+          disabled={disabled}
+          style={{ width: "100%", padding: 6, border: "1px solid var(--border)", borderRadius: 6, fontSize: 12 }}
+        />
+      ) : null}
+    </div>
   );
 }
