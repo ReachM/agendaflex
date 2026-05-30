@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   hasPermission,
   getVisibleMenuItems,
-  TENANT_MENU_ITEMS,
-  type PermissionKey
+  TENANT_MENU_ITEMS
 } from "@/lib/security/permissions";
 
 // ═══ v2 Permission Tests ═════════════════════════════════════════

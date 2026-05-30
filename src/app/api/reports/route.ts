@@ -13,26 +13,27 @@ export async function GET(request: NextRequest) {
     const from = params.get("from");
     const to = params.get("to");
 
-    const dateFilter = {
-      ...(from ? { gte: new Date(from) } : {}),
-      ...(to ? { lte: new Date(to) } : {})
-    };
-    const hasDateFilter = Object.keys(dateFilter).length > 0;
+    const now = new Date();
+    const defaultFrom = new Date();
+    defaultFrom.setDate(defaultFrom.getDate() - 30);
+    const periodFrom = from ? new Date(from) : defaultFrom;
+    const periodTo = to ? new Date(to) : now;
 
-    // ─── Starter Reports ──────────────────────────────
-    const [totalAppointments, appointmentsByStatus, totalCustomers, topServices] = await Promise.all([
-      prisma.appointment.count({
-        where: { companyId: cid, ...(hasDateFilter ? { startAt: dateFilter } : {}) }
-      }),
+    const dateFilter = { gte: periodFrom, lte: periodTo };
+
+    // ─── Visão geral / Starter ────────────────────────
+    const [totalAppointments, appointmentsByStatus, totalCustomers, newCustomers, topServices] = await Promise.all([
+      prisma.appointment.count({ where: { companyId: cid, startAt: dateFilter } }),
       prisma.appointment.groupBy({
         by: ["status"],
-        where: { companyId: cid, ...(hasDateFilter ? { startAt: dateFilter } : {}) },
+        where: { companyId: cid, startAt: dateFilter },
         _count: { id: true }
       }),
       prisma.customer.count({ where: { companyId: cid, deletedAt: null } }),
+      prisma.customer.count({ where: { companyId: cid, deletedAt: null, createdAt: dateFilter } }),
       prisma.appointment.groupBy({
         by: ["serviceId"],
-        where: { companyId: cid, status: { notIn: ["CANCELLED", "NO_SHOW"] }, serviceId: { not: null } },
+        where: { companyId: cid, startAt: dateFilter, status: { notIn: ["CANCELLED", "NO_SHOW"] }, serviceId: { not: null } },
         _count: { id: true },
         orderBy: { _count: { id: "desc" } },
         take: 10
@@ -44,8 +45,9 @@ export async function GET(request: NextRequest) {
       ? await prisma.service.findMany({ where: { id: { in: serviceIds } }, select: { id: true, name: true } })
       : [];
 
-    const result: Record<string, any> = {
+    const result: Record<string, unknown> = {
       planLevel: features.planSlug,
+      period: { from: periodFrom.toISOString(), to: periodTo.toISOString() },
       starter: {
         totalAppointments,
         appointmentsByStatus: appointmentsByStatus.map(s => ({
@@ -53,6 +55,7 @@ export async function GET(request: NextRequest) {
           count: s._count.id
         })),
         totalCustomers,
+        newCustomers,
         topServices: topServices.map(s => ({
           serviceId: s.serviceId,
           serviceName: serviceMap.find(sv => sv.id === s.serviceId)?.name ?? "-",
@@ -63,76 +66,110 @@ export async function GET(request: NextRequest) {
 
     // ─── Pro Reports ──────────────────────────────────
     if (features.planSlug === "pro" || features.planSlug === "max") {
-      const [byProfessional, cancellationRate, byClientBooking, peakHours] = await Promise.all([
+      const [byProfessional, cancellationCount, byClientBooking, hourlyAppts, weekdayAppts, returningCustomers] = await Promise.all([
         prisma.appointment.groupBy({
           by: ["professionalId"],
-          where: { companyId: cid, ...(hasDateFilter ? { startAt: dateFilter } : {}) },
+          where: { companyId: cid, startAt: dateFilter, status: { notIn: ["CANCELLED", "NO_SHOW"] } },
           _count: { id: true },
           orderBy: { _count: { id: "desc" } },
           take: 10
         }),
         prisma.appointment.count({
-          where: { companyId: cid, status: "CANCELLED", ...(hasDateFilter ? { startAt: dateFilter } : {}) }
+          where: { companyId: cid, startAt: dateFilter, status: "CANCELLED" }
         }),
         prisma.appointment.count({
-          where: { companyId: cid, bookedByClient: true, ...(hasDateFilter ? { startAt: dateFilter } : {}) }
+          where: { companyId: cid, startAt: dateFilter, bookedByClient: true }
         }),
-        // Peak hours approximation
+        // Hourly distribution
         prisma.appointment.findMany({
-          where: { companyId: cid, status: { notIn: ["CANCELLED", "NO_SHOW"] } },
-          select: { startAt: true },
-          take: 500
+          where: { companyId: cid, startAt: dateFilter, status: { notIn: ["CANCELLED", "NO_SHOW"] } },
+          select: { startAt: true, customerId: true }
+        }),
+        // Weekday distribution (uses same data)
+        prisma.appointment.findMany({
+          where: { companyId: cid, startAt: dateFilter, status: { notIn: ["CANCELLED", "NO_SHOW"] } },
+          select: { startAt: true }
+        }),
+        // Returning customers (have 2+ completed appointments)
+        prisma.appointment.groupBy({
+          by: ["customerId"],
+          where: { companyId: cid, status: "COMPLETED" },
+          _count: { id: true },
+          having: { id: { _count: { gt: 1 } } }
         })
       ]);
 
       const profIds = byProfessional.map(p => p.professionalId);
       const profMap = profIds.length > 0
-        ? await prisma.professional.findMany({ where: { id: { in: profIds } }, select: { id: true, name: true } })
+        ? await prisma.professional.findMany({ where: { id: { in: profIds } }, select: { id: true, name: true, specialty: true } })
         : [];
 
-      // Calculate peak hours
+      // Hourly distribution (occupation)
       const hourCounts: Record<number, number> = {};
-      peakHours.forEach(a => {
+      const customerVisits = new Map<string, number>();
+      hourlyAppts.forEach(a => {
         const h = new Date(a.startAt).getHours();
         hourCounts[h] = (hourCounts[h] || 0) + 1;
+        customerVisits.set(a.customerId, (customerVisits.get(a.customerId) ?? 0) + 1);
       });
-      const peakHoursResult = Object.entries(hourCounts)
-        .map(([hour, count]) => ({ hour: Number(hour), count }))
+      const hourlyDistribution = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: hourCounts[h] ?? 0 }));
+      const peakHours = [...hourlyDistribution]
         .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
+        .slice(0, 5)
+        .filter(h => h.count > 0);
+
+      // Weekday distribution
+      const dayCounts: Record<number, number> = {};
+      weekdayAppts.forEach(a => {
+        const d = new Date(a.startAt).getDay();
+        dayCounts[d] = (dayCounts[d] || 0) + 1;
+      });
+      const weekdayDistribution = Array.from({ length: 7 }, (_, d) => ({ weekday: d, count: dayCounts[d] ?? 0 }));
+      const bestDay = [...weekdayDistribution].sort((a, b) => b.count - a.count)[0];
+      const weekdayLabels = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
       result.pro = {
-        byProfessional: byProfessional.map(p => ({
-          professionalId: p.professionalId,
-          professionalName: profMap.find(pr => pr.id === p.professionalId)?.name ?? "-",
-          count: p._count.id
-        })),
-        cancellationRate: totalAppointments > 0 ? ((cancellationRate / totalAppointments) * 100).toFixed(1) : 0,
-        totalCancelled: cancellationRate,
+        byProfessional: byProfessional.map(p => {
+          const prof = profMap.find(pr => pr.id === p.professionalId);
+          return {
+            professionalId: p.professionalId,
+            professionalName: prof?.name ?? "-",
+            specialty: prof?.specialty ?? null,
+            count: p._count.id
+          };
+        }),
+        cancellationRate: totalAppointments > 0 ? Number(((cancellationCount / totalAppointments) * 100).toFixed(1)) : 0,
+        totalCancelled: cancellationCount,
         clientBookings: byClientBooking,
-        peakHours: peakHoursResult
+        clientBookingRate: totalAppointments > 0 ? Number(((byClientBooking / totalAppointments) * 100).toFixed(1)) : 0,
+        peakHours,
+        hourlyDistribution,
+        weekdayDistribution: weekdayDistribution.map(w => ({ weekday: w.weekday, weekdayName: weekdayLabels[w.weekday], count: w.count })),
+        returningCustomersCount: returningCustomers.length,
+        retentionRate: totalCustomers > 0 ? Number(((returningCustomers.length / totalCustomers) * 100).toFixed(1)) : 0,
+        bestDay: bestDay && bestDay.count > 0 ? { weekday: bestDay.weekday, weekdayName: weekdayLabels[bestDay.weekday], count: bestDay.count } : null
       };
     }
 
     // ─── Max Reports (financial) ──────────────────────
     if (features.allowFinancialControl) {
-      const [totalRevenue, totalCosts, totalExpenses, monthlyRevenue, topClientsBySpend] = await Promise.all([
+      const [totalRevenue, totalCosts, totalExpenses, dailyRevenue, topClientsBySpend, monthlyAppointmentValue] = await Promise.all([
         prisma.financialRecord.aggregate({
-          where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PAID", ...(hasDateFilter ? { paidAt: dateFilter } : {}) },
+          where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PAID", paidAt: dateFilter },
           _sum: { amount: true }
         }),
         prisma.financialRecord.aggregate({
-          where: { companyId: cid, flowType: "COST", paymentStatus: "PAID", ...(hasDateFilter ? { paidAt: dateFilter } : {}) },
+          where: { companyId: cid, flowType: "COST", paymentStatus: "PAID", paidAt: dateFilter },
           _sum: { amount: true }
         }),
         prisma.financialRecord.aggregate({
-          where: { companyId: cid, flowType: "EXPENSE", paymentStatus: "PAID", ...(hasDateFilter ? { paidAt: dateFilter } : {}) },
+          where: { companyId: cid, flowType: "EXPENSE", paymentStatus: "PAID", paidAt: dateFilter },
           _sum: { amount: true }
         }),
-        prisma.appointment.aggregate({
-          where: { companyId: cid, status: "COMPLETED", totalValue: { not: null }, ...(hasDateFilter ? { startAt: dateFilter } : {}) },
-          _sum: { totalValue: true },
-          _count: { id: true }
+        // Daily revenue from financial records
+        prisma.financialRecord.findMany({
+          where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PAID", paidAt: dateFilter },
+          select: { paidAt: true, amount: true }
         }),
         prisma.appointment.groupBy({
           by: ["customerId"],
@@ -141,6 +178,11 @@ export async function GET(request: NextRequest) {
           _count: { id: true },
           orderBy: { _sum: { totalValue: "desc" } },
           take: 10
+        }),
+        prisma.appointment.aggregate({
+          where: { companyId: cid, status: "COMPLETED", totalValue: { not: null }, startAt: dateFilter },
+          _sum: { totalValue: true },
+          _count: { id: true }
         })
       ]);
 
@@ -149,12 +191,23 @@ export async function GET(request: NextRequest) {
         ? await prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, name: true } })
         : [];
 
+      // Daily revenue bucket
+      const revenueByDayMap = new Map<string, number>();
+      for (const r of dailyRevenue) {
+        if (!r.paidAt) continue;
+        const key = new Date(r.paidAt).toISOString().slice(0, 10);
+        revenueByDayMap.set(key, (revenueByDayMap.get(key) ?? 0) + Number(r.amount));
+      }
+      const dailyRevenueArr = Array.from(revenueByDayMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, total]) => ({ date, total }));
+
       const revenueNum = Number(totalRevenue._sum.amount ?? 0);
       const costsNum = Number(totalCosts._sum.amount ?? 0);
       const expensesNum = Number(totalExpenses._sum.amount ?? 0);
       const profit = revenueNum - costsNum - expensesNum;
-      const avgTicket = (monthlyRevenue._count.id ?? 0) > 0
-        ? Number(monthlyRevenue._sum.totalValue ?? 0) / monthlyRevenue._count.id
+      const avgTicket = (monthlyAppointmentValue._count.id ?? 0) > 0
+        ? Number(monthlyAppointmentValue._sum.totalValue ?? 0) / monthlyAppointmentValue._count.id
         : 0;
 
       result.max = {
@@ -164,6 +217,7 @@ export async function GET(request: NextRequest) {
         profit,
         margin: revenueNum > 0 ? Number(((profit / revenueNum) * 100).toFixed(1)) : 0,
         avgTicket,
+        dailyRevenue: dailyRevenueArr,
         topClientsBySpend: topClientsBySpend.map(c => ({
           customerId: c.customerId,
           customerName: customerMap.find(cu => cu.id === c.customerId)?.name ?? "-",
