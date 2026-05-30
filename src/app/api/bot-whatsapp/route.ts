@@ -47,6 +47,7 @@ async function getOrCreateConfig(companyId: string) {
  * GET /api/bot-whatsapp
  * Retorna Company.botEnabled (fonte de verdade do liga/desliga) + a configuração
  * do bot (CompanyBotConfig), criando uma config padrão se ainda não existir.
+ * Inclui também KPIs (últimas 24h e mês) e atividade recente.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -55,9 +56,67 @@ export async function GET(request: NextRequest) {
 
     const config = await getOrCreateConfig(context.companyId);
 
+    const now = new Date();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const last30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [
+      conversations24h,
+      conversationsMonth,
+      botAppointments24h,
+      botAppointmentsMonth,
+      reminders24h,
+      recentReminders
+    ] = await Promise.all([
+      prisma.botConversationState.count({
+        where: { companyId: context.companyId, updatedAt: { gte: last24h } }
+      }),
+      prisma.botConversationState.count({
+        where: { companyId: context.companyId, updatedAt: { gte: startOfMonth } }
+      }),
+      prisma.appointment.count({
+        where: { companyId: context.companyId, source: "BOT", createdAt: { gte: last24h } }
+      }),
+      prisma.appointment.count({
+        where: { companyId: context.companyId, source: "BOT", createdAt: { gte: startOfMonth } }
+      }),
+      prisma.sentReminder.count({
+        where: { appointment: { companyId: context.companyId }, sentAt: { gte: last24h } }
+      }),
+      prisma.sentReminder.findMany({
+        where: { appointment: { companyId: context.companyId }, sentAt: { gte: last30d } },
+        include: {
+          appointment: {
+            select: {
+              id: true,
+              startAt: true,
+              customer: { select: { name: true } }
+            }
+          }
+        },
+        orderBy: { sentAt: "desc" },
+        take: 10
+      })
+    ]);
+
     return ok({
       botEnabled: context.company.botEnabled,
-      config
+      config,
+      stats: {
+        conversations24h,
+        conversationsMonth,
+        botAppointments24h,
+        botAppointmentsMonth,
+        reminders24h
+      },
+      recentActivity: recentReminders.map(r => ({
+        id: r.id,
+        type: r.type,
+        sentAt: r.sentAt,
+        customerName: r.appointment.customer?.name ?? "—",
+        appointmentStartAt: r.appointment.startAt
+      }))
     });
   } catch (error) {
     return handleApiError(error);
