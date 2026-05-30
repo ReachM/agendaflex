@@ -1704,37 +1704,7 @@ export function ReportsView() {
   );
 }
 
-export function SettingsView() {
-  const [session, setSession] = useState<AnyRecord | null>(null);
-  const [error, setError] = useState("");
-  // Dynamic import to avoid monolith bloat
-  const [SubscriptionSection, setSubComp] = useState<any>(null);
-
-  useEffect(() => {
-    apiFetch<AnyRecord>("/api/auth/me").then(setSession).catch((err) => setError(err.message));
-    import("@/components/subscription-section").then((mod) => setSubComp(() => mod.SubscriptionSection));
-  }, []);
-
-  return (
-    <>
-      <PageHeader title="Configurações" subtitle="Dados gerais da empresa" />
-      <ErrorBox error={error} />
-      <section className="panel">
-        <div className="panel__head">
-          <div className="panel__title">{session?.company?.name ?? "Empresa"}</div>
-        </div>
-        <div className="panel__body">
-          <div className="grid cols-3">
-            <StatCard label="Status" value={session?.company?.status ?? "-"} />
-            <StatCard label="Segmento" value={session?.company?.segment ?? "-"} />
-            <StatCard label="Plano" value={session?.company?.plan ?? "-"} />
-          </div>
-        </div>
-      </section>
-      {SubscriptionSection && <SubscriptionSection />}
-    </>
-  );
-}
+export { SettingsView } from "@/components/settings-view";
 
 export function BookingSettingsManager() {
   const [settings, setSettings] = useState<AnyRecord | null>(null);
