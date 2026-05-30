@@ -7,13 +7,9 @@ import {
 } from "@/lib/security/permissions";
 
 // ═══ v2 Permission Tests ═════════════════════════════════════════
-// Financeiro e Notas Fiscais foram reativados em 2026-05-29 (v2).
-// Checklists permanece desativado até ChecklistTemplate/Section serem criados.
+// Financeiro, Notas Fiscais e Checklists reativados em 2026-05-29 (v2).
 
 describe("v2 — Permissions by Role", () => {
-  // Permissions ainda desativadas em todos os roles de tenant nesta fase.
-  const checklistPermissions: PermissionKey[] = ["checklists:manage", "checklists:view"];
-
   describe("COMPANY_ADMIN", () => {
     it("has core operational permissions", () => {
       expect(hasPermission("COMPANY_ADMIN", "users:manage")).toBe(true);
@@ -28,16 +24,12 @@ describe("v2 — Permissions by Role", () => {
       expect(hasPermission("COMPANY_ADMIN", "clinical_notes:view")).toBe(true);
     });
 
-    it("has financial and invoice permissions (v2 reactivation)", () => {
+    it("has financial, invoice and checklist permissions (v2 reactivation)", () => {
       expect(hasPermission("COMPANY_ADMIN", "financial:view")).toBe(true);
       expect(hasPermission("COMPANY_ADMIN", "financial:manage")).toBe(true);
       expect(hasPermission("COMPANY_ADMIN", "invoices:manage")).toBe(true);
-    });
-
-    it("does NOT have checklist permissions (still pending v2.1)", () => {
-      for (const perm of checklistPermissions) {
-        expect(hasPermission("COMPANY_ADMIN", perm)).toBe(false);
-      }
+      expect(hasPermission("COMPANY_ADMIN", "checklists:manage")).toBe(true);
+      expect(hasPermission("COMPANY_ADMIN", "checklists:view")).toBe(true);
     });
   });
 
@@ -50,16 +42,12 @@ describe("v2 — Permissions by Role", () => {
       expect(hasPermission("MANAGER", "settings:manage")).toBe(true);
     });
 
-    it("has financial:view (v2) but not financial:manage", () => {
+    it("has financial:view (v2) and checklists, but not financial:manage or invoices:manage", () => {
       expect(hasPermission("MANAGER", "financial:view")).toBe(true);
       expect(hasPermission("MANAGER", "financial:manage")).toBe(false);
       expect(hasPermission("MANAGER", "invoices:manage")).toBe(false);
-    });
-
-    it("does NOT have checklist permissions", () => {
-      for (const perm of checklistPermissions) {
-        expect(hasPermission("MANAGER", perm)).toBe(false);
-      }
+      expect(hasPermission("MANAGER", "checklists:manage")).toBe(true);
+      expect(hasPermission("MANAGER", "checklists:view")).toBe(true);
     });
   });
 
@@ -71,13 +59,12 @@ describe("v2 — Permissions by Role", () => {
       expect(hasPermission("STAFF", "professionals:view")).toBe(true);
     });
 
-    it("does NOT have financial or checklist permissions", () => {
+    it("has checklists:view but not financial or invoice permissions", () => {
+      expect(hasPermission("STAFF", "checklists:view")).toBe(true);
+      expect(hasPermission("STAFF", "checklists:manage")).toBe(false);
       expect(hasPermission("STAFF", "financial:view")).toBe(false);
       expect(hasPermission("STAFF", "financial:manage")).toBe(false);
       expect(hasPermission("STAFF", "invoices:manage")).toBe(false);
-      for (const perm of checklistPermissions) {
-        expect(hasPermission("STAFF", perm)).toBe(false);
-      }
     });
 
     it("does NOT have admin-level permissions", () => {
@@ -101,11 +88,11 @@ describe("v2 — Permissions by Role", () => {
 // ═══ v2 Menu Tests ═══════════════════════════════════════════════
 
 describe("v2 — Menu Items", () => {
-  it("includes Financeiro and Notas Fiscais (v2), excludes Checklists (pending)", () => {
+  it("includes Financeiro, Notas Fiscais and Checklists (v2)", () => {
     const menuHrefs = TENANT_MENU_ITEMS.map((item) => item.href);
     expect(menuHrefs).toContain("/financeiro");
     expect(menuHrefs).toContain("/notas-fiscais");
-    expect(menuHrefs).not.toContain("/checklists");
+    expect(menuHrefs).toContain("/checklists");
   });
 
   it("includes all core MVP modules", () => {
@@ -125,7 +112,7 @@ describe("v2 — Menu Items", () => {
   });
 
   describe("getVisibleMenuItems by role", () => {
-    it("COMPANY_ADMIN sees core items; Financeiro requires plan feature", () => {
+    it("COMPANY_ADMIN sees core items; paid items require plan features", () => {
       const items = getVisibleMenuItems("COMPANY_ADMIN");
       const hrefs = items.map((i) => i.href);
       expect(hrefs).toContain("/dashboard");
@@ -139,8 +126,7 @@ describe("v2 — Menu Items", () => {
       // Without planFeatures provided, plan-gated items still appear (handled at API layer)
       expect(hrefs).toContain("/financeiro");
       expect(hrefs).toContain("/notas-fiscais");
-      // Checklists ainda removido
-      expect(hrefs).not.toContain("/checklists");
+      expect(hrefs).toContain("/checklists");
     });
 
     it("STAFF sees only permitted items", () => {
@@ -239,7 +225,7 @@ describe("v2 — Plan Feature Flags (Seed Alignment)", () => {
     allowAdvancedReports: true,
     allowFinancialControl: true,
     allowInvoiceRequest: true,
-    allowCustomerChecklist: false,
+    allowCustomerChecklist: true,
     allowBotIntegration: true,
     allowAuditLogs: true,
     allowCustomFields: true,
@@ -263,10 +249,10 @@ describe("v2 — Plan Feature Flags (Seed Alignment)", () => {
     expect(proFeatures.allowCustomerChecklist).toBe(false);
   });
 
-  it("Max plan enables financial and invoices; checklists still pending v2.1", () => {
+  it("Max plan enables financial, invoices and checklists", () => {
     expect(maxFeatures.allowFinancialControl).toBe(true);
     expect(maxFeatures.allowInvoiceRequest).toBe(true);
-    expect(maxFeatures.allowCustomerChecklist).toBe(false);
+    expect(maxFeatures.allowCustomerChecklist).toBe(true);
     expect(maxFeatures.allowClientSelfScheduling).toBe(true);
     expect(maxFeatures.allowBotIntegration).toBe(true);
     expect(maxFeatures.allowAdvancedReports).toBe(true);

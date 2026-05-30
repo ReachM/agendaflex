@@ -131,6 +131,18 @@ enum FinancialAccountType {
   OTHER
 }
 
+enum ChecklistTemplateStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum ChecklistItemType {
+  CHECKBOX
+  NOTE
+  PHOTO
+}
+
 enum AppointmentSource {
   INTERNAL
   PUBLIC_LINK
@@ -308,28 +320,31 @@ model Company {
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 
-  users                 CompanyUser[]
-  customers             Customer[]
-  services              Service[]
-  professionals         Professional[]
-  appointments          Appointment[]
-  appointmentServices   AppointmentService[]
-  customFields          CustomField[]
-  fieldValues           CustomFieldValue[]
-  auditLogs             AuditLog[]
-  subscriptions         CompanySubscription[]
-  financialRecords      FinancialRecord[]
-  financialCategories   FinancialCategory[]
-  financialAccounts     FinancialAccount[]
-  invoiceRequests       InvoiceRequest[]
-  invoiceConfig         CompanyInvoiceConfig?
-  checklists            Checklist[]
-  checklistItems        ChecklistItem[]
-  customerCopies        CustomerCopy[]
-  bookingSettings       PublicBookingSettings?
-  notificationLogs      NotificationLog[]
-  botConfiguration      CompanyBotConfig?
-  botConversationStates BotConversationState[]
+  users                  CompanyUser[]
+  customers              Customer[]
+  services               Service[]
+  professionals          Professional[]
+  appointments           Appointment[]
+  appointmentServices    AppointmentService[]
+  customFields           CustomField[]
+  fieldValues            CustomFieldValue[]
+  auditLogs              AuditLog[]
+  subscriptions          CompanySubscription[]
+  financialRecords       FinancialRecord[]
+  financialCategories    FinancialCategory[]
+  financialAccounts      FinancialAccount[]
+  invoiceRequests        InvoiceRequest[]
+  invoiceConfig          CompanyInvoiceConfig?
+  checklists             Checklist[]
+  checklistItems         ChecklistItem[]
+  checklistTemplates     ChecklistTemplate[]
+  checklistSections      ChecklistSection[]
+  checklistTemplateItems ChecklistTemplateItem[]
+  customerCopies         CustomerCopy[]
+  bookingSettings        PublicBookingSettings?
+  notificationLogs       NotificationLog[]
+  botConfiguration       CompanyBotConfig?
+  botConversationStates  BotConversationState[]
 
   // Liga/desliga do bot — fonte única de verdade. Reaproveitado pelo bot Evolution API.
   botEnabled Boolean @default(false)
@@ -494,25 +509,28 @@ model Customer {
 // ═══════════════════════════════════════════════════
 
 model Service {
-  id              String   @id @default(cuid())
-  companyId       String
-  name            String
-  description     String?
-  basePrice       Decimal? @db.Decimal(12, 2)
-  durationMinutes Int      @default(60)
-  isActive        Boolean  @default(true)
-  isPublic        Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  companyId           String
+  name                String
+  description         String?
+  basePrice           Decimal? @db.Decimal(12, 2)
+  durationMinutes     Int      @default(60)
+  isActive            Boolean  @default(true)
+  isPublic            Boolean  @default(false)
+  checklistTemplateId String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   company             Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
   appointments        Appointment[]
   appointmentServices AppointmentService[]
+  checklistTemplate   ChecklistTemplate?   @relation(fields: [checklistTemplateId], references: [id])
 
   @@index([companyId])
   @@index([companyId, isActive])
   @@index([companyId, name])
   @@index([companyId, isPublic])
+  @@index([checklistTemplateId])
 }
 
 // ═══════════════════════════════════════════════════
@@ -794,41 +812,112 @@ model CompanyInvoiceConfig {
 // ═══════════════════════════════════════════════════
 
 model Checklist {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   companyId       String
   appointmentId   String
+  templateId      String?
   title           String
   notes           String?
-  status          String   @default("draft")
+  status          String    @default("draft")
   createdByUserId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  appointment  Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  createdBy    User?           @relation(fields: [createdByUserId], references: [id])
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointment  Appointment        @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  template     ChecklistTemplate? @relation(fields: [templateId], references: [id])
+  createdBy    User?              @relation(fields: [createdByUserId], references: [id])
   items        ChecklistItem[]
   customerCopy CustomerCopy?
 
   @@index([companyId])
   @@index([appointmentId])
+  @@index([templateId])
 }
 
 model ChecklistItem {
-  id          String   @id @default(cuid())
-  companyId   String
-  checklistId String
-  description String
-  isChecked   Boolean  @default(false)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String            @id @default(cuid())
+  companyId      String
+  checklistId    String
+  templateItemId String?
+  description    String
+  itemType       ChecklistItemType @default(CHECKBOX)
+  isChecked      Boolean           @default(false)
+  noteValue      String?
+  photoUrl       String?
+  sortOrder      Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
-  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  checklist    Checklist              @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  templateItem ChecklistTemplateItem? @relation(fields: [templateItemId], references: [id])
 
   @@index([companyId])
   @@index([checklistId])
+  @@index([templateItemId])
+}
+
+// ═══════════════════════════════════════════════════
+// CHECKLIST TEMPLATES (catálogo reutilizável)
+// ═══════════════════════════════════════════════════
+
+model ChecklistTemplate {
+  id               String                  @id @default(cuid())
+  companyId        String
+  name             String
+  description      String?
+  status           ChecklistTemplateStatus @default(DRAFT)
+  estimatedMinutes Int?
+  sortOrder        Int                     @default(0)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sections  ChecklistSection[]
+  services  Service[]
+  instances Checklist[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+}
+
+model ChecklistSection {
+  id         String   @id @default(cuid())
+  companyId  String
+  templateId String
+  name       String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  template ChecklistTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  items    ChecklistTemplateItem[]
+
+  @@index([companyId])
+  @@index([templateId])
+}
+
+model ChecklistTemplateItem {
+  id          String            @id @default(cuid())
+  companyId   String
+  sectionId   String
+  description String
+  itemType    ChecklistItemType @default(CHECKBOX)
+  isRequired  Boolean           @default(false)
+  helpText    String?
+  sortOrder   Int               @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  company   Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  section   ChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  instances ChecklistItem[]
+
+  @@index([companyId])
+  @@index([sectionId])
 }
 
 model CustomerCopy {

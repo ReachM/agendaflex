@@ -48,8 +48,8 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
     "financial:view",
     "financial:manage",
     "invoices:manage",
-    // TODO [MVP-FUTURE] Reativar checklists quando os models ChecklistTemplate/Section forem criados:
-    // "checklists:manage",
+    "checklists:manage",
+    "checklists:view",
     "public_booking:manage",
     "clinical_notes:view"
   ],
@@ -66,10 +66,9 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
     "reports:view",
     "logs:view",
     "settings:manage",
-    "financial:view"
-    // TODO [MVP-FUTURE] Reativar checklists quando os models forem criados:
-    // "checklists:manage",
-    // "checklists:view"
+    "financial:view",
+    "checklists:manage",
+    "checklists:view"
   ],
   STAFF: [
     "customers:view",
@@ -78,9 +77,8 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
     "professionals:view",
     "appointments:manage",
     "appointments:view",
-    "custom_fields:view"
-    // TODO [MVP-FUTURE] Reativar na v2:
-    // "checklists:view"
+    "custom_fields:view",
+    "checklists:view"
   ],
   USER: [
     "customers:view",
@@ -107,8 +105,7 @@ export const TENANT_MENU_ITEMS: MenuItem[] = [
   { href: "/usuarios", label: "Usuários", icon: "UserCog", permission: "users:manage" },
   { href: "/financeiro", label: "Financeiro", icon: "DollarSign", permission: "financial:view", planFeature: "allowFinancialControl" },
   { href: "/notas-fiscais", label: "Notas Fiscais", icon: "FileText", permission: "invoices:manage", planFeature: "allowInvoiceRequest" },
-  // TODO [MVP-FUTURE] Checklists — reativar quando ChecklistTemplate/Section forem criados na próxima fase
-  // { href: "/checklists", label: "Checklists", icon: "CheckSquare", permission: "checklists:manage", planFeature: "allowCustomerChecklist" },
+  { href: "/checklists", label: "Checklists", icon: "CheckSquare", permission: "checklists:view", planFeature: "allowCustomerChecklist" },
   { href: "/link-agenda", label: "Link de Agenda", icon: "Link2", permission: "public_booking:manage", planFeature: "allowClientSelfScheduling" },
   { href: "/relatorios", label: "Relatórios", icon: "Activity", permission: "reports:view" },
   { href: "/logs", label: "Logs", icon: "FileClock", permission: "logs:view" },

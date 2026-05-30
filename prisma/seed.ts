@@ -47,8 +47,7 @@ const rolePermissions: Record<RoleName, string[]> = {
     "custom_fields:manage","custom_fields:view","reports:view","reports:advanced","logs:view",
     "settings:manage",
     "financial:view","financial:manage","invoices:manage",
-    // TODO [MVP-FUTURE] Reativar checklists quando ChecklistTemplate/Section forem criados:
-    // "checklists:manage","checklists:view",
+    "checklists:manage","checklists:view",
     "public_booking:manage","clinical_notes:view"
   ],
   MANAGER: [
@@ -56,14 +55,12 @@ const rolePermissions: Record<RoleName, string[]> = {
     "professionals:manage","professionals:view","appointments:manage","appointments:view",
     "custom_fields:view","reports:view","logs:view","settings:manage",
     "financial:view",
-    // TODO [MVP-FUTURE] Reativar checklists na próxima fase:
-    // "checklists:manage","checklists:view"
+    "checklists:manage","checklists:view"
   ],
   STAFF: [
     "customers:view","customers:manage","services:view","professionals:view",
     "appointments:manage","appointments:view","custom_fields:view",
-    // TODO [MVP-FUTURE] Reativar checklist na v2
-    // "checklists:view"
+    "checklists:view"
   ],
   USER: ["customers:view","appointments:view"]
 };
@@ -219,18 +216,18 @@ async function main() {
       allowClientSelfScheduling: true, allowAdvancedReports: true,
       allowFinancialControl: true,
       allowInvoiceRequest: true,
-      allowCustomerChecklist: false,   // TODO [MVP-FUTURE] Ativar quando ChecklistTemplate/Section existirem
+      allowCustomerChecklist: true,
       allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true
     },
     create: {
-      name: "Max", slug: "max", description: "Tudo do Pro + notas fiscais, limites altos, logs avançados, mais configurações de bot.",
+      name: "Max", slug: "max", description: "Tudo do Pro + notas fiscais, checklists, limites altos, logs avançados, mais configurações de bot.",
       price: 199.90, maxUsers: 100, maxProfessionals: 100, maxCustomers: 50000, maxAppointmentsPerMonth: 50000,
       allowClientSelfScheduling: true, allowAdvancedReports: true,
       allowFinancialControl: true,
       allowInvoiceRequest: true,
-      allowCustomerChecklist: false,   // TODO [MVP-FUTURE] Ativar quando ChecklistTemplate/Section existirem
+      allowCustomerChecklist: true,
       allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true, sortOrder: 3
@@ -448,6 +445,103 @@ async function main() {
       }
     });
   }
+
+  // ─── Checklist templates seed (Max - Oficina) ──
+  async function seedChecklistTemplate(
+    companyId: string,
+    name: string,
+    description: string,
+    sections: { name: string; items: { description: string; itemType: "CHECKBOX" | "NOTE" | "PHOTO"; isRequired?: boolean }[] }[]
+  ) {
+    const existing = await prisma.checklistTemplate.findFirst({ where: { companyId, name } });
+    if (existing) return existing;
+    const template = await prisma.checklistTemplate.create({
+      data: {
+        companyId,
+        name,
+        description,
+        status: "ACTIVE",
+        estimatedMinutes: 30,
+        sortOrder: 0
+      }
+    });
+    for (let s = 0; s < sections.length; s++) {
+      const sec = sections[s];
+      const section = await prisma.checklistSection.create({
+        data: { companyId, templateId: template.id, name: sec.name, sortOrder: s }
+      });
+      for (let i = 0; i < sec.items.length; i++) {
+        const it = sec.items[i];
+        await prisma.checklistTemplateItem.create({
+          data: {
+            companyId,
+            sectionId: section.id,
+            description: it.description,
+            itemType: it.itemType,
+            isRequired: it.isRequired ?? false,
+            sortOrder: i
+          }
+        });
+      }
+    }
+    return template;
+  }
+
+  await seedChecklistTemplate(
+    workshop.id,
+    "Recepção de veículo",
+    "Vistoria padrão de entrada e diagnóstico inicial",
+    [
+      {
+        name: "Recepção",
+        items: [
+          { description: "Conferir placa e modelo", itemType: "CHECKBOX", isRequired: true },
+          { description: "Vistoria visual da carroceria", itemType: "CHECKBOX", isRequired: true },
+          { description: "Foto do veículo (lateral e frente)", itemType: "PHOTO" },
+          { description: "Quilometragem atual", itemType: "NOTE", isRequired: true }
+        ]
+      },
+      {
+        name: "Diagnóstico",
+        items: [
+          { description: "Testar motor em marcha lenta", itemType: "CHECKBOX" },
+          { description: "Verificar nível de óleo", itemType: "CHECKBOX" },
+          { description: "Descrição do problema relatado", itemType: "NOTE", isRequired: true }
+        ]
+      },
+      {
+        name: "Entrega",
+        items: [
+          { description: "Teste de funcionamento pós-reparo", itemType: "CHECKBOX", isRequired: true },
+          { description: "Orientações entregues ao cliente", itemType: "NOTE" }
+        ]
+      }
+    ]
+  );
+
+  await seedChecklistTemplate(
+    workshop.id,
+    "Troca de óleo",
+    "Procedimento padrão de troca de óleo e filtro",
+    [
+      {
+        name: "Preparação",
+        items: [
+          { description: "Conferir tipo de óleo recomendado", itemType: "CHECKBOX", isRequired: true },
+          { description: "Conferir filtro compatível", itemType: "CHECKBOX", isRequired: true }
+        ]
+      },
+      {
+        name: "Execução",
+        items: [
+          { description: "Drenar óleo antigo", itemType: "CHECKBOX", isRequired: true },
+          { description: "Substituir filtro", itemType: "CHECKBOX", isRequired: true },
+          { description: "Abastecer com novo óleo", itemType: "CHECKBOX", isRequired: true },
+          { description: "Foto da etiqueta de quilometragem", itemType: "PHOTO" }
+        ]
+      }
+    ]
+  );
 
   // Audit log
   await prisma.auditLog.create({
