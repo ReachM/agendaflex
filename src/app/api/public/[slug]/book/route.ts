@@ -25,8 +25,10 @@ export async function GET(
         id: true,
         name: true,
         tradeName: true,
+        phone: true,
         segment: true,
         status: true,
+        settings: true,
         publicBookingEnabled: true,
         autoConfirmBooking: true
       }
@@ -61,12 +63,16 @@ export async function GET(
       })
     ]);
 
+    const companySettings = (company.settings ?? {}) as Record<string, unknown>;
+
     return ok({
       company: {
         name: company.name,
         tradeName: company.tradeName,
+        phone: company.phone,
         segment: company.segment,
-        isHealthSegment
+        isHealthSegment,
+        businessHours: (companySettings.businessHours as Record<string, { open: boolean; from?: string; to?: string }> | undefined) ?? null
       },
       services,
       professionals,

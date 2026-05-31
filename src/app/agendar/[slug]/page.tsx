@@ -17,7 +17,14 @@ import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import "./public-booking.css";
 
-type CompanyInfo = { name: string; tradeName: string; segment: string; isHealthSegment: boolean };
+type CompanyInfo = {
+  name: string;
+  tradeName: string;
+  phone?: string | null;
+  segment: string;
+  isHealthSegment: boolean;
+  businessHours?: Record<string, { open: boolean; from?: string; to?: string }> | null;
+};
 type Service = { id: string; name: string; description: string; basePrice: string; durationMinutes: number };
 type Professional = { id: string; name: string; specialty: string };
 type Slot = { time: string; startAt: string; endAt: string; available: boolean };
@@ -254,7 +261,7 @@ export default function PublicBookingPage() {
     return (
       <div className="pb">
         <div className="pb__shell">
-          <Header companyDisplay={companyDisplay} initials={initials} />
+          <Header companyDisplay={companyDisplay} initials={initials} phone={company?.phone ?? null} businessHours={company?.businessHours ?? null} />
           <div className="pb-card">
             <div className="pb-success">
               <div className="pb-success__icon"><Check size={36} /></div>
@@ -281,7 +288,7 @@ export default function PublicBookingPage() {
   return (
     <div className="pb">
       <div className="pb__shell">
-        <Header companyDisplay={companyDisplay} initials={initials} />
+        <Header companyDisplay={companyDisplay} initials={initials} phone={company?.phone ?? null} businessHours={company?.businessHours ?? null} />
 
         <section className="pb-hero">
           <h1>Agende seu horário em <em>poucos cliques</em></h1>
@@ -637,15 +644,57 @@ export default function PublicBookingPage() {
 
 /* ─── Subcomponentes locais ─── */
 
-function Header({ companyDisplay, initials }: { companyDisplay: string; initials: string }) {
+function Header({
+  companyDisplay,
+  initials,
+  phone,
+  businessHours
+}: {
+  companyDisplay: string;
+  initials: string;
+  phone: string | null;
+  businessHours?: Record<string, { open: boolean; from?: string; to?: string }> | null;
+}) {
+  const today = new Date().getDay();
+  const dayKeys = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const todayHours = businessHours?.[dayKeys[today]];
+  const isOpen = todayHours?.open && todayHours.from && todayHours.to;
+  const waNumber = phone?.replace(/\D/g, "");
+  const waLink = waNumber ? `https://wa.me/55${waNumber.startsWith("55") ? waNumber.slice(2) : waNumber}` : null;
+
   return (
     <header className="pb-head">
       <div className="pb-brand">
         <span className="pb-brand__logo">{initials}</span>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="pb-brand__name">{companyDisplay}</div>
-          <div className="pb-brand__slogan">Agendamento online</div>
+          <div className="pb-brand__slogan" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 6, height: 6, borderRadius: 999, background: isOpen ? "#16a34a" : "#94a3b8", display: "inline-block" }} />
+              {isOpen ? `Aberto agora · ${todayHours.from}–${todayHours.to}` : "Fechado agora"}
+            </span>
+            {phone ? <span style={{ color: "rgba(255,255,255,0.7)" }}>· {phone}</span> : null}
+          </div>
         </div>
+        {waLink ? (
+          <a
+            href={waLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Falar no WhatsApp"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "8px 14px", borderRadius: 999,
+              background: "#25d366", color: "#fff",
+              fontSize: 13, fontWeight: 600,
+              textDecoration: "none",
+              boxShadow: "0 2px 8px rgba(37,211,102,0.3)"
+            }}
+          >
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24z"/></svg>
+            WhatsApp
+          </a>
+        ) : null}
       </div>
     </header>
   );
