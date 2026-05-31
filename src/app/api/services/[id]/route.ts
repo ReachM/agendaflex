@@ -39,14 +39,32 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       where: { id, companyId: auth.companyId }
     });
 
+    // Validate ownership of category/template if provided
+    if (body.categoryId) {
+      const cat = await prisma.serviceCategory.findFirst({
+        where: { id: body.categoryId, companyId: auth.companyId }
+      });
+      if (!cat) throw new Error("Categoria inválida");
+    }
+    if (body.checklistTemplateId) {
+      const tpl = await prisma.checklistTemplate.findFirst({
+        where: { id: body.checklistTemplateId, companyId: auth.companyId }
+      });
+      if (!tpl) throw new Error("Template de checklist inválido");
+    }
+
     const service = await prisma.service.update({
       where: { id: oldService.id },
       data: {
-        name: body.name,
-        description: body.description,
-        basePrice: body.basePrice,
-        durationMinutes: body.durationMinutes,
-        isActive: body.isActive
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.description !== undefined ? { description: body.description } : {}),
+        ...(body.basePrice !== undefined ? { basePrice: body.basePrice } : {}),
+        ...(body.durationMinutes !== undefined ? { durationMinutes: body.durationMinutes } : {}),
+        ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
+        ...(body.isPublic !== undefined ? { isPublic: body.isPublic } : {}),
+        ...(body.categoryId !== undefined ? { categoryId: body.categoryId || null } : {}),
+        ...(body.checklistTemplateId !== undefined ? { checklistTemplateId: body.checklistTemplateId || null } : {}),
+        ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {})
       }
     });
 

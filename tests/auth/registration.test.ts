@@ -59,7 +59,7 @@ describe("SEGMENTS — mapeamento rótulo -> enum", () => {
 });
 
 describe("buildRegisterBody — montagem do body de registro", () => {
-  it("monta o body no formato esperado pela rota, com trim e e-mail normalizado", () => {
+  it("monta o body no formato esperado pela rota, com trim, e-mail normalizado e documento/telefone só com dígitos", () => {
     const body = buildRegisterBody(filledState());
     expect(body).toEqual({
       adminName: "Maria Souza",
@@ -67,7 +67,8 @@ describe("buildRegisterBody — montagem do body de registro", () => {
       adminPassword: "Senha1234",
       adminPhone: "11999990000",
       companyName: "Salão Bella",
-      document: "12.345.678/0001-90",
+      // document é enviado apenas com dígitos — o front pode mostrar formatado, mas a API recebe canônico
+      document: "12345678000190",
       companyPhone: undefined,
       segment: "SALAO_BELEZA"
     });

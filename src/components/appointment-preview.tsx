@@ -80,9 +80,23 @@ export function AppointmentPreviewModal({
   const status = appointment.status;
   const canManage = !role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"].includes(role);
   const canChangeStatus = !role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER", "STAFF"].includes(role);
+  const canSeeFinancial = Boolean(planFeatures?.allowFinancialControl) && canManage;
   const isTerminal = status === "CANCELLED" || status === "COMPLETED" || status === "NO_SHOW";
   const checklistAllowed = planFeatures?.allowCustomerChecklist === true;
   const hasChecklist = (appointment.checklists ?? []).length > 0;
+
+  // Financial breakdown computed from appointment fields (gated by canSeeFinancial)
+  const servicesTotal = (appointment.appointmentServices ?? []).reduce(
+    (sum: number, s: AnyRecord) => sum + (s.totalPrice ? Number(s.totalPrice) : 0),
+    0
+  );
+  const parts = appointment.partsValue ? Number(appointment.partsValue) : 0;
+  const labor = appointment.laborValue ? Number(appointment.laborValue) : 0;
+  const discountPct = appointment.discountPercent ? Number(appointment.discountPercent) : 0;
+  const discountVal = appointment.discountValue ? Number(appointment.discountValue) : 0;
+  const calculatedDiscount = discountVal || (servicesTotal + parts + labor) * discountPct / 100;
+  const total = appointment.totalValue ? Number(appointment.totalValue) : (servicesTotal + parts + labor - calculatedDiscount);
+  const hasFinancialData = servicesTotal > 0 || parts > 0 || labor > 0 || total > 0;
 
   async function handleStatus(newStatus: string, reason?: string) {
     setLoading(true);
@@ -161,37 +175,38 @@ export function AppointmentPreviewModal({
           </div>
         )}
 
-        {/* TODO [MVP-FUTURE] Reativar seção de valores financeiros na v2 */}
-        {/* <div className="preview-financial" style={{ marginTop: 12 }}>
-          <strong className="preview-section-label">Valores</strong>
-          <div className="preview-financial__grid">
-            {servicesTotal > 0 && (
-              <div className="preview-financial__row">
-                <span>Serviços</span><span>{formatMoney(servicesTotal)}</span>
+        {canSeeFinancial && hasFinancialData ? (
+          <div className="preview-financial" style={{ marginTop: 12 }}>
+            <strong className="preview-section-label">Valores</strong>
+            <div className="preview-financial__grid">
+              {servicesTotal > 0 && (
+                <div className="preview-financial__row">
+                  <span>Serviços</span><span>{formatMoney(servicesTotal)}</span>
+                </div>
+              )}
+              {parts > 0 && (
+                <div className="preview-financial__row">
+                  <span>Peças</span><span>{formatMoney(parts)}</span>
+                </div>
+              )}
+              {labor > 0 && (
+                <div className="preview-financial__row">
+                  <span>Mão de obra</span><span>{formatMoney(labor)}</span>
+                </div>
+              )}
+              {(discountPct > 0 || discountVal > 0) && (
+                <div className="preview-financial__row preview-financial__discount">
+                  <span>Desconto{discountPct > 0 ? ` (${discountPct}%)` : ""}</span>
+                  <span>- {formatMoney(calculatedDiscount)}</span>
+                </div>
+              )}
+              <div className="preview-financial__total">
+                <span>Total</span>
+                <strong>{formatMoney(total)}</strong>
               </div>
-            )}
-            {parts > 0 && (
-              <div className="preview-financial__row">
-                <span>Peças</span><span>{formatMoney(parts)}</span>
-              </div>
-            )}
-            {labor > 0 && (
-              <div className="preview-financial__row">
-                <span>Mão de obra</span><span>{formatMoney(labor)}</span>
-              </div>
-            )}
-            {(discountPct > 0 || discountVal > 0) && (
-              <div className="preview-financial__row preview-financial__discount">
-                <span>Desconto{discountPct > 0 ? ` (${discountPct}%)` : ""}</span>
-                <span>- {formatMoney(calculatedDiscount)}</span>
-              </div>
-            )}
-            <div className="preview-financial__total">
-              <span>Total</span>
-              <strong>{formatMoney(total)}</strong>
             </div>
           </div>
-        </div> */}
+        ) : null}
 
         {/* Observations */}
         {appointment.notes && (
@@ -390,6 +405,7 @@ export function TodayAppointments({
   const [profFilter, setProfFilter] = useState("");
 
   const canChangeStatus = !role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER", "STAFF"].includes(role);
+  const canSeeValues = Boolean(planFeatures?.allowFinancialControl) && (!role || ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"].includes(role));
 
   // Unique professionals for filter
   const professionals = [...new Map(
@@ -465,10 +481,9 @@ export function TodayAppointments({
                     <span className={`badge ${statusBadgeClass[appt.status] ?? ""}`}>
                       {statusLabels[appt.status] ?? appt.status}
                     </span>
-                    {/* TODO [MVP-FUTURE] Reativar totalValue na v2 */}
-                    {/* {canSeeValues && appt.totalValue && (
+                    {canSeeValues && appt.totalValue ? (
                       <span className="today-card__value">{formatMoney(appt.totalValue)}</span>
-                    )} */}
+                    ) : null}
                   </div>
                   {/* Quick actions */}
                   {canChangeStatus && !isTerminal && (

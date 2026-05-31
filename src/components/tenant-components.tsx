@@ -703,7 +703,6 @@ export function AppointmentManager() {
       return;
     }
     try {
-      // TODO [MVP-FUTURE] Reativar pricing financeiro na v2
       await apiFetch("/api/appointments", {
         method: "POST",
         body: JSON.stringify({
@@ -786,7 +785,6 @@ export function AppointmentManager() {
     setEditError("");
     setSaving(true);
     try {
-      // TODO [MVP-FUTURE] Reativar pricing financeiro na v2
       await apiFetch(`/api/appointments/${editingId}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -858,8 +856,7 @@ export function AppointmentManager() {
               <TextArea label="Observações gerais" value={editForm.notes} onChange={(notes) => setEditForm({ ...editForm, notes })} />
               <TextArea label="Observações internas" value={editForm.internalNotes} onChange={(internalNotes) => setEditForm({ ...editForm, internalNotes })} />
               <DynamicFields fields={filteredFields} values={editCustomValues} onChange={setEditCustomValues} />
-              {/* TODO [MVP-FUTURE] Reativar calculadora financeira na v2 */}
-              {/* <PricingSummary services={services} selectedIds={editSelectedServiceIds} servicesTotal={editServicesTotal} pricing={editPricing} onPricingChange={setEditPricing} /> */}
+              {/* Pricing financeiro fica em /agenda (AgendaPage v2), não neste form legacy */}
               <div className="field full" style={{ display: "flex", gap: 12 }}>
                 <button className="button" type="submit" disabled={saving}>
                   <Save size={16} />
@@ -886,8 +883,7 @@ export function AppointmentManager() {
           <TextArea label="Observações gerais" value={form.notes} onChange={(notes) => setForm({ ...form, notes })} />
           <TextArea label="Observações internas" value={form.internalNotes} onChange={(internalNotes) => setForm({ ...form, internalNotes })} />
           <DynamicFields fields={filteredFields} values={customValues} onChange={setCustomValues} />
-          {/* TODO [MVP-FUTURE] Reativar calculadora financeira na v2 */}
-          {/* <PricingSummary services={services} selectedIds={selectedServiceIds} servicesTotal={selectedServicesTotal} pricing={pricing} onPricingChange={setPricing} /> */}
+          {/* Pricing financeiro fica em /agenda (AgendaPage v2), não neste form legacy */}
           <div className="field full">
             <button className="button" type="submit">
               <CalendarPlus size={16} />

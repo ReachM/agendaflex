@@ -105,55 +105,88 @@ export async function getAvailableSlots(input: {
   if (requestedDate < today) return empty("Data no passado.");
   if (requestedDate > maxDate) return empty("Data além do limite permitido.");
 
-  let startHour = 8;
-  let endHour = 18;
+  let startMinute = 8 * 60;
+  let endMinute = 18 * 60;
   const dayOfWeek = requestedDate.getDay();
 
   if (professional.workingHours && typeof professional.workingHours === "object") {
-    const wh = professional.workingHours as Record<string, { start?: number; end?: number; off?: boolean }>;
+    // Supporta dois formatos:
+    //   v1 (legado): { start: 9, end: 18, off: false }
+    //   v2 (novo): { open: true, from: "09:00", to: "18:00" }   ← salvo pelo ProfessionalManager refatorado
+    const wh = professional.workingHours as Record<string, { start?: number; end?: number; off?: boolean; open?: boolean; from?: string; to?: string }>;
     const dayConfig = wh[DAY_KEYS[dayOfWeek]];
-    if (dayConfig?.off) return empty("Profissional não atende nesse dia.");
-    if (dayConfig?.start !== undefined) startHour = dayConfig.start;
-    if (dayConfig?.end !== undefined) endHour = dayConfig.end;
+    if (dayConfig) {
+      // v1
+      if (dayConfig.off) return empty("Profissional não atende nesse dia.");
+      // v2
+      if (dayConfig.open === false) return empty("Profissional não atende nesse dia.");
+
+      if (dayConfig.start !== undefined) startMinute = dayConfig.start * 60;
+      if (dayConfig.end !== undefined) endMinute = dayConfig.end * 60;
+      if (dayConfig.from) {
+        const [h, m] = dayConfig.from.split(":").map(Number);
+        if (!Number.isNaN(h)) startMinute = h * 60 + (m || 0);
+      }
+      if (dayConfig.to) {
+        const [h, m] = dayConfig.to.split(":").map(Number);
+        if (!Number.isNaN(h)) endMinute = h * 60 + (m || 0);
+      }
+    }
+  } else if (dayOfWeek === 0) {
+    // Domingo desligado por padrão APENAS quando não há config explícita.
+    return empty("Não há atendimento aos domingos.");
   }
 
-  // Domingo desligado por padrão.
-  if (dayOfWeek === 0) return empty("Não há atendimento aos domingos.");
-
   const dayStart = new Date(requestedDate);
-  dayStart.setHours(startHour, 0, 0, 0);
+  dayStart.setHours(Math.floor(startMinute / 60), startMinute % 60, 0, 0);
   const dayEnd = new Date(requestedDate);
-  dayEnd.setHours(endHour, 0, 0, 0);
+  dayEnd.setHours(Math.floor(endMinute / 60), endMinute % 60, 0, 0);
 
-  const existingAppointments = await prisma.appointment.findMany({
-    where: {
-      companyId,
-      professionalId,
-      status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
-      startAt: { lt: dayEnd },
-      endAt: { gt: dayStart }
-    },
-    select: { startAt: true, endAt: true }
-  });
+  const [existingAppointments, dayTimeOffs] = await Promise.all([
+    prisma.appointment.findMany({
+      where: {
+        companyId,
+        professionalId,
+        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+        startAt: { lt: dayEnd },
+        endAt: { gt: dayStart }
+      },
+      select: { startAt: true, endAt: true }
+    }),
+    prisma.professionalTimeOff.findMany({
+      where: {
+        companyId,
+        professionalId,
+        startAt: { lt: dayEnd },
+        endAt: { gt: dayStart }
+      },
+      select: { startAt: true, endAt: true }
+    })
+  ]);
 
   const minNotice = new Date(now.getTime() + minNoticeHours * 60 * 60 * 1000);
   const allSlots: AvailableSlot[] = [];
 
-  for (let minutes = startHour * 60; minutes + serviceDuration <= endHour * 60; minutes += slotInterval) {
+  for (let minutes = startMinute; minutes + serviceDuration <= endMinute; minutes += slotInterval) {
     const slotStart = new Date(requestedDate);
     slotStart.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
     const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60 * 1000);
 
     if (slotStart < minNotice) continue;
 
-    const hasConflict = existingAppointments.some((appt) => {
+    const hasAppointmentConflict = existingAppointments.some((appt) => {
       const apptStart = new Date(appt.startAt);
       const apptEnd = new Date(appt.endAt);
       return slotStart < apptEnd && slotEnd > apptStart;
     });
+    const hasTimeOffConflict = dayTimeOffs.some((t) => {
+      const tStart = new Date(t.startAt);
+      const tEnd = new Date(t.endAt);
+      return slotStart < tEnd && slotEnd > tStart;
+    });
 
     const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-    allSlots.push({ time, startAt: slotStart.toISOString(), endAt: slotEnd.toISOString(), available: !hasConflict });
+    allSlots.push({ time, startAt: slotStart.toISOString(), endAt: slotEnd.toISOString(), available: !hasAppointmentConflict && !hasTimeOffConflict });
   }
 
   return { slots: allSlots.filter((s) => s.available), allSlots, serviceDuration, date };
