@@ -155,8 +155,11 @@ export const professionalCreateSchema = z.object({
   email: optionalString(255),
   phone: optionalString(30),
   specialty: optionalString(180),
+  avatarUrl: optionalString(500),
   isActive: z.coerce.boolean().default(true),
+  isPublic: z.coerce.boolean().default(true),
   workingHours: z.unknown().optional(),
+  serviceIds: z.array(z.string()).optional(),
   customValues
 });
 
