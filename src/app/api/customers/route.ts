@@ -23,9 +23,14 @@ export async function GET(request: NextRequest) {
   try {
     const context = await requireTenant(request, "customers:manage");
     const query = listQuerySchema.parse(Object.fromEntries(request.nextUrl.searchParams));
+    const tag = request.nextUrl.searchParams.get("tag");
 
-    // Check if user can see clinical notes (sensitive data)
     const canViewClinicalNotes = hasPermission(context.roleName, "customers:manage");
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const last90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
     const customers = await prisma.customer.findMany({
       where: {
@@ -44,30 +49,97 @@ export async function GET(request: NextRequest) {
           : {})
       },
       orderBy: { createdAt: "desc" },
-      take: 100
+      take: 200
     });
 
-    // Strip sensitive fields for users without permission
+    // Aggregate visits per customer (completed appointments)
+    const customerIds = customers.map(c => c.id);
+    const [aggregates, lastVisits] = customerIds.length > 0
+      ? await Promise.all([
+          prisma.appointment.groupBy({
+            by: ["customerId"],
+            where: { companyId: context.companyId, customerId: { in: customerIds }, status: "COMPLETED" },
+            _count: { id: true },
+            _sum: { totalValue: true }
+          }),
+          prisma.appointment.groupBy({
+            by: ["customerId"],
+            where: { companyId: context.companyId, customerId: { in: customerIds }, status: { notIn: ["CANCELLED", "NO_SHOW"] } },
+            _max: { startAt: true }
+          })
+        ])
+      : [[], []];
+
+    const visitMap = new Map<string, { count: number; spent: number }>();
+    for (const a of aggregates) {
+      visitMap.set(a.customerId, { count: a._count.id, spent: Number(a._sum.totalValue ?? 0) });
+    }
+    const lastVisitMap = new Map<string, Date | null>();
+    for (const a of lastVisits) {
+      lastVisitMap.set(a.customerId, a._max.startAt ?? null);
+    }
+
+    function resolveTag(c: typeof customers[number], visits: number, spent: number, lastVisit: Date | null): "VIP" | "NEW" | "RECURRING" | "INACTIVE" | "REGULAR" {
+      if (spent >= 1000 || visits >= 5) return "VIP";
+      if (new Date(c.createdAt).getTime() >= last30.getTime()) return "NEW";
+      if (lastVisit && new Date(lastVisit).getTime() < last90.getTime()) return "INACTIVE";
+      if (visits >= 2) return "RECURRING";
+      return "REGULAR";
+    }
+
     const processed = customers.map(c => {
-      if (!canViewClinicalNotes) {
-        return {
-          ...c,
-          clinicalNotes: c.clinicalNotes ? "[Restrito]" : null,
-          allergies: c.allergies ? "[Restrito]" : null,
-          medications: c.medications ? "[Restrito]" : null,
-          preExistingConditions: c.preExistingConditions ? "[Restrito]" : null,
-          requiredCare: c.requiredCare ? "[Restrito]" : null
-        };
-      }
-      return c;
+      const v = visitMap.get(c.id) ?? { count: 0, spent: 0 };
+      const lastVisit = lastVisitMap.get(c.id) ?? null;
+      const computedTag = resolveTag(c, v.count, v.spent, lastVisit);
+
+      const stripped = !canViewClinicalNotes
+        ? {
+            ...c,
+            clinicalNotes: c.clinicalNotes ? "[Restrito]" : null,
+            allergies: c.allergies ? "[Restrito]" : null,
+            medications: c.medications ? "[Restrito]" : null,
+            preExistingConditions: c.preExistingConditions ? "[Restrito]" : null,
+            requiredCare: c.requiredCare ? "[Restrito]" : null
+          }
+        : c;
+
+      return {
+        ...stripped,
+        stats: {
+          visitCount: v.count,
+          totalSpent: v.spent,
+          avgTicket: v.count > 0 ? Number((v.spent / v.count).toFixed(2)) : 0,
+          lastVisit
+        },
+        tag: computedTag
+      };
     });
 
-    // Get company segment to determine which fields to show
-    const segment = context.company.segment;
+    const filtered = tag && tag !== "all"
+      ? processed.filter(c => c.tag === tag.toUpperCase())
+      : processed;
+
+    // Global metrics
+    const vipCount = processed.filter(c => c.tag === "VIP").length;
+    const newCount = processed.filter(c => c.tag === "NEW").length;
+    const inactiveCount = processed.filter(c => c.tag === "INACTIVE").length;
+    const totalSpentAll = processed.reduce((acc, c) => acc + c.stats.totalSpent, 0);
+    const totalVisitsAll = processed.reduce((acc, c) => acc + c.stats.visitCount, 0);
+    const avgTicketGlobal = totalVisitsAll > 0 ? Number((totalSpentAll / totalVisitsAll).toFixed(2)) : 0;
+    const newThisMonth = await prisma.customer.count({ where: { companyId: context.companyId, deletedAt: null, createdAt: { gte: startOfMonth } } });
 
     return ok({
-      customers: await attachCustomValues(context.companyId, "CUSTOMER", processed),
-      segment
+      customers: await attachCustomValues(context.companyId, "CUSTOMER", filtered),
+      segment: context.company.segment,
+      metrics: {
+        total: customers.length,
+        vipCount,
+        newCount,
+        newThisMonth,
+        inactiveCount,
+        avgTicket: avgTicketGlobal,
+        totalSpent: totalSpentAll
+      }
     });
   } catch (error) {
     return handleApiError(error);
