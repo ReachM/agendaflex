@@ -36,7 +36,35 @@ type Settings = {
   instructions: string | null;
   confirmationMessage: string | null;
   requireManualApproval: boolean;
+  primaryColor?: string | null;
 };
+
+function shadeHex(hex: string, amount: number): string {
+  const clean = hex.replace("#", "");
+  if (clean.length !== 6) return hex;
+  const r = Math.max(0, Math.min(255, parseInt(clean.slice(0, 2), 16) + amount));
+  const g = Math.max(0, Math.min(255, parseInt(clean.slice(2, 4), 16) + amount));
+  const b = Math.max(0, Math.min(255, parseInt(clean.slice(4, 6), 16) + amount));
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace("#", "");
+  if (clean.length !== 6) return hex;
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function brandPalette(primary: string): React.CSSProperties {
+  return {
+    ["--pb-brand" as never]: primary,
+    ["--pb-brand-hover" as never]: shadeHex(primary, -24),
+    ["--pb-brand-light" as never]: hexToRgba(primary, 0.18),
+    ["--pb-brand-ghost" as never]: hexToRgba(primary, 0.08)
+  };
+}
 
 const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MONTH_SHORT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -256,10 +284,12 @@ export default function PublicBookingPage() {
     .join("")
     .toUpperCase();
 
+  const brandStyle = brandPalette(settings?.primaryColor ?? "#0d9488");
+
   // ─── Success ──────────────────────────────────────────────
   if (success) {
     return (
-      <div className="pb">
+      <div className="pb" style={brandStyle}>
         <div className="pb__shell">
           <Header companyDisplay={companyDisplay} initials={initials} phone={company?.phone ?? null} businessHours={company?.businessHours ?? null} />
           <div className="pb-card">
@@ -286,7 +316,7 @@ export default function PublicBookingPage() {
 
   // ─── Main flow ────────────────────────────────────────────
   return (
-    <div className="pb">
+    <div className="pb" style={brandStyle}>
       <div className="pb__shell">
         <Header companyDisplay={companyDisplay} initials={initials} phone={company?.phone ?? null} businessHours={company?.businessHours ?? null} />
 

@@ -7,6 +7,7 @@ import {
   CheckCircle,
   Edit2,
   Eye,
+  Palette,
   RefreshCcw,
   Save,
   Trash2,
@@ -1320,6 +1321,16 @@ export function ReportsView() {
 
 export { SettingsView } from "@/components/settings-view";
 
+const BRAND_COLORS = [
+  { hex: "#0d9488", label: "Teal (padrão)" },
+  { hex: "#d97706", label: "Âmbar" },
+  { hex: "#9333ea", label: "Roxo" },
+  { hex: "#db2777", label: "Rosa" },
+  { hex: "#2563eb", label: "Azul" },
+  { hex: "#16a34a", label: "Verde" },
+  { hex: "#0f172a", label: "Slate" }
+];
+
 export function BookingSettingsManager() {
   const [settings, setSettings] = useState<AnyRecord | null>(null);
   const [services, setServices] = useState<AnyRecord[]>([]);
@@ -1330,6 +1341,7 @@ export function BookingSettingsManager() {
   const [success, setSuccess] = useState("");
   const [copied, setCopied] = useState(false);
   const [session, setSession] = useState<AnyRecord | null>(null);
+  const [primaryColor, setPrimaryColor] = useState<string>("#0d9488");
 
   async function load() {
     setError("");
@@ -1343,6 +1355,7 @@ export function BookingSettingsManager() {
       setProfessionals(data.professionals);
       setCompany(data.company);
       setSession(sessionData);
+      setPrimaryColor(data.settings?.primaryColor ?? "#0d9488");
     } catch (err) {
       setError((err as Error).message);
     }
@@ -1506,6 +1519,84 @@ export function BookingSettingsManager() {
           </div>
         </section>
       </div>
+
+      {/* Identidade visual */}
+      <section className="panel" style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <span style={{ width: 36, height: 36, borderRadius: 10, background: "var(--primary-light)", color: "var(--primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Palette size={18} />
+          </span>
+          <div>
+            <h2 className="section-title" style={{ margin: 0 }}>Identidade visual</h2>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>
+              Cor primária exibida na sua página pública de agendamento
+            </p>
+          </div>
+        </div>
+
+        <div className="field">
+          <label>Cor primária</label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+            {BRAND_COLORS.map((c) => (
+              <button
+                key={c.hex}
+                type="button"
+                title={c.label}
+                onClick={() => {
+                  setPrimaryColor(c.hex);
+                  save({ primaryColor: c.hex });
+                }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: c.hex,
+                  border: "none",
+                  cursor: "pointer",
+                  outline: primaryColor === c.hex ? `3px solid ${c.hex}` : "3px solid transparent",
+                  outlineOffset: 2,
+                  transition: "outline var(--transition)",
+                  boxShadow: primaryColor === c.hex ? "0 0 0 1px #fff inset" : "none"
+                }}
+                aria-label={c.label}
+                aria-pressed={primaryColor === c.hex}
+              />
+            ))}
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="color"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                onBlur={(e) => save({ primaryColor: e.target.value })}
+                style={{ width: 32, height: 32, borderRadius: "50%", border: "none", cursor: "pointer", padding: 0, background: "transparent" }}
+              />
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>Customizada</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Preview mini */}
+        <div style={{ marginTop: 16, padding: 16, background: "var(--surface-muted)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Pré-visualização</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 9, background: primaryColor, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 14 }}>
+              {(company?.name ?? "M")
+                .split(" ")
+                .slice(0, 2)
+                .map((w: string) => w[0])
+                .join("")
+                .toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{company?.name ?? "Sua empresa"}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>Agendar serviço</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 10, height: 36, borderRadius: 8, background: primaryColor, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 600 }}>
+            Confirmar agendamento
+          </div>
+        </div>
+      </section>
 
       {/* Scheduling Rules */}
       <section className="panel" style={{ marginTop: 16 }}>

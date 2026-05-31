@@ -348,6 +348,7 @@ model Company {
   notificationLogs       NotificationLog[]
   botConfiguration       CompanyBotConfig?
   botConversationStates  BotConversationState[]
+  integrations           CompanyIntegration[]
 
   // Liga/desliga do bot — fonte única de verdade. Reaproveitado pelo bot Evolution API.
   botEnabled Boolean @default(false)
@@ -1081,6 +1082,7 @@ model PublicBookingSettings {
   sendEmailNotifications    Boolean  @default(true)
   sendWhatsappNotifications Boolean  @default(false)
   sendSmsNotifications      Boolean  @default(false)
+  primaryColor              String?  @default("#0d9488")
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 
@@ -1214,4 +1216,39 @@ model SentReminder {
 
   @@unique([appointmentId, type])
   @@index([appointmentId])
+}
+
+// ═══════════════════════════════════════════════════
+// SYSTEM FLAGS (feature flags globais da plataforma)
+// ═══════════════════════════════════════════════════
+
+model SystemFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Boolean  @default(false)
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}
+
+// ═══════════════════════════════════════════════════
+// COMPANY INTEGRATIONS (NFE.io, Stripe, Asaas, etc.)
+// Apenas metadados não-sensíveis. API keys completas NUNCA são persistidas —
+// apenas os últimos 4 chars (apiKeyHint) para o usuário identificar a chave.
+// ═══════════════════════════════════════════════════
+
+model CompanyIntegration {
+  id         String   @id @default(cuid())
+  companyId  String
+  type       String
+  isActive   Boolean  @default(false)
+  config     Json     @default("{}")
+  apiKeyHint String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, type])
+  @@index([companyId])
 }

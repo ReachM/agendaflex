@@ -1,574 +1,301 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,
-  Clock,
+  Briefcase,
+  CalendarDays,
   DollarSign,
   Download,
-  Lightbulb,
-  Sparkles,
+  FileSpreadsheet,
+  LayoutDashboard,
+  Lock,
   TrendingDown,
   TrendingUp,
+  UserCog,
   Users
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";
 
-type ServiceRow = { serviceId: string | null; serviceName: string; count: number };
-type StatusRow = { status: string; count: number };
-type ProRow = { professionalId: string; professionalName: string; specialty: string | null; count: number };
-type PeakRow = { hour: number; count: number };
-type WeekdayRow = { weekday: number; weekdayName: string; count: number };
-type ClientRow = { customerId: string; customerName: string; totalSpent: number; appointmentCount: number };
+type PlanFeatures = {
+  planSlug: string;
+  allowAdvancedReports?: boolean;
+  allowFinancialControl?: boolean;
+};
 
-type ReportData = {
-  planLevel: string;
-  period: { from: string; to: string };
-  starter: {
-    totalAppointments: number;
-    appointmentsByStatus: StatusRow[];
-    totalCustomers: number;
+type OverviewData = {
+  totalAppointments: number;
+  completedAppointments: number;
+  cancelledAppointments: number;
+  noShowAppointments: number;
+  newCustomers: number;
+  revenue: number;
+  appointmentsByDay: { date: string; count: number }[];
+};
+
+type ServiceRow = {
+  serviceId: string;
+  serviceName: string;
+  count: number;
+  revenue: number;
+  avgPrice: number;
+  cancellationRate: number;
+};
+
+type ProfessionalRow = {
+  professionalId: string;
+  professionalName: string;
+  count: number;
+  completedCount: number;
+  cancelledCount: number;
+  revenue: number;
+};
+
+type CustomerRow = {
+  customerId: string;
+  customerName: string;
+  appointmentCount: number;
+  totalSpent: number;
+  lastAppointment: string | null;
+  status: string;
+};
+
+type CustomersData = {
+  rows: CustomerRow[];
+  retention: {
     newCustomers: number;
-    topServices: ServiceRow[];
-  };
-  pro?: {
-    byProfessional: ProRow[];
-    cancellationRate: number;
-    totalCancelled: number;
-    clientBookings: number;
-    clientBookingRate: number;
-    peakHours: PeakRow[];
-    hourlyDistribution: PeakRow[];
-    weekdayDistribution: WeekdayRow[];
-    returningCustomersCount: number;
-    retentionRate: number;
-    bestDay: WeekdayRow | null;
-  };
-  max?: {
-    totalRevenue: number;
-    totalCosts: number;
-    totalExpenses: number;
-    profit: number;
-    margin: number;
-    avgTicket: number;
-    dailyRevenue: { date: string; total: number }[];
-    topClientsBySpend: ClientRow[];
+    returningCustomers: number;
+    churnRate: number;
   };
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  SCHEDULED: "Agendado",
-  CONFIRMED: "Confirmado",
-  IN_PROGRESS: "Em atendimento",
-  COMPLETED: "Concluído",
-  CANCELLED: "Cancelado",
-  NO_SHOW: "Não compareceu"
+type FinancialData = {
+  revenueByMonth: { month: string; revenue: number; expense: number }[];
+  topServices: { name: string; revenue: number }[];
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: "var(--info)",
-  CONFIRMED: "var(--primary)",
-  IN_PROGRESS: "var(--accent)",
-  COMPLETED: "var(--success)",
-  CANCELLED: "var(--danger)",
-  NO_SHOW: "#94a3b8"
+type ApiResponse = {
+  period: { from: string; to: string };
+  planFeatures: PlanFeatures;
+  overview?: OverviewData;
+  services?: { rows: ServiceRow[] };
+  professionals?: { rows: ProfessionalRow[] };
+  customers?: CustomersData;
+  financial?: FinancialData;
 };
 
-type Range = "7d" | "30d" | "month" | "year" | "custom";
+type TabId = "overview" | "services" | "professionals" | "customers" | "financial" | "custom";
 
-const RANGE_LABELS: { id: Range; label: string }[] = [
-  { id: "7d", label: "7 dias" },
-  { id: "30d", label: "30 dias" },
-  { id: "month", label: "Mês" },
-  { id: "year", label: "Ano" },
-  { id: "custom", label: "Personalizado" }
+const TABS: { id: TabId; label: string; icon: typeof LayoutDashboard; planFeature: keyof PlanFeatures | null }[] = [
+  { id: "overview", label: "Visão geral", icon: LayoutDashboard, planFeature: null },
+  { id: "services", label: "Serviços", icon: Briefcase, planFeature: "allowAdvancedReports" },
+  { id: "professionals", label: "Profissionais", icon: UserCog, planFeature: "allowAdvancedReports" },
+  { id: "customers", label: "Clientes", icon: Users, planFeature: "allowAdvancedReports" },
+  { id: "financial", label: "Financeiro", icon: DollarSign, planFeature: "allowAdvancedReports" },
+  { id: "custom", label: "Personalizado", icon: Download, planFeature: "allowAdvancedReports" }
 ];
 
-function rangeBounds(range: Range, customFrom: string, customTo: string): { from: string; to: string } {
+type Range = "week" | "month" | "quarter" | "year";
+const RANGES: { id: Range; label: string }[] = [
+  { id: "week", label: "Semana" },
+  { id: "month", label: "Mês" },
+  { id: "quarter", label: "Trimestre" },
+  { id: "year", label: "Ano" }
+];
+
+function rangeBounds(range: Range): { from: string; to: string } {
   const now = new Date();
   const to = new Date(now);
   to.setHours(23, 59, 59, 999);
-  let from = new Date(now);
+  const from = new Date(now);
   from.setHours(0, 0, 0, 0);
 
-  if (range === "7d") {
-    from.setDate(from.getDate() - 6);
-  } else if (range === "30d") {
-    from.setDate(from.getDate() - 29);
-  } else if (range === "month") {
-    from = new Date(now.getFullYear(), now.getMonth(), 1);
-  } else if (range === "year") {
-    from = new Date(now.getFullYear(), 0, 1);
-  } else if (range === "custom") {
-    if (customFrom) from = new Date(customFrom);
-    if (customTo) {
-      const t = new Date(customTo);
-      t.setHours(23, 59, 59, 999);
-      return { from: from.toISOString(), to: t.toISOString() };
-    }
-  }
+  if (range === "week") from.setDate(from.getDate() - 6);
+  else if (range === "month") from.setDate(from.getDate() - 29);
+  else if (range === "quarter") from.setMonth(from.getMonth() - 3);
+  else from.setFullYear(from.getFullYear() - 1);
 
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-function formatMoney(value: number) {
+function formatMoney(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(new Date(value));
+function formatMonthLabel(key: string): string {
+  const [year, month] = key.split("-");
+  const labels = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  return `${labels[Number(month) - 1] ?? month}/${year.slice(-2)}`;
 }
 
-type TabKey = "overview" | "financial" | "customers" | "professionals" | "services" | "occupation";
+function formatDayShort(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function pct(part: number, total: number): string {
+  if (total === 0) return "0%";
+  return `${((part / total) * 100).toFixed(1)}%`;
+}
 
 export default function RelatoriosPage() {
-  const [data, setData] = useState<ReportData | null>(null);
-  const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [range, setRange] = useState<Range>("month");
+  const [data, setData] = useState<ApiResponse | null>(null);
+  const [planFeatures, setPlanFeatures] = useState<PlanFeatures | null>(null);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<Range>("30d");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
-  const [tab, setTab] = useState<TabKey>("overview");
+  const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (tab: TabId, currentRange: Range) => {
+    if (tab === "custom") return;
+    const tabForApi = tab === "overview" ? "overview" : tab;
     setLoading(true);
-    const { from, to } = rangeBounds(range, customFrom, customTo);
-    const params = new URLSearchParams({ from, to });
+    setError("");
     try {
-      const result = await apiFetch<ReportData>(`/api/reports?${params}`);
-      setData(result);
-      setError("");
+      const { from, to } = rangeBounds(currentRange);
+      const res = await apiFetch<ApiResponse>(
+        `/api/reports?tab=${tabForApi}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      );
+      setData(res);
+      setPlanFeatures(res.planFeatures);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [range, customFrom, customTo]);
+  }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load(activeTab, range);
+  }, [activeTab, range, load]);
 
-  const completedCount = useMemo(() =>
-    data?.starter.appointmentsByStatus.find(s => s.status === "COMPLETED")?.count ?? 0,
-    [data]);
-
-  const insight = useMemo(() => {
-    if (!data?.pro?.bestDay) return null;
-    return `${data.pro.bestDay.weekdayName} é seu dia de ouro: ${data.pro.bestDay.count} atendimentos no período.`;
-  }, [data]);
-
-  function exportCsv() {
-    if (!data) return;
-    const rows: (string | number)[][] = [
-      ["Período", `${data.period.from} → ${data.period.to}`],
-      [],
-      ["Visão geral"],
-      ["Total agendamentos", data.starter.totalAppointments],
-      ["Concluídos", completedCount],
-      ["Clientes cadastrados", data.starter.totalCustomers],
-      ["Novos no período", data.starter.newCustomers],
-      [],
-      ["Status", "Quantidade"],
-      ...data.starter.appointmentsByStatus.map(s => [STATUS_LABELS[s.status] ?? s.status, s.count] as (string | number)[]),
-      [],
-      ["Top serviços", "Vezes agendado"],
-      ...data.starter.topServices.map(s => [s.serviceName, s.count] as (string | number)[])
-    ];
-    if (data.pro) {
-      rows.push([], ["Profissionais", "Atendimentos"]);
-      data.pro.byProfessional.forEach(p => rows.push([p.professionalName, p.count]));
-    }
-    if (data.max) {
-      rows.push([], ["Financeiro"]);
-      rows.push(["Receita", data.max.totalRevenue]);
-      rows.push(["Custos", data.max.totalCosts]);
-      rows.push(["Despesas", data.max.totalExpenses]);
-      rows.push(["Lucro", data.max.profit]);
-      rows.push(["Margem (%)", data.max.margin]);
-      rows.push(["Ticket médio", data.max.avgTicket]);
-    }
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `relatorio-${range}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  function handleTabClick(tab: TabId) {
+    const meta = TABS.find((t) => t.id === tab);
+    if (meta?.planFeature && !planFeatures?.[meta.planFeature]) return;
+    setActiveTab(tab);
   }
-
-  const showFinancialTab = Boolean(data?.max);
-  const showProTabs = Boolean(data?.pro);
-  const tabs: { id: TabKey; label: string; visible: boolean }[] = [
-    { id: "overview", label: "Visão geral", visible: true },
-    { id: "financial", label: "Financeiro", visible: showFinancialTab },
-    { id: "customers", label: "Clientes", visible: true },
-    { id: "professionals", label: "Profissionais", visible: showProTabs },
-    { id: "services", label: "Serviços", visible: true },
-    { id: "occupation", label: "Ocupação", visible: showProTabs }
-  ];
-  const visibleTabs = tabs.filter(t => t.visible);
 
   return (
     <>
       <PageHeader
         title="Relatórios"
-        subtitle={`Indicadores do plano ${data?.planLevel?.toUpperCase() ?? ""}`}
+        subtitle="Visão analítica do seu negócio"
         actions={
-          <>
-            <div className="range-pill" role="tablist" aria-label="Período">
-              {RANGE_LABELS.map(r => (
-                <button
-                  key={r.id}
-                  type="button"
-                  className={range === r.id ? "is-active" : ""}
-                  onClick={() => setRange(r.id)}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            {range === "custom" ? (
-              <>
-                <input className="input" type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{ width: 150 }} />
-                <input className="input" type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={{ width: 150 }} />
-              </>
-            ) : null}
-            <button type="button" className="btn btn-ghost" onClick={exportCsv} disabled={!data}>
-              <Download size={15} /> Exportar
-            </button>
-          </>
-        }
-      />
-
-      {error ? <div className="error-box">{error}</div> : null}
-
-      {loading && !data ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-          <div className="loading-spinner" />
-        </div>
-      ) : data ? (
-        <>
-          {insight ? (
-            <div className="panel" style={{ marginBottom: 16, padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--warning-light)", color: "var(--warning)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                <Lightbulb size={20} />
-              </div>
-              <div>
-                <strong style={{ fontSize: 14 }}>Insight automático</strong>
-                <div style={{ fontSize: 13, color: "var(--muted)" }}>{insight}</div>
-              </div>
-            </div>
-          ) : null}
-
-          {/* Tabs */}
-          <div className="tabs" style={{ marginBottom: 16 }}>
-            {visibleTabs.map(t => (
+          <div style={{ display: "flex", gap: 4, background: "var(--surface-muted)", padding: 4, borderRadius: 9 }}>
+            {RANGES.map((r) => (
               <button
-                key={t.id}
+                key={r.id}
                 type="button"
-                className={`tab ${tab === t.id ? "active" : ""}`}
-                onClick={() => setTab(t.id)}
+                onClick={() => setRange(r.id)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  border: "none",
+                  background: range === r.id ? "var(--surface)" : "transparent",
+                  color: range === r.id ? "var(--text)" : "var(--muted)",
+                  fontWeight: range === r.id ? 600 : 500,
+                  fontSize: 12.5,
+                  cursor: "pointer",
+                  boxShadow: range === r.id ? "var(--shadow-sm)" : "none",
+                  transition: "all var(--transition)"
+                }}
               >
-                {t.label}
+                {r.label}
               </button>
             ))}
           </div>
+        }
+      />
 
-          {tab === "overview" ? (
-            <OverviewTab data={data} completedCount={completedCount} />
-          ) : tab === "financial" && data.max ? (
-            <FinancialTab data={data.max} />
-          ) : tab === "customers" ? (
-            <CustomersTab data={data} />
-          ) : tab === "professionals" && data.pro ? (
-            <ProfessionalsTab data={data.pro} />
-          ) : tab === "services" ? (
-            <ServicesTab services={data.starter.topServices} />
-          ) : tab === "occupation" && data.pro ? (
-            <OccupationTab data={data.pro} />
-          ) : null}
-        </>
-      ) : null}
+      <TabBar activeTab={activeTab} planFeatures={planFeatures} onSelect={handleTabClick} />
+
+      {error && <div className="error-box">{error}</div>}
+
+      {activeTab === "custom" ? (
+        <CustomTab range={range} />
+      ) : loading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+          <div className="loading-spinner" />
+        </div>
+      ) : !data ? (
+        <div className="empty-state">
+          <h3>Sem dados</h3>
+          <p>Selecione um período para visualizar os relatórios.</p>
+        </div>
+      ) : activeTab === "overview" && data.overview ? (
+        <OverviewTab data={data.overview} />
+      ) : activeTab === "services" && data.services ? (
+        <ServicesTab rows={data.services.rows} />
+      ) : activeTab === "professionals" && data.professionals ? (
+        <ProfessionalsTab rows={data.professionals.rows} />
+      ) : activeTab === "customers" && data.customers ? (
+        <CustomersTab data={data.customers} />
+      ) : activeTab === "financial" && data.financial ? (
+        <FinancialTab data={data.financial} />
+      ) : (
+        <div className="empty-state">
+          <h3>Sem dados para esta aba</h3>
+        </div>
+      )}
     </>
   );
 }
 
-function OverviewTab({ data, completedCount }: { data: ReportData; completedCount: number }) {
-  const statusMax = Math.max(...data.starter.appointmentsByStatus.map(s => s.count), 1);
-  const conversionRate = data.starter.totalAppointments > 0
-    ? Number(((completedCount / data.starter.totalAppointments) * 100).toFixed(0))
-    : 0;
-
+function TabBar({
+  activeTab,
+  planFeatures,
+  onSelect
+}: {
+  activeTab: TabId;
+  planFeatures: PlanFeatures | null;
+  onSelect: (tab: TabId) => void;
+}) {
   return (
-    <>
-      <div className="grid cols-4" style={{ marginBottom: 16 }}>
-        <KpiCard label="Atendimentos" value={String(data.starter.totalAppointments)} icon={<BarChart3 size={20} />} variant="info" hint={`${completedCount} concluídos`} />
-        <KpiCard label="Taxa de conclusão" value={`${conversionRate}%`} icon={<Sparkles size={20} />} variant="success" hint={`${completedCount}/${data.starter.totalAppointments}`} />
-        <KpiCard label="Novos clientes" value={String(data.starter.newCustomers)} icon={<Users size={20} />} variant="warning" hint={`${data.starter.totalCustomers} no total`} />
-        {data.pro ? (
-          <KpiCard label="Cancelamentos" value={`${data.pro.cancellationRate}%`} icon={<TrendingDown size={20} />} variant="danger" hint={`${data.pro.totalCancelled} no período`} />
-        ) : (
-          <KpiCard label="Serviço top" value={data.starter.topServices[0]?.serviceName ?? "—"} icon={<TrendingUp size={20} />} variant="success" hint={`${data.starter.topServices[0]?.count ?? 0}x agendado`} />
-        )}
-      </div>
-
-      <div className="grid cols-2" style={{ marginBottom: 16 }}>
-        <section className="panel">
-          <div className="panel__head">
-            <div className="panel__title">Distribuição por status</div>
-          </div>
-          <div className="panel__body">
-            <div className="hbar">
-              {data.starter.appointmentsByStatus.map(s => (
-                <div key={s.status} className="hbar__item">
-                  <span className="hbar__label">{STATUS_LABELS[s.status] ?? s.status}</span>
-                  <div className="hbar__track">
-                    <div className="hbar__fill" style={{ width: `${Math.max((s.count / statusMax) * 100, 8)}%`, background: STATUS_COLORS[s.status] }}>{s.count}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel__head">
-            <div className="panel__title">Top serviços</div>
-          </div>
-          <div className="panel__body">
-            <ServicesBars services={data.starter.topServices.slice(0, 6)} />
-          </div>
-        </section>
-      </div>
-    </>
-  );
-}
-
-function FinancialTab({ data }: { data: NonNullable<ReportData["max"]> }) {
-  const maxDaily = Math.max(...data.dailyRevenue.map(d => d.total), 1);
-  return (
-    <>
-      <div className="grid cols-4" style={{ marginBottom: 16 }}>
-        <KpiCard label="Receita" value={formatMoney(data.totalRevenue)} icon={<TrendingUp size={20} />} variant="success" />
-        <KpiCard label="Custos" value={formatMoney(data.totalCosts)} icon={<TrendingDown size={20} />} variant="warning" />
-        <KpiCard label="Despesas" value={formatMoney(data.totalExpenses)} icon={<TrendingDown size={20} />} variant="danger" />
-        <KpiCard label="Lucro" value={formatMoney(data.profit)} icon={<DollarSign size={20} />} variant="info" hint={`Margem ${data.margin}%`} />
-      </div>
-
-      <div className="grid cols-2" style={{ marginBottom: 16 }}>
-        <section className="panel">
-          <div className="panel__head">
-            <div className="panel__title">Faturamento por dia</div>
-            <div className="panel__sub">Receita paga no período</div>
-          </div>
-          <div className="panel__body">
-            {data.dailyRevenue.length === 0 ? (
-              <div className="empty">Sem receita paga no período.</div>
-            ) : (
-              <div className="bar-chart" style={{ height: 180 }}>
-                {data.dailyRevenue.map(d => {
-                  const pct = (d.total / maxDaily) * 100;
-                  return (
-                    <div key={d.date} style={{ flex: 1, minWidth: 12, position: "relative", display: "flex", alignItems: "flex-end" }} title={`${formatDate(d.date)}: ${formatMoney(d.total)}`}>
-                      <div style={{ width: "100%", height: `${Math.max(pct, 4)}%`, background: "linear-gradient(180deg, var(--success), #15803d)", borderRadius: "4px 4px 0 0" }} />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel__head">
-            <div className="panel__title">Ticket médio</div>
-            <div className="panel__sub">Por atendimento concluído</div>
-          </div>
-          <div className="panel__body" style={{ textAlign: "center", padding: "24px 0" }}>
-            <div style={{ fontSize: 36, fontWeight: 800, color: "var(--text)" }}>{formatMoney(data.avgTicket)}</div>
-            <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted)" }}>
-              {data.topClientsBySpend.length} clientes acompanhados
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <section className="panel">
-        <div className="panel__head">
-          <div className="panel__title">Clientes mais valiosos</div>
-          <div className="panel__sub">Total gasto histórico</div>
-        </div>
-        <div className="panel__body panel__body--flush">
-          {data.topClientsBySpend.length === 0 ? (
-            <div className="empty">Sem dados ainda.</div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>Atendimentos</th>
-                  <th style={{ textAlign: "right" }}>Total gasto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.topClientsBySpend.map(c => (
-                  <tr key={c.customerId}>
-                    <td>{c.customerName}</td>
-                    <td>{c.appointmentCount}</td>
-                    <td style={{ textAlign: "right", fontWeight: 700 }}>{formatMoney(c.totalSpent)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </section>
-    </>
-  );
-}
-
-function CustomersTab({ data }: { data: ReportData }) {
-  return (
-    <div className="grid cols-3" style={{ marginBottom: 16 }}>
-      <KpiCard label="Total cadastrados" value={String(data.starter.totalCustomers)} icon={<Users size={20} />} variant="info" />
-      <KpiCard label="Novos no período" value={String(data.starter.newCustomers)} icon={<Sparkles size={20} />} variant="success" />
-      {data.pro ? (
-        <KpiCard label="Retenção" value={`${data.pro.retentionRate}%`} icon={<TrendingUp size={20} />} variant="warning" hint={`${data.pro.returningCustomersCount} recorrentes`} />
-      ) : null}
-    </div>
-  );
-}
-
-function ProfessionalsTab({ data }: { data: NonNullable<ReportData["pro"]> }) {
-  const max = Math.max(...data.byProfessional.map(p => p.count), 1);
-  return (
-    <section className="panel">
-      <div className="panel__head">
-        <div className="panel__title">Ranking de profissionais</div>
-        <div className="panel__sub">Atendimentos concluídos no período</div>
-      </div>
-      <div className="panel__body">
-        {data.byProfessional.length === 0 ? (
-          <div className="empty">Sem dados.</div>
-        ) : (
-          <div className="hbar">
-            {data.byProfessional.map((p, idx) => (
-              <div key={p.professionalId} className="hbar__item">
-                <span className="hbar__label" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <span className={`avatar avatar--sm av-${(idx % 8) + 1}`}>{p.professionalName[0]?.toUpperCase() ?? "?"}</span>
-                  <span>
-                    {p.professionalName}
-                    {p.specialty ? <span style={{ color: "var(--muted)", fontSize: 11, display: "block" }}>{p.specialty}</span> : null}
-                  </span>
-                </span>
-                <div className="hbar__track">
-                  <div className="hbar__fill" style={{ width: `${(p.count / max) * 100}%` }}>{p.count}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function ServicesTab({ services }: { services: ServiceRow[] }) {
-  return (
-    <section className="panel">
-      <div className="panel__head">
-        <div className="panel__title">Serviços mais procurados</div>
-        <div className="panel__sub">Top 10 do período</div>
-      </div>
-      <div className="panel__body">
-        <ServicesBars services={services} />
-      </div>
-    </section>
-  );
-}
-
-function ServicesBars({ services }: { services: ServiceRow[] }) {
-  if (services.length === 0) return <div className="empty">Sem dados.</div>;
-  const max = Math.max(...services.map(s => s.count), 1);
-  return (
-    <div className="hbar">
-      {services.map(s => (
-        <div key={s.serviceId ?? s.serviceName} className="hbar__item">
-          <span className="hbar__label">{s.serviceName}</span>
-          <div className="hbar__track">
-            <div className="hbar__fill" style={{ width: `${Math.max((s.count / max) * 100, 8)}%` }}>{s.count}x</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function OccupationTab({ data }: { data: NonNullable<ReportData["pro"]> }) {
-  const hourMax = Math.max(...data.hourlyDistribution.map(h => h.count), 1);
-  const dayMax = Math.max(...data.weekdayDistribution.map(d => d.count), 1);
-
-  return (
-    <div className="grid cols-2" style={{ marginBottom: 16 }}>
-      <section className="panel">
-        <div className="panel__head">
-          <div className="panel__title">Ocupação por hora</div>
-          <div className="panel__sub">Distribuição 0h–23h</div>
-        </div>
-        <div className="panel__body">
-          <div className="bar-chart" style={{ height: 180 }}>
-            {data.hourlyDistribution.map(h => {
-              const pct = (h.count / hourMax) * 100;
-              return (
-                <div key={h.hour} style={{ flex: 1, minWidth: 6, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 4 }} title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} agendamentos`}>
-                  <div style={{ width: "100%", height: `${Math.max(pct, 2)}%`, background: "linear-gradient(180deg, var(--primary), var(--primary-hover))", borderRadius: "4px 4px 0 0" }} />
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 10, color: "var(--muted)" }}>
-            <span>00h</span><span>06h</span><span>12h</span><span>18h</span><span>23h</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panel__head">
-          <div className="panel__title">Ocupação por dia da semana</div>
-          <div className="panel__sub">Atendimentos concluídos</div>
-        </div>
-        <div className="panel__body">
-          <div className="hbar">
-            {data.weekdayDistribution.map(d => (
-              <div key={d.weekday} className="hbar__item">
-                <span className="hbar__label">{d.weekdayName}</span>
-                <div className="hbar__track">
-                  <div className="hbar__fill" style={{ width: `${Math.max((d.count / dayMax) * 100, 4)}%` }}>{d.count}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="panel" style={{ gridColumn: "1 / -1" }}>
-        <div className="panel__head">
-          <div className="panel__title">Horários mais procurados</div>
-        </div>
-        <div className="panel__body">
-          {data.peakHours.length === 0 ? (
-            <div className="empty">Sem dados.</div>
-          ) : (
-            data.peakHours.map(h => (
-              <div key={h.hour} className="metric-row">
-                <span className="metric-row__label"><Clock size={14} />{String(h.hour).padStart(2, "0")}:00</span>
-                <span className="metric-row__value">{h.count} atendimentos</span>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
+    <div
+      style={{
+        display: "flex",
+        gap: 4,
+        padding: 4,
+        background: "var(--surface-muted)",
+        borderRadius: "var(--radius)",
+        marginBottom: 24,
+        flexWrap: "wrap"
+      }}
+    >
+      {TABS.map((tab) => {
+        const Icon = tab.icon;
+        const locked = !!(tab.planFeature && !planFeatures?.[tab.planFeature]);
+        const isActive = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onSelect(tab.id)}
+            disabled={locked}
+            title={locked ? "Disponível no plano Pro e Max" : tab.label}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 14px",
+              borderRadius: 8,
+              border: "none",
+              background: isActive ? "var(--surface)" : "transparent",
+              color: isActive ? "var(--text)" : "var(--muted)",
+              fontWeight: isActive ? 600 : 500,
+              fontSize: 13.5,
+              cursor: locked ? "not-allowed" : "pointer",
+              boxShadow: isActive ? "var(--shadow-sm)" : "none",
+              opacity: locked ? 0.55 : 1,
+              transition: "all var(--transition)"
+            }}
+          >
+            <Icon size={14} />
+            {tab.label}
+            {locked && <Lock size={12} style={{ marginLeft: 2 }} />}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -576,32 +303,540 @@ function OccupationTab({ data }: { data: NonNullable<ReportData["pro"]> }) {
 function KpiCard({
   label,
   value,
+  hint,
   icon,
-  variant,
-  hint
+  variant = "default"
 }: {
   label: string;
-  value: string;
-  icon: React.ReactNode;
-  variant: "success" | "danger" | "info" | "warning";
+  value: string | number;
   hint?: string;
+  icon: React.ReactNode;
+  variant?: "default" | "success" | "danger" | "info" | "warning";
 }) {
-  const cls: Record<string, string> = {
-    success: "stat-card--success",
-    danger: "stat-card--danger",
-    info: "stat-card--info",
-    warning: "stat-card--warning"
-  };
+  const cls = variant === "default" ? "" : `stat-card--${variant}`;
   return (
-    <div className={`stat-card ${cls[variant]}`}>
+    <div className={`stat-card ${cls}`}>
       <div className="stat-card__header">
         <div>
           <div className="stat-card__label">{label}</div>
-          <div className="stat-card__value">{value}</div>
+          <div className="stat-card__value">{String(value)}</div>
         </div>
         <div className="stat-card__icon">{icon}</div>
       </div>
-      {hint ? <div className="stat-card__footer">{hint}</div> : null}
+      {hint && <div className="stat-card__footer">{hint}</div>}
+    </div>
+  );
+}
+
+function OverviewTab({ data }: { data: OverviewData }) {
+  const maxBar = data.appointmentsByDay.reduce((m, d) => Math.max(m, d.count), 0) || 1;
+  const last30 = data.appointmentsByDay.slice(-30);
+
+  return (
+    <>
+      <div className="grid cols-4" style={{ marginBottom: 16 }}>
+        <KpiCard
+          label="Total de agendamentos"
+          value={data.totalAppointments}
+          icon={<CalendarDays size={20} />}
+          variant="info"
+        />
+        <KpiCard
+          label="Concluídos"
+          value={data.completedAppointments}
+          hint={pct(data.completedAppointments, data.totalAppointments) + " do total"}
+          icon={<TrendingUp size={20} />}
+          variant="success"
+        />
+        <KpiCard
+          label="Cancelados / no-show"
+          value={data.cancelledAppointments + data.noShowAppointments}
+          hint={pct(data.cancelledAppointments + data.noShowAppointments, data.totalAppointments) + " do total"}
+          icon={<TrendingDown size={20} />}
+          variant="danger"
+        />
+        <KpiCard
+          label="Novos clientes"
+          value={data.newCustomers}
+          hint={formatMoney(data.revenue) + " em receita paga"}
+          icon={<Users size={20} />}
+          variant="warning"
+        />
+      </div>
+
+      <section className="panel">
+        <div className="panel__head">
+          <div>
+            <div className="panel__title">Agendamentos por dia</div>
+            <div className="panel__sub">Últimos {last30.length} dias</div>
+          </div>
+        </div>
+        <div className="panel__body">
+          {last30.length === 0 ? (
+            <div className="empty-state">
+              <h3>Sem agendamentos no período</h3>
+            </div>
+          ) : (
+            <BarChart
+              data={last30.map((d) => ({ label: formatDayShort(d.date), value: d.count }))}
+              max={maxBar}
+              valueFormatter={(v) => String(v)}
+            />
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function ServicesTab({ rows }: { rows: ServiceRow[] }) {
+  return (
+    <section className="panel">
+      <div className="panel__head">
+        <div>
+          <div className="panel__title">Desempenho por serviço</div>
+          <div className="panel__sub">{rows.length} serviços com agendamentos no período</div>
+        </div>
+      </div>
+      <div className="panel__body panel__body--flush">
+        {rows.length === 0 ? (
+          <div className="empty-state">
+            <h3>Sem dados de serviços no período</h3>
+          </div>
+        ) : (
+          <div className="table-wrap" style={{ borderRadius: 0, border: 0, boxShadow: "none" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Serviço</th>
+                  <th style={{ textAlign: "right" }}>Agendamentos</th>
+                  <th style={{ textAlign: "right" }}>Receita total</th>
+                  <th style={{ textAlign: "right" }}>Preço médio</th>
+                  <th style={{ textAlign: "right" }}>Taxa cancelamento</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.serviceId}>
+                    <td style={{ fontWeight: 600 }}>{r.serviceName}</td>
+                    <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r.count}</td>
+                    <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatMoney(r.revenue)}</td>
+                    <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatMoney(r.avgPrice)}</td>
+                    <td style={{ textAlign: "right" }}>
+                      <span className={`pill ${r.cancellationRate > 15 ? "pill--danger" : r.cancellationRate > 5 ? "pill--warn" : "pill--success"}`}>
+                        {r.cancellationRate}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ProfessionalsTab({ rows }: { rows: ProfessionalRow[] }) {
+  return (
+    <section className="panel">
+      <div className="panel__head">
+        <div>
+          <div className="panel__title">Desempenho por profissional</div>
+          <div className="panel__sub">{rows.length} profissionais com atividade no período</div>
+        </div>
+      </div>
+      <div className="panel__body panel__body--flush">
+        {rows.length === 0 ? (
+          <div className="empty-state">
+            <h3>Sem dados de profissionais no período</h3>
+          </div>
+        ) : (
+          <div className="table-wrap" style={{ borderRadius: 0, border: 0, boxShadow: "none" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Profissional</th>
+                  <th style={{ textAlign: "right" }}>Agendamentos</th>
+                  <th style={{ textAlign: "right" }}>Concluídos</th>
+                  <th style={{ textAlign: "right" }}>Cancelados</th>
+                  <th style={{ textAlign: "right" }}>Receita gerada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.professionalId}>
+                    <td style={{ fontWeight: 600 }}>{r.professionalName}</td>
+                    <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r.count}</td>
+                    <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      <span className="pill pill--success">{r.completedCount}</span>
+                    </td>
+                    <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      <span className="pill pill--danger">{r.cancelledCount}</span>
+                    </td>
+                    <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatMoney(r.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function CustomersTab({ data }: { data: CustomersData }) {
+  const total = data.retention.newCustomers + data.retention.returningCustomers;
+  const returningRate = total > 0
+    ? Number(((data.retention.returningCustomers / total) * 100).toFixed(1))
+    : 0;
+
+  return (
+    <>
+      <div className="grid cols-3" style={{ marginBottom: 16 }}>
+        <KpiCard label="Novos clientes" value={data.retention.newCustomers} icon={<Users size={20} />} variant="info" />
+        <KpiCard label="Recorrentes" value={data.retention.returningCustomers} icon={<TrendingUp size={20} />} variant="success" />
+        <KpiCard label="Taxa de retorno" value={`${returningRate}%`} hint={`Churn: ${data.retention.churnRate}%`} icon={<TrendingDown size={20} />} variant="warning" />
+      </div>
+
+      <section className="panel">
+        <div className="panel__head">
+          <div>
+            <div className="panel__title">Top 50 clientes por valor gasto</div>
+            <div className="panel__sub">{data.rows.length} clientes listados</div>
+          </div>
+        </div>
+        <div className="panel__body panel__body--flush">
+          {data.rows.length === 0 ? (
+            <div className="empty-state">
+              <h3>Sem clientes com gastos registrados</h3>
+            </div>
+          ) : (
+            <div className="table-wrap" style={{ borderRadius: 0, border: 0, boxShadow: "none" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th style={{ textAlign: "right" }}>Agendamentos</th>
+                    <th style={{ textAlign: "right" }}>Total gasto</th>
+                    <th>Último atendimento</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.rows.map((r) => (
+                    <tr key={r.customerId}>
+                      <td style={{ fontWeight: 600 }}>{r.customerName}</td>
+                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r.appointmentCount}</td>
+                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatMoney(r.totalSpent)}</td>
+                      <td>{r.lastAppointment ? formatDayShort(r.lastAppointment.slice(0, 10)) : "—"}</td>
+                      <td>
+                        <span className={`pill ${r.status === "active" ? "pill--success" : "pill--muted"}`}>
+                          {r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function FinancialTab({ data }: { data: FinancialData }) {
+  const max = data.revenueByMonth.reduce((m, r) => Math.max(m, r.revenue, r.expense), 0) || 1;
+
+  return (
+    <>
+      <section className="panel" style={{ marginBottom: 16 }}>
+        <div className="panel__head">
+          <div>
+            <div className="panel__title">Receita x despesa por mês</div>
+            <div className="panel__sub">Últimos 6 meses</div>
+          </div>
+        </div>
+        <div className="panel__body">
+          <DualBarChart
+            data={data.revenueByMonth.map((r) => ({
+              label: formatMonthLabel(r.month),
+              revenue: r.revenue,
+              expense: r.expense
+            }))}
+            max={max}
+          />
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel__head">
+          <div>
+            <div className="panel__title">Top serviços por receita</div>
+            <div className="panel__sub">{data.topServices.length} serviços</div>
+          </div>
+        </div>
+        <div className="panel__body panel__body--flush">
+          {data.topServices.length === 0 ? (
+            <div className="empty-state">
+              <h3>Sem receita no período</h3>
+            </div>
+          ) : (
+            <div className="table-wrap" style={{ borderRadius: 0, border: 0, boxShadow: "none" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Serviço</th>
+                    <th style={{ textAlign: "right" }}>Receita</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.topServices.map((s, i) => (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 600 }}>{s.name}</td>
+                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatMoney(s.revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function CustomTab({ range }: { range: Range }) {
+  const initial = useMemo(() => rangeBounds(range), [range]);
+  const [from, setFrom] = useState(initial.from.slice(0, 10));
+  const [to, setTo] = useState(initial.to.slice(0, 10));
+  const [statuses, setStatuses] = useState<string[]>([]);
+  const [professionalId, setProfessionalId] = useState("");
+  const [serviceId, setServiceId] = useState("");
+  const [services, setServices] = useState<{ id: string; name: string }[]>([]);
+  const [professionals, setProfessionals] = useState<{ id: string; name: string }[]>([]);
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [sv, pr] = await Promise.all([
+          apiFetch<{ services: { id: string; name: string }[] }>("/api/services"),
+          apiFetch<{ professionals: { id: string; name: string }[] }>("/api/professionals")
+        ]);
+        setServices(sv.services ?? []);
+        setProfessionals(pr.professionals ?? []);
+      } catch {
+        // silently — filters just stay empty
+      }
+    })();
+  }, []);
+
+  const STATUS_OPTIONS = [
+    { id: "SCHEDULED", label: "Agendado" },
+    { id: "CONFIRMED", label: "Confirmado" },
+    { id: "IN_PROGRESS", label: "Em atendimento" },
+    { id: "COMPLETED", label: "Concluído" },
+    { id: "CANCELLED", label: "Cancelado" },
+    { id: "NO_SHOW", label: "Não compareceu" }
+  ];
+
+  function toggleStatus(id: string) {
+    setStatuses((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  }
+
+  function buildQuery(): string {
+    const params = new URLSearchParams();
+    if (from) params.set("from", `${from}T00:00:00.000Z`);
+    if (to) params.set("to", `${to}T23:59:59.999Z`);
+    statuses.forEach((s) => params.append("status", s));
+    if (professionalId) params.set("professionalId", professionalId);
+    if (serviceId) params.set("serviceId", serviceId);
+    return params.toString();
+  }
+
+  function exportCsv() {
+    window.location.href = `/api/reports/export?${buildQuery()}`;
+  }
+
+  function exportPdf() {
+    setToast("Exportação em PDF: em breve.");
+    setTimeout(() => setToast(""), 3000);
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel__head">
+        <div>
+          <div className="panel__title">Exportação personalizada</div>
+          <div className="panel__sub">Filtre o período e baixe os dados em CSV.</div>
+        </div>
+      </div>
+      <div className="panel__body">
+        {toast && (
+          <div style={{ padding: "10px 14px", borderRadius: 8, background: "var(--info-light)", color: "var(--info)", fontSize: 13, marginBottom: 14 }}>
+            {toast}
+          </div>
+        )}
+
+        <div className="form-grid">
+          <div className="field">
+            <label>De</label>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Até</label>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Profissional</label>
+            <select value={professionalId} onChange={(e) => setProfessionalId(e.target.value)}>
+              <option value="">Todos</option>
+              {professionals.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>Serviço</label>
+            <select value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
+              <option value="">Todos</option>
+              {services.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field full">
+            <label>Status</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+              {STATUS_OPTIONS.map((opt) => {
+                const on = statuses.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => toggleStatus(opt.id)}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      border: `1px solid ${on ? "var(--primary)" : "var(--border)"}`,
+                      background: on ? "var(--primary-ghost)" : "var(--surface)",
+                      color: on ? "var(--primary)" : "var(--text-secondary)",
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all var(--transition)"
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+          <button type="button" className="btn btn-primary" onClick={exportCsv}>
+            <FileSpreadsheet size={14} /> Exportar CSV
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={exportPdf}>
+            <Download size={14} /> Exportar PDF
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BarChart({
+  data,
+  max,
+  valueFormatter
+}: {
+  data: { label: string; value: number }[];
+  max: number;
+  valueFormatter: (v: number) => string;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 220, paddingTop: 12 }}>
+      {data.map((d, i) => {
+        const heightPct = max > 0 ? (d.value / max) * 100 : 0;
+        return (
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
+            <div
+              style={{
+                width: "100%",
+                background: "linear-gradient(180deg, var(--primary) 0%, var(--primary-hover) 100%)",
+                borderRadius: "4px 4px 0 0",
+                height: `${heightPct}%`,
+                minHeight: d.value > 0 ? 2 : 0,
+                position: "relative",
+                transition: "height var(--transition)"
+              }}
+              title={`${d.label}: ${valueFormatter(d.value)}`}
+            />
+            <span style={{ fontSize: 9.5, color: "var(--muted)", marginTop: 6, transform: "rotate(-45deg)", transformOrigin: "center", whiteSpace: "nowrap" }}>
+              {d.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DualBarChart({
+  data,
+  max
+}: {
+  data: { label: string; revenue: number; expense: number }[];
+  max: number;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--success)" }} /> Receita
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--danger)" }} /> Despesa
+        </span>
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 220 }}>
+        {data.map((d, i) => (
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 4, width: "100%", height: "100%" }}>
+              <div
+                style={{
+                  flex: 1,
+                  background: "var(--success)",
+                  borderRadius: "4px 4px 0 0",
+                  height: `${(d.revenue / max) * 100}%`,
+                  minHeight: d.revenue > 0 ? 2 : 0
+                }}
+                title={`Receita: ${formatMoney(d.revenue)}`}
+              />
+              <div
+                style={{
+                  flex: 1,
+                  background: "var(--danger)",
+                  borderRadius: "4px 4px 0 0",
+                  height: `${(d.expense / max) * 100}%`,
+                  minHeight: d.expense > 0 ? 2 : 0
+                }}
+                title={`Despesa: ${formatMoney(d.expense)}`}
+              />
+            </div>
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>{d.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

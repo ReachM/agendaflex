@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
   ArrowRight,
   Bot,
   CalendarDays,
@@ -265,6 +266,51 @@ export default function BotSettingsPage() {
 
       {error && <div className="error-box">{error}</div>}
       {success && <div className="success-box"><CheckCircle size={16} />{success}</div>}
+
+      {/* Status banner */}
+      {whatsappInstance && stats ? (
+        <div style={{
+          background: "linear-gradient(135deg, rgba(13,148,136,0.12), rgba(13,148,136,0.06))",
+          border: "1px solid rgba(13,148,136,0.25)",
+          borderRadius: "var(--radius-lg)",
+          padding: "18px 24px",
+          marginBottom: 24,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--success)", flexShrink: 0 }} />
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text)" }}>
+              Bot está atendendo seus clientes
+            </h2>
+          </div>
+          <div style={{ display: "flex", gap: 24, flexShrink: 0, flexWrap: "wrap" }}>
+            <StatusChip label="conversas hoje" value={stats.conversations24h} />
+            <StatusChip label="agendamentos via bot este mês" value={stats.botAppointmentsMonth} />
+            <StatusChip label="lembretes enviados hoje" value={stats.reminders24h} />
+          </div>
+        </div>
+      ) : !whatsappInstance ? (
+        <div style={{
+          background: "rgba(234,88,12,0.08)",
+          border: "1px solid rgba(234,88,12,0.25)",
+          borderRadius: "var(--radius-lg)",
+          padding: "14px 20px",
+          marginBottom: 24,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          color: "var(--warning)"
+        }}>
+          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 14, fontWeight: 600 }}>
+            Bot desconectado — configure a instância WhatsApp abaixo para ativar
+          </span>
+        </div>
+      ) : null}
 
       {/* KPIs */}
       {stats ? (
@@ -605,6 +651,17 @@ function KpiCard({ label, value, icon, variant, hint }: {
         <div className="stat-card__icon">{icon}</div>
       </div>
       {hint ? <div className="stat-card__footer">{hint}</div> : null}
+    </div>
+  );
+}
+
+function StatusChip({ label, value }: { label: string; value: number }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.1 }}>
+      <span style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{value}</span>
+      <span style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>
+        {label}
+      </span>
     </div>
   );
 }

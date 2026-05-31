@@ -3,6 +3,7 @@
 import {
   Activity,
   ArrowRight,
+  Bell,
   Bot,
   Briefcase,
   Building2,
@@ -14,11 +15,13 @@ import {
   DollarSign,
   FileClock,
   FileText,
+  HelpCircle,
   LayoutDashboard,
   Link2,
   LogOut,
   type LucideIcon,
   Menu,
+  Search,
   Settings,
   SlidersHorizontal,
   ToggleLeft,
@@ -30,6 +33,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { TrialBanner, TrialExpiredModal, type SubscriptionState } from "@/components/subscription-gate";
+import { GlobalSearch } from "@/components/global-search";
 import { Mark } from "@/components/brand/Mark";
 import { Wordmark } from "@/components/brand/Wordmark";
 
@@ -47,7 +51,7 @@ const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard, CalendarDays, Users, ClipboardList, Briefcase,
   SlidersHorizontal, UserCog, DollarSign, FileText, CheckSquare,
   Activity, FileClock, Settings, Building2, CreditCard, Link2, Bot,
-  Clock, ToggleLeft
+  Clock, ToggleLeft, HelpCircle, Bell, Search
 };
 
 const roleLabels: Record<string, string> = {
@@ -291,7 +295,37 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="sep">/</span>
             <span className="now">{pageTitle}</span>
           </div>
+          {!isMaster && <GlobalSearch />}
           <div className="topbar-actions">
+            <button
+              type="button"
+              aria-label="Ajuda"
+              title="Ajuda"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 9,
+                background: "transparent",
+                border: "1px solid transparent",
+                color: "var(--text-secondary)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "all var(--transition)"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--surface-muted)";
+                e.currentTarget.style.borderColor = "var(--border)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "transparent";
+              }}
+            >
+              <HelpCircle size={18} />
+            </button>
+            {!isMaster && <NotificationBell />}
             <div className="user-chip">
               <span className="chip-avatar">{userInitials}</span>
               <span className="chip-name">{session?.user.name?.split(" ")[0]}</span>
@@ -308,5 +342,68 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {showBlockingModal && <TrialExpiredModal />}
     </div>
+  );
+}
+
+function NotificationBell() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/notifications/count")
+      .then((r) => (r.ok ? r.json() : { count: 0 }))
+      .then((data) => {
+        if (active) setCount(typeof data?.count === "number" ? data.count : 0);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <button
+      type="button"
+      aria-label="Notificações"
+      title={count > 0 ? `${count} notificações pendentes` : "Notificações"}
+      style={{
+        position: "relative",
+        width: 38,
+        height: 38,
+        borderRadius: 9,
+        background: "transparent",
+        border: "1px solid transparent",
+        color: "var(--text-secondary)",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        transition: "all var(--transition)"
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "var(--surface-muted)";
+        e.currentTarget.style.borderColor = "var(--border)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.borderColor = "transparent";
+      }}
+    >
+      <Bell size={18} />
+      {count > 0 && (
+        <span
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 9,
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "var(--danger)",
+            boxShadow: "0 0 0 2px #fff"
+          }}
+        />
+      )}
+    </button>
   );
 }

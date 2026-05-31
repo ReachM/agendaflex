@@ -84,7 +84,8 @@ export async function GET(
         slotIntervalMinutes: settings?.slotIntervalMinutes ?? 30,
         instructions: settings?.instructions ?? null,
         confirmationMessage: settings?.confirmationMessage ?? null,
-        requireManualApproval: settings?.requireManualApproval ?? false
+        requireManualApproval: settings?.requireManualApproval ?? false,
+        primaryColor: settings?.primaryColor ?? "#0d9488"
       }
     });
   } catch (error) {

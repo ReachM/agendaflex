@@ -1,10 +1,13 @@
 import { NextRequest } from "next/server";
+import { z } from "zod";
 import { handleApiError, ok } from "@/lib/api/errors";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { requirePlanFeature } from "@/lib/security/plan-guard";
+
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida (use o formato #RRGGBB).");
 
 /**
  * GET /api/booking-settings — returns the public booking configuration for the company
@@ -44,7 +47,8 @@ export async function GET(request: NextRequest) {
         confirmationMessage: null,
         sendEmailNotifications: true,
         sendWhatsappNotifications: false,
-        sendSmsNotifications: false
+        sendSmsNotifications: false,
+        primaryColor: "#0d9488"
       },
       services,
       professionals,
@@ -68,6 +72,10 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
 
+    if (body.primaryColor !== undefined && body.primaryColor !== null) {
+      hexColorSchema.parse(body.primaryColor);
+    }
+
     // Update PublicBookingSettings
     const settings = await prisma.publicBookingSettings.upsert({
       where: { companyId: context.companyId },
@@ -84,7 +92,8 @@ export async function PATCH(request: NextRequest) {
         confirmationMessage: body.confirmationMessage ?? null,
         sendEmailNotifications: body.sendEmailNotifications ?? true,
         sendWhatsappNotifications: body.sendWhatsappNotifications ?? false,
-        sendSmsNotifications: body.sendSmsNotifications ?? false
+        sendSmsNotifications: body.sendSmsNotifications ?? false,
+        primaryColor: body.primaryColor ?? "#0d9488"
       },
       update: {
         ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
@@ -98,7 +107,8 @@ export async function PATCH(request: NextRequest) {
         ...(body.confirmationMessage !== undefined ? { confirmationMessage: body.confirmationMessage } : {}),
         ...(body.sendEmailNotifications !== undefined ? { sendEmailNotifications: body.sendEmailNotifications } : {}),
         ...(body.sendWhatsappNotifications !== undefined ? { sendWhatsappNotifications: body.sendWhatsappNotifications } : {}),
-        ...(body.sendSmsNotifications !== undefined ? { sendSmsNotifications: body.sendSmsNotifications } : {})
+        ...(body.sendSmsNotifications !== undefined ? { sendSmsNotifications: body.sendSmsNotifications } : {}),
+        ...(body.primaryColor !== undefined ? { primaryColor: body.primaryColor } : {})
       }
     });
 
