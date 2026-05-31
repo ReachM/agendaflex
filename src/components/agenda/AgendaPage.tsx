@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, CalendarPlus, Check, DollarSign, Edit2, Eye, Plus, Save, X } from "lucide-react";
+import { Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Clock, DollarSign, Edit2, Eye, Plus, Save, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   getAgendaPreset,
@@ -426,22 +426,41 @@ function CalendarBoard({
   );
 }
 
+type TimeOff = {
+  id: string;
+  professionalId: string;
+  startAt: string;
+  endAt: string;
+  reason: string | null;
+  professional: { id: string; name: string };
+};
+
 export function AgendaPage() {
   const now = new Date();
   const [appointments, setAppointments] = useState<AnyRecord[]>([]);
   const [customers, setCustomers] = useState<AnyRecord[]>([]);
   const [services, setServices] = useState<AnyRecord[]>([]);
   const [professionals, setProfessionals] = useState<AnyRecord[]>([]);
+  const [timeOffs, setTimeOffs] = useState<TimeOff[]>([]);
   const [fields, setFields] = useState<CustomField[]>([]);
   const [preset, setPreset] = useState<AgendaPreset>(getAgendaPreset(null));
   const [access, setAccess] = useState<AgendaAccess>(emptyAccess());
   const [filters, setFilters] = useState<AgendaFilterValues>({});
-  const [view, setView] = useState<"cards" | "table" | "week">("cards");
+  const [view, setView] = useState<"cards" | "table" | "week">("week");
+  const [referenceDate, setReferenceDate] = useState<Date>(new Date());
   const [error, setError] = useState("");
   const [selectedAppointment, setSelectedAppointment] = useState<AnyRecord | null>(null);
   const [editingAppointment, setEditingAppointment] = useState<AnyRecord | null>(null);
-  const [showCreate, setShowCreate] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [blockForm, setBlockForm] = useState({
+    professionalId: "",
+    startAt: toDateTimeInput(now),
+    endAt: toDateTimeInput(addHours(now, 1)),
+    reason: ""
+  });
+  const [blockError, setBlockError] = useState("");
 
   const [form, setForm] = useState<AppointmentFormState>({
     customerId: "",
@@ -467,12 +486,21 @@ export function AgendaPage() {
   async function load(nextFilters = filters) {
     setError("");
     const query = makeParams(nextFilters);
-    const [appointmentData, customerData, serviceData, professionalData, fieldData] = await Promise.all([
+
+    // 7-day window around referenceDate for TimeOff fetch
+    const winStart = new Date(referenceDate);
+    winStart.setHours(0, 0, 0, 0);
+    winStart.setDate(winStart.getDate() - 7);
+    const winEnd = new Date(referenceDate);
+    winEnd.setDate(winEnd.getDate() + 30);
+
+    const [appointmentData, customerData, serviceData, professionalData, fieldData, timeOffData] = await Promise.all([
       apiFetch<{ appointments: AnyRecord[]; agenda?: { preset: AgendaPreset; access: AgendaAccess } }>(`/api/appointments${query ? `?${query}` : ""}`),
       apiFetch<{ customers: AnyRecord[] }>("/api/customers"),
       apiFetch<{ services: AnyRecord[] }>("/api/services"),
       apiFetch<{ professionals: AnyRecord[] }>("/api/professionals"),
-      apiFetch<{ customFields: CustomField[] }>("/api/custom-fields")
+      apiFetch<{ customFields: CustomField[] }>("/api/custom-fields"),
+      apiFetch<{ timeOffs: TimeOff[] }>(`/api/professional-time-off?from=${winStart.toISOString()}&to=${winEnd.toISOString()}`).catch(() => ({ timeOffs: [] as TimeOff[] }))
     ]);
 
     setAppointments(appointmentData.appointments);
@@ -482,6 +510,59 @@ export function AgendaPage() {
     setServices(serviceData.services.filter((service) => service.isActive));
     setProfessionals(professionalData.professionals.filter((professional) => professional.isActive));
     setFields(fieldData.customFields.filter((field) => field.isActive));
+    setTimeOffs(timeOffData.timeOffs ?? []);
+  }
+
+  async function submitBlock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBlockError("");
+    if (!blockForm.professionalId) {
+      setBlockError("Selecione um profissional");
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiFetch("/api/professional-time-off", {
+        method: "POST",
+        body: JSON.stringify({
+          professionalId: blockForm.professionalId,
+          startAt: new Date(blockForm.startAt).toISOString(),
+          endAt: new Date(blockForm.endAt).toISOString(),
+          reason: blockForm.reason || null
+        })
+      });
+      setShowBlockModal(false);
+      setBlockForm({ professionalId: "", startAt: toDateTimeInput(new Date()), endAt: toDateTimeInput(addHours(new Date(), 1)), reason: "" });
+      await load();
+    } catch (err) {
+      setBlockError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeTimeOff(id: string) {
+    if (!confirm("Remover este bloqueio de horário?")) return;
+    try {
+      await apiFetch(`/api/professional-time-off/${id}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  function navigateDays(deltaDays: number) {
+    const next = new Date(referenceDate);
+    next.setDate(next.getDate() + deltaDays);
+    setReferenceDate(next);
+  }
+
+  function navigateToday() {
+    setReferenceDate(new Date());
+  }
+
+  function setProfessionalFilter(professionalId: string) {
+    setFilters({ ...filters, professionalId });
   }
 
   useEffect(() => {
@@ -624,24 +705,86 @@ export function AgendaPage() {
     await changeStatus(id, "CANCELLED");
   }
 
+  const referenceLabel = useMemo(() => {
+    return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(referenceDate);
+  }, [referenceDate]);
+
   return (
     <>
       <PageHeader
         title={preset.title}
-        subtitle={preset.subtitle}
+        subtitle={`${referenceLabel} · ${appointments.length} agendamentos`}
         actions={
           <>
-            <button className="button secondary" onClick={() => load()} type="button">Atualizar</button>
-            {access.canManage ? (
-              <button className="button" onClick={() => setShowCreate((value) => !value)} type="button">
-                <Plus size={16} />
-                {showCreate ? "Ocultar formulario" : preset.labels.newAppointment}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: 3, border: "1px solid var(--border)", borderRadius: 9, background: "var(--surface)" }}>
+              <button type="button" className="btn btn-sm btn-ghost" onClick={() => navigateDays(-7)} title="Semana anterior">
+                <ChevronLeft size={13} />
               </button>
+              <button type="button" className="btn btn-sm btn-ghost" onClick={navigateToday}>
+                <CalendarDays size={13} /> Hoje
+              </button>
+              <button type="button" className="btn btn-sm btn-ghost" onClick={() => navigateDays(7)} title="Próxima semana">
+                <ChevronRight size={13} />
+              </button>
+            </div>
+            <select
+              className="select"
+              value={filters.professionalId ?? ""}
+              onChange={e => setProfessionalFilter(e.target.value)}
+              style={{ width: "auto", minWidth: 180, height: 38 }}
+            >
+              <option value="">Todos profissionais</option>
+              {professionals.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            {access.canManage ? (
+              <>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowBlockModal(true)}>
+                  <Ban size={15} /> Bloquear horário
+                </button>
+                <button type="button" className="btn btn-primary" onClick={() => setShowCreate(v => !v)}>
+                  <Plus size={15} />
+                  {showCreate ? "Ocultar formulário" : preset.labels.newAppointment}
+                </button>
+              </>
             ) : null}
           </>
         }
       />
       <ErrorBox error={error} />
+
+      {timeOffs.length > 0 ? (
+        <section className="panel" style={{ marginBottom: 16 }}>
+          <div className="panel__head">
+            <div>
+              <div className="panel__title">
+                <Ban size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--danger)" }} />
+                Bloqueios ativos ({timeOffs.length})
+              </div>
+              <div className="panel__sub">Períodos em que os profissionais não aceitam agendamento</div>
+            </div>
+          </div>
+          <div className="panel__body" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {timeOffs.map(t => (
+              <div key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px", border: "1px solid var(--danger-light)", borderRadius: 999, background: "var(--danger-light)", fontSize: 12 }}>
+                <strong>{t.professional.name}</strong>
+                <span style={{ color: "var(--muted)" }}>
+                  {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t.startAt))}
+                  {" → "}
+                  {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t.endAt))}
+                </span>
+                {t.reason ? <span style={{ color: "var(--danger)", fontStyle: "italic" }}>· {t.reason}</span> : null}
+                {access.canManage ? (
+                  <button type="button" onClick={() => removeTimeOff(t.id)} style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--danger)", padding: 0 }} title="Remover bloqueio">
+                    <Trash2 size={12} />
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {showCreate && access.canManage ? (
         <section className="form-panel grid" style={{ marginBottom: 16 }}>
@@ -724,6 +867,58 @@ export function AgendaPage() {
           onStatusChange={changeStatus}
           preset={preset}
         />
+      ) : null}
+
+      {showBlockModal ? (
+        <div className="modal-overlay" onClick={() => setShowBlockModal(false)} role="dialog" aria-modal="true">
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="preview-modal__header">
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                <Ban size={18} style={{ display: "inline", marginRight: 8, verticalAlign: "-3px", color: "var(--danger)" }} />
+                Bloquear horário
+              </h2>
+              <button type="button" className="icon-button secondary" onClick={() => setShowBlockModal(false)} aria-label="Fechar">
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="muted" style={{ marginTop: 12, fontSize: 13 }}>
+              O profissional não receberá agendamentos neste período. Conflito com agendamentos existentes é validado no servidor.
+            </p>
+
+            <ErrorBox error={blockError} />
+
+            <form onSubmit={submitBlock} style={{ display: "grid", gap: 16, marginTop: 16 }}>
+              <div className="field">
+                <label>Profissional *</label>
+                <select className="select" required value={blockForm.professionalId} onChange={e => setBlockForm({ ...blockForm, professionalId: e.target.value })}>
+                  <option value="">Selecione um profissional</option>
+                  {professionals.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div className="form-grid">
+                <div className="field">
+                  <label>Início *</label>
+                  <input className="input" type="datetime-local" required value={blockForm.startAt} onChange={e => setBlockForm({ ...blockForm, startAt: e.target.value })} />
+                </div>
+                <div className="field">
+                  <label>Fim *</label>
+                  <input className="input" type="datetime-local" required min={blockForm.startAt} value={blockForm.endAt} onChange={e => setBlockForm({ ...blockForm, endAt: e.target.value })} />
+                </div>
+              </div>
+              <div className="field">
+                <label>Motivo (opcional)</label>
+                <input className="input" maxLength={200} value={blockForm.reason} onChange={e => setBlockForm({ ...blockForm, reason: e.target.value })} placeholder="Ex.: Folga, Curso, Médico" />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowBlockModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  <Clock size={14} /> {saving ? "Bloqueando..." : "Bloquear horário"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : null}
 
       {editingAppointment ? (

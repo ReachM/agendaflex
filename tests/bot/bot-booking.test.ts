@@ -5,6 +5,7 @@ const { prismaMock } = vi.hoisted(() => ({
     companyBotConfig: { findUnique: vi.fn() },
     botConversationState: { findUnique: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn() },
     appointment: { findFirst: vi.fn(), create: vi.fn() },
+    professionalTimeOff: { findFirst: vi.fn() },
     customer: { findFirst: vi.fn(), create: vi.fn() },
     service: { findFirst: vi.fn() },
     $transaction: vi.fn()

@@ -19,19 +19,33 @@ export async function ensureNoConflict(
   db: Prisma.TransactionClient = prisma,
   message = "Já existe um agendamento para este profissional nesse horário."
 ): Promise<void> {
-  const conflict = await db.appointment.findFirst({
-    where: {
-      companyId: input.companyId,
-      professionalId: input.professionalId,
-      status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
-      ...(input.excludeId ? { id: { not: input.excludeId } } : {}),
-      startAt: { lt: input.endAt },
-      endAt: { gt: input.startAt }
-    }
-  });
+  const [conflict, timeOff] = await Promise.all([
+    db.appointment.findFirst({
+      where: {
+        companyId: input.companyId,
+        professionalId: input.professionalId,
+        status: { notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
+        ...(input.excludeId ? { id: { not: input.excludeId } } : {}),
+        startAt: { lt: input.endAt },
+        endAt: { gt: input.startAt }
+      }
+    }),
+    db.professionalTimeOff.findFirst({
+      where: {
+        companyId: input.companyId,
+        professionalId: input.professionalId,
+        startAt: { lt: input.endAt },
+        endAt: { gt: input.startAt }
+      },
+      select: { reason: true }
+    })
+  ]);
 
   if (conflict) {
     throw new ApiError(409, message);
+  }
+  if (timeOff) {
+    throw new ApiError(409, `Profissional indisponível neste horário${timeOff.reason ? ` (${timeOff.reason})` : " (bloqueio)"}.`);
   }
 }
 
