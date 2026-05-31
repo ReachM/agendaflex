@@ -1434,21 +1434,8 @@ export function BookingSettingsManager() {
           </label>
         </div>
 
-        {settings?.enabled && (
-          <div style={{ background: "var(--surface-muted)", padding: "14px 16px", borderRadius: "var(--radius)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <input
-              type="text"
-              readOnly
-              value={publicLink}
-              style={{ flex: 1, minWidth: 200, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "8px 12px", fontSize: 13 }}
-            />
-            <button className="button" type="button" onClick={copyLink} style={{ minWidth: 120 }}>
-              {copied ? "✓ Copiado!" : "Copiar link"}
-            </button>
-            <a className="button secondary" href={publicLink} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-              Abrir ↗
-            </a>
-          </div>
+        {settings?.enabled && publicLink && (
+          <ShareToolkit publicLink={publicLink} companyName={company?.name ?? "Agendamento"} copied={copied} onCopy={copyLink} />
         )}
       </section>
 
@@ -1649,5 +1636,75 @@ export function BookingSettingsManager() {
         </div>
       </section>
     </>
+  );
+}
+
+function ShareToolkit({ publicLink, companyName, copied, onCopy }: { publicLink: string; companyName: string; copied: boolean; onCopy: () => void }) {
+  const [showEmbed, setShowEmbed] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(publicLink)}`;
+  const waMessage = encodeURIComponent(`Olá! Para agendar seu horário em ${companyName} acesse: ${publicLink}`);
+  const waUrl = `https://wa.me/?text=${waMessage}`;
+  const embedSnippet = `<iframe src="${publicLink}" width="100%" height="800" frameborder="0" style="border:0;border-radius:14px;max-width:600px"></iframe>`;
+
+  function copyEmbed() {
+    navigator.clipboard.writeText(embedSnippet);
+    setEmbedCopied(true);
+    setTimeout(() => setEmbedCopied(false), 2000);
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 16, alignItems: "start" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ background: "var(--surface-muted)", padding: "12px 14px", borderRadius: "var(--radius)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <input
+            type="text"
+            readOnly
+            value={publicLink}
+            style={{ flex: 1, minWidth: 200, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "8px 12px", fontSize: 13 }}
+            onFocus={e => e.currentTarget.select()}
+          />
+          <button className="btn btn-primary btn-sm" type="button" onClick={onCopy}>
+            {copied ? <><Check size={13} /> Copiado</> : "Copiar link"}
+          </button>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <a className="btn btn-sm btn-ghost" href={publicLink} target="_blank" rel="noopener noreferrer">
+            🔗 Abrir
+          </a>
+          <a className="btn btn-sm btn-ghost" href={waUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#25d366" }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+            WhatsApp
+          </a>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => { navigator.clipboard.writeText(`📅 Agende seu horário: ${publicLink}`); alert("Texto para bio copiado!"); }} style={{ color: "#e1306c" }}>
+            📷 Bio Instagram
+          </button>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => setShowEmbed(s => !s)}>
+            {"</>"} Embed no site
+          </button>
+        </div>
+
+        {showEmbed ? (
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 12 }}>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Cole no HTML do seu site</div>
+            <pre style={{ background: "var(--bg)", padding: 10, borderRadius: 6, fontSize: 11, overflow: "auto", margin: 0 }}>{embedSnippet}</pre>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={copyEmbed} style={{ marginTop: 8 }}>
+              {embedCopied ? <><Check size={12} /> Copiado</> : "Copiar código"}
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 12, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={qrUrl} alt={`QR Code para ${publicLink}`} width={180} height={180} style={{ borderRadius: 8 }} />
+        <span style={{ fontSize: 11, color: "var(--muted)" }}>Aponte a câmera para agendar</span>
+        <a className="btn btn-sm btn-ghost" href={qrUrl} download={`qr-code-${companyName.toLowerCase().replace(/\s+/g, '-')}.png`}>
+          Baixar QR
+        </a>
+      </div>
+    </div>
   );
 }
