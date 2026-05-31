@@ -141,6 +141,10 @@ export const serviceCreateSchema = z.object({
   basePrice: z.coerce.number().nonnegative().optional(),
   durationMinutes: z.coerce.number().int().positive().max(1440).default(60),
   isActive: z.coerce.boolean().default(true),
+  isPublic: z.coerce.boolean().default(false),
+  categoryId: z.string().nullish(),
+  checklistTemplateId: z.string().nullish(),
+  sortOrder: z.coerce.number().int().min(0).default(0),
   customValues
 });
 
