@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
       throw new ApiError(403, "Usuário sem empresa ativa vinculada.");
     }
 
+    const tokenTtl = body.rememberMe ? "30d" : "8h";
     const token = await signAuthToken(
       superRole
         ? { sub: user.id, role: "SUPER_ADMIN" }
@@ -57,7 +58,8 @@ export async function POST(request: NextRequest) {
             sub: user.id,
             role: activeMembership!.role.name,
             companyId: activeMembership!.companyId
-          }
+          },
+      tokenTtl
     );
 
     const response = created({
@@ -78,12 +80,14 @@ export async function POST(request: NextRequest) {
       redirectTo: superRole ? "/master" : "/dashboard"
     });
 
+    // 30 dias se "manter conectado", senão a sessão padrão de 8h.
+    const cookieMaxAge = body.rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
     response.cookies.set("marcaiflex_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 8
+      maxAge: cookieMaxAge
     });
 
     await audit(request, null, {

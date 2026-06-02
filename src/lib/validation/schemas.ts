@@ -12,7 +12,12 @@ const customValues = z.record(z.unknown()).optional();
 
 export const loginSchema = z.object({
   email: z.string().trim().email(),
-  password: z.string().min(8).max(200)
+  password: z.string().min(8).max(200),
+  rememberMe: z.coerce.boolean().optional()
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().email().max(255)
 });
 
 export const registerSchema = z.object({

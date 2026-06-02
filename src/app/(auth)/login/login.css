@@ -1,0 +1,12 @@
+/* Login: estilos específicos (ajustes que não pertencem ao shell de auth) */
+
+.login-remember {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 20px;
+}
+
+.login-remember .auth-checkbox {
+  font-size: 13px;
+}

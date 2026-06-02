@@ -17,11 +17,11 @@ function secretKey() {
   return new TextEncoder().encode(secret);
 }
 
-export async function signAuthToken(payload: AuthTokenPayload) {
+export async function signAuthToken(payload: AuthTokenPayload, expiresIn: string = "8h") {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("8h")
+    .setExpirationTime(expiresIn)
     .sign(secretKey());
 }
 

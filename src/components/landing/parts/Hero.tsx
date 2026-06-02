@@ -97,7 +97,7 @@ export function Hero() {
             prestadores de serviço.
           </p>
           <div className="lp-hero__cta">
-            <Link href="/cadastro" className="lp-btn lp-btn--primary lp-btn--lg">
+            <Link href="/register" className="lp-btn lp-btn--primary lp-btn--lg">
               Começar teste grátis de 7 dias →
             </Link>
             <a href="#planos" className="lp-btn lp-btn--ghost lp-btn--lg">

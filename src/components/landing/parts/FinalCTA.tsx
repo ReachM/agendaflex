@@ -16,7 +16,7 @@ export function FinalCTA() {
             amarra, sem complicação.
           </p>
           <div className="lp-final__actions">
-            <Link href="/cadastro" className="lp-btn lp-btn--amber lp-btn--lg">
+            <Link href="/register" className="lp-btn lp-btn--amber lp-btn--lg">
               Começar agora →
             </Link>
             <a href="#planos" className="lp-btn lp-btn--on-dark lp-btn--lg">

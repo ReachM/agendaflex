@@ -93,7 +93,7 @@ export function Pricing() {
                     ))}
                   </ul>
                   <Link
-                    href="/cadastro"
+                    href="/register"
                     className={`lp-btn ${featured ? "lp-btn--primary" : "lp-btn--outline"} lp-btn--block`}
                   >
                     Começar grátis
@@ -107,7 +107,7 @@ export function Pricing() {
         {status === "error" && (
           <div className="lp-plans__fallback lp-reveal">
             <p>Veja todos os planos e comece seu teste grátis de 7 dias em poucos minutos.</p>
-            <Link href="/cadastro" className="lp-btn lp-btn--primary">
+            <Link href="/register" className="lp-btn lp-btn--primary">
               Ver planos e começar <ArrowRight size={18} />
             </Link>
           </div>

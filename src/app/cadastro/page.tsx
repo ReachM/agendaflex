@@ -1,20 +1,10 @@
-import { RegisterForm } from "@/components/register-form";
+import { permanentRedirect } from "next/navigation";
 
-export default function CadastroPage() {
-  return (
-    <main className="login-page">
-      <section className="login-copy">
-        <div className="brand-mark">MF</div>
-        <h1>Comece em minutos</h1>
-        <p>
-          Crie sua conta no MarcaiFlex e teste grátis por 7 dias, com todos os
-          recursos liberados: agenda, clientes, serviços, profissionais e bot de
-          WhatsApp. Sem cartão de crédito.
-        </p>
-      </section>
-      <section className="login-panel">
-        <RegisterForm />
-      </section>
-    </main>
-  );
+/**
+ * /cadastro foi renomeado para /register quando movemos as telas de auth para
+ * o grupo (auth). Mantemos esta página apenas para redirecionar links antigos
+ * (compartilhamentos, e-mails) com 308 PERMANENT REDIRECT.
+ */
+export default function CadastroRedirectPage(): never {
+  permanentRedirect("/register");
 }

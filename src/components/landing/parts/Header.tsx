@@ -33,7 +33,7 @@ export function Header() {
             <Link href="/login" className="lp-btn lp-btn--ghost">
               Entrar
             </Link>
-            <Link href="/cadastro" className="lp-btn lp-btn--primary">
+            <Link href="/register" className="lp-btn lp-btn--primary">
               Começar grátis
             </Link>
           </div>
