@@ -784,3 +784,62 @@
   .ag-ev__s,
   .ag-ev__time { display: none; }
 }
+
+/* ── Page header novo ── */
+.ag-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.ag-page-head__left { flex: 1; min-width: 0; }
+.ag-page-head__right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ag-title { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+.ag-subtitle { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+
+/* ── View toggle pill ── */
+.range-pill {
+  display: inline-flex;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.range-pill__btn {
+  padding: 7px 14px;
+  font-size: 13px; font-weight: 600;
+  color: var(--muted);
+  border-right: 1px solid var(--border);
+  transition: all var(--transition);
+  background: transparent;
+  border-top: 0; border-bottom: 0;
+  cursor: pointer;
+}
+.range-pill__btn:last-child { border-right: 0; }
+.range-pill__btn.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(15,23,42,0.08);
+}
+
+/* ── Grid agenda principal ── */
+.ag-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+.ag-main { min-width: 0; }
+.ag-sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+@media (max-width: 1280px) {
+  .ag-grid { grid-template-columns: 1fr; }
+  .ag-sidebar { display: none; }
+}
+@media (max-width: 640px) {
+  .ag-page-head { flex-direction: column; align-items: flex-start; }
+  .ag-title { font-size: 22px; }
+  .range-pill { display: none; }
+}

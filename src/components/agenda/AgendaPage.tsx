@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Clock, DollarSign, Edit2, Eye, Plus, Save, Trash2, X } from "lucide-react";
+import { Activity, Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Clock, DollarSign, Edit2, Eye, Plus, Save, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   getAgendaPreset,
@@ -720,80 +720,42 @@ export function AgendaPage() {
 
   return (
     <>
-      <PageHeader
-        title={preset.title}
-        subtitle={`${referenceLabel} · ${appointments.length} agendamentos`}
-        actions={
-          <>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: 3, border: "1px solid var(--border)", borderRadius: 9, background: "var(--surface)" }}>
-              <button type="button" className="btn btn-sm btn-ghost" onClick={() => navigateDays(-7)} title="Semana anterior">
-                <ChevronLeft size={13} />
+      {/* ── Page header novo ── */}
+      <div className="ag-page-head">
+        <div className="ag-page-head__left">
+          <h1 className="ag-title">{preset.title}</h1>
+          <p className="ag-subtitle">Visualize, organize e crie agendamentos com arrastar e soltar.</p>
+        </div>
+        <div className="ag-page-head__right">
+          <div className="range-pill">
+            {(["Dia", "Semana", "Mês", "Lista"] as const).map((label) => (
+              <button
+                key={label}
+                type="button"
+                className={`range-pill__btn${label === "Semana" ? " is-active" : ""}`}
+                onClick={() => label !== "Semana" && alert("Em breve")}
+              >
+                {label}
               </button>
-              <button type="button" className="btn btn-sm btn-ghost" onClick={navigateToday}>
-                <CalendarDays size={13} /> Hoje
-              </button>
-              <button type="button" className="btn btn-sm btn-ghost" onClick={() => navigateDays(7)} title="Próxima semana">
-                <ChevronRight size={13} />
-              </button>
-            </div>
-            <select
-              className="select"
-              value={filters.professionalId ?? ""}
-              onChange={e => setProfessionalFilter(e.target.value)}
-              style={{ width: "auto", minWidth: 180, height: 38 }}
-            >
-              <option value="">Todos profissionais</option>
-              {professionals.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            {access.canManage ? (
-              <>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowBlockModal(true)}>
-                  <Ban size={15} /> Bloquear horário
-                </button>
-                <button type="button" className="btn btn-primary" onClick={() => setShowCreate(v => !v)}>
-                  <Plus size={15} />
-                  {showCreate ? "Ocultar formulário" : preset.labels.newAppointment}
-                </button>
-              </>
-            ) : null}
-          </>
-        }
-      />
-      <ErrorBox error={error} />
-
-      {timeOffs.length > 0 ? (
-        <section className="panel" style={{ marginBottom: 16 }}>
-          <div className="panel__head">
-            <div>
-              <div className="panel__title">
-                <Ban size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--danger)" }} />
-                Bloqueios ativos ({timeOffs.length})
-              </div>
-              <div className="panel__sub">Períodos em que os profissionais não aceitam agendamento</div>
-            </div>
-          </div>
-          <div className="panel__body" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {timeOffs.map(t => (
-              <div key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px", border: "1px solid var(--danger-light)", borderRadius: 999, background: "var(--danger-light)", fontSize: 12 }}>
-                <strong>{t.professional.name}</strong>
-                <span style={{ color: "var(--muted)" }}>
-                  {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t.startAt))}
-                  {" → "}
-                  {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t.endAt))}
-                </span>
-                {t.reason ? <span style={{ color: "var(--danger)", fontStyle: "italic" }}>· {t.reason}</span> : null}
-                {access.canManage ? (
-                  <button type="button" onClick={() => removeTimeOff(t.id)} style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--danger)", padding: 0 }} title="Remover bloqueio">
-                    <Trash2 size={12} />
-                  </button>
-                ) : null}
-              </div>
             ))}
           </div>
-        </section>
-      ) : null}
+
+          {access.canManage ? (
+            <>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowBlockModal(true)}>
+                <Activity size={15} />
+                Bloquear horário
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => setShowCreate(v => !v)}>
+                <Plus size={15} />
+                Novo agendamento
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      <ErrorBox error={error} />
 
       {showCreate && access.canManage ? (
         <section className="form-panel grid" style={{ marginBottom: 16 }}>
@@ -820,90 +782,74 @@ export function AgendaPage() {
         </section>
       ) : null}
 
-      <AgendaFilters
-        access={access}
-        customers={customers}
-        onChange={setFilters}
-        onRefresh={() => load()}
-        preset={preset}
+      {timeOffs.length > 0 ? (
+        <section className="panel" style={{ marginBottom: 16 }}>
+          <div className="panel__head">
+            <div className="panel__title">
+              <Ban size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--danger)" }} />
+              Bloqueios ativos ({timeOffs.length})
+            </div>
+          </div>
+          <div className="panel__body" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {timeOffs.map(t => (
+              <div key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px", border: "1px solid var(--danger-light)", borderRadius: 999, background: "var(--danger-light)", fontSize: 12 }}>
+                <strong>{t.professional.name}</strong>
+                <span style={{ color: "var(--muted)" }}>
+                  {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t.startAt))}
+                  {" → "}
+                  {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(t.endAt))}
+                </span>
+                {t.reason ? <span style={{ color: "var(--danger)", fontStyle: "italic" }}>· {t.reason}</span> : null}
+                {access.canManage ? (
+                  <button type="button" onClick={() => removeTimeOff(t.id)} style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--danger)", padding: 0 }} title="Remover bloqueio">
+                    <Trash2 size={12} />
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <WeekToolbar
+        weekStart={weekStart}
         professionals={professionals}
-        services={services}
-        values={filters}
+        activeProfessionalIds={activeProfessionalIds}
+        onPrev={goPrevWeek}
+        onNext={goNextWeek}
+        onToday={goWeekToday}
+        onToggleProfessional={toggleProfessional}
       />
 
-      <section className="panel grid">
-        <div className="toolbar">
-          <h2 className="section-title">Visualizacao</h2>
-          <div className="tabs">
-            {[
-              ["cards", "Cards"],
-              ["table", "Tabela"],
-              ["week", "Semana"]
-            ].map(([value, label]) => (
-              <button className={`tab ${view === value ? "active" : ""}`} key={value} onClick={() => setView(value as any)} type="button">
-                {label}
-              </button>
-            ))}
-          </div>
+      <div className="ag-grid">
+        <div className="ag-main">
+          <WeekCalendar
+            appointments={filteredAppointments}
+            weekStart={weekStart}
+            onSelectAppointment={setSelectedAppointment}
+          />
+          <StatsStrip
+            appointments={filteredAppointments}
+            weekStart={weekStart}
+            professionalCount={
+              activeProfessionalIds.size > 0 ? activeProfessionalIds.size : professionals.length
+            }
+            showFinancial={access.canSeeFinancial && preset.showFinancial}
+          />
         </div>
-
-        {appointments.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state__icon"><CalendarPlus size={32} /></div>
-            <h3>{preset.emptyState}</h3>
-            <p>Use os filtros ou cadastre um novo {preset.labels.appointment.toLowerCase()}.</p>
-          </div>
-        ) : view === "cards" ? (
-          <div className="grid cols-3">
-            {appointments.map((appointment) => (
-              <AppointmentCard appointment={appointment} access={access} key={appointment.id} onOpen={setSelectedAppointment} preset={preset} />
-            ))}
-          </div>
-        ) : view === "table" ? (
-          <AgendaTable appointments={appointments} access={access} onCancel={cancel} onEdit={openEdit} onOpen={setSelectedAppointment} preset={preset} />
-        ) : (
-          <>
-            <WeekToolbar
-              weekStart={weekStart}
-              professionals={professionals}
-              activeProfessionalIds={activeProfessionalIds}
-              onPrev={goPrevWeek}
-              onNext={goNextWeek}
-              onToday={goWeekToday}
-              onToggleProfessional={toggleProfessional}
-            />
-            <div className="ag-grid">
-              <div className="ag-main">
-                <WeekCalendar
-                  appointments={filteredAppointments}
-                  weekStart={weekStart}
-                  onSelectAppointment={setSelectedAppointment}
-                />
-                <StatsStrip
-                  appointments={filteredAppointments}
-                  weekStart={weekStart}
-                  professionalCount={
-                    activeProfessionalIds.size > 0 ? activeProfessionalIds.size : professionals.length
-                  }
-                  showFinancial={access.canSeeFinancial && preset.showFinancial}
-                />
-              </div>
-              <aside className="ag-sidebar">
-                <MiniCalendar
-                  selectedDate={selectedDate}
-                  daysWithEvents={daysWithEvents}
-                  onSelectDate={handleMiniSelectDate}
-                />
-                <DayList
-                  appointments={filteredAppointments}
-                  selectedDate={selectedDate}
-                  onSelectAppointment={setSelectedAppointment}
-                />
-              </aside>
-            </div>
-          </>
-        )}
-      </section>
+        <aside className="ag-sidebar">
+          <MiniCalendar
+            selectedDate={selectedDate}
+            daysWithEvents={daysWithEvents}
+            onSelectDate={handleMiniSelectDate}
+          />
+          <DayList
+            appointments={filteredAppointments}
+            selectedDate={selectedDate}
+            onSelectAppointment={setSelectedAppointment}
+          />
+        </aside>
+      </div>
 
       {selectedAppointment ? (
         <AppointmentPreview
