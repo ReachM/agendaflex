@@ -1,18 +1,26 @@
 "use client";
 
 import { CalendarPlus, User, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AgendaPreset } from "@/config/agenda-presets";
 import { AgendaActions } from "@/components/agenda/AgendaActions";
 import {
   canRenderAgendaField,
   resolveAgendaFieldValue,
-  statusBadgeClass,
   statusLabels,
   type AgendaAccess,
   type AnyRecord
 } from "@/components/agenda/AppointmentCard";
 import { apiFetch } from "@/lib/client-api";
+
+const STATUS_PILL_CLASS: Record<string, string> = {
+  SCHEDULED: "ag-pill ag-pill--scheduled",
+  CONFIRMED: "ag-pill ag-pill--confirmed",
+  IN_PROGRESS: "ag-pill ag-pill--inprogress",
+  COMPLETED: "ag-pill ag-pill--completed",
+  CANCELLED: "ag-pill ag-pill--cancelled",
+  NO_SHOW: "ag-pill ag-pill--noshow"
+};
 
 type CustomField = {
   label: string;
@@ -66,6 +74,15 @@ export function AppointmentPreview({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPrint, setShowPrint] = useState(false);
+
+  // ESC fecha o drawer
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const visiblePresetFields = useMemo(() => {
     return preset.previewFields
@@ -122,27 +139,40 @@ export function AppointmentPreview({
     }
   }
 
+  const pillClass = STATUS_PILL_CLASS[appointment.status] ?? "ag-pill ag-pill--scheduled";
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content preview-modal" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 760 }}>
-        <div className="preview-modal__header">
+    <>
+      <div
+        className="ag-drawer-overlay ag-drawer-overlay--open"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <aside
+        className="ag-drawer ag-drawer--open"
+        role="dialog"
+        aria-modal="true"
+        aria-label={preset.labels.appointment}
+      >
+        <header className="ag-drawer__head">
           <div>
-            <h2 className="section-title" style={{ margin: 0 }}>{preset.labels.appointment}</h2>
-            <p className="muted" style={{ margin: "4px 0 0" }}>{formatDateTime(appointment.startAt)}</p>
+            <h3>{preset.labels.appointment}</h3>
+            <p className="muted" style={{ margin: "4px 0 0", fontSize: 12 }}>{formatDateTime(appointment.startAt)}</p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className={`badge ${statusBadgeClass[appointment.status] ?? ""}`}>
-              {statusLabels[appointment.status] ?? appointment.status}
-            </span>
-            <button className="icon-button secondary" onClick={onClose} title="Fechar" type="button">
-              <X size={16} />
-            </button>
-          </div>
-        </div>
+          <button className="ag-drawer__close" onClick={onClose} title="Fechar" type="button" aria-label="Fechar">
+            <X size={18} />
+          </button>
+        </header>
 
-        {error ? <div className="error-box" style={{ marginTop: 12 }}>{error}</div> : null}
+        <div className="ag-drawer__body">
+        <span className={pillClass}>
+          <span className="ag-pill__dot" aria-hidden="true" />
+          {statusLabels[appointment.status] ?? appointment.status}
+        </span>
 
-        <div className="detail-cards" style={{ marginTop: 16 }}>
+        {error ? <div className="error-box" style={{ marginTop: 0, marginBottom: 12 }}>{error}</div> : null}
+
+        <div className="detail-cards" style={{ marginTop: 4 }}>
           <div className="detail-card detail-card--client">
             <div className="detail-card__icon"><User size={20} /></div>
             <div className="detail-card__body">
@@ -288,7 +318,8 @@ export function AppointmentPreview({
             </div>
           </div>
         ) : null}
-      </div>
-    </div>
+        </div>
+      </aside>
+    </>
   );
 }

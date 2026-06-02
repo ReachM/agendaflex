@@ -11,6 +11,12 @@ import {
 import { AgendaFilters, type AgendaFilterValues } from "@/components/agenda/AgendaFilters";
 import { AppointmentCard, canRenderAgendaField, resolveAgendaFieldValue, statusBadgeClass, statusLabels, type AgendaAccess, type AnyRecord } from "@/components/agenda/AppointmentCard";
 import { AppointmentPreview } from "@/components/agenda/AppointmentPreview";
+import { DayList } from "@/components/agenda/DayList";
+import { MiniCalendar } from "@/components/agenda/MiniCalendar";
+import { StatsStrip } from "@/components/agenda/StatsStrip";
+import { WeekCalendar } from "@/components/agenda/WeekCalendar";
+import { WeekToolbar } from "@/components/agenda/WeekToolbar";
+import { addDays as addDaysWeek, isSameDay as isSameDayWeek, startOfDay as startOfDayWeek, startOfWeek as startOfWeekWeek } from "@/components/agenda/week-utils";
 import { DynamicFields, type CustomValues } from "@/components/dynamic-fields";
 import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";
@@ -36,10 +42,6 @@ type AppointmentFormState = {
   notes: string;
   internalNotes: string;
 };
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
 
 function formatMoney(value?: string | number | null) {
   if (value === null || value === undefined || value === "") return "-";
@@ -380,52 +382,6 @@ function AgendaTable({
   );
 }
 
-function CalendarBoard({
-  appointments,
-  preset,
-  onOpen
-}: {
-  appointments: AnyRecord[];
-  preset: AgendaPreset;
-  onOpen: (appointment: AnyRecord) => void;
-}) {
-  const days = useMemo(() => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    return Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(start);
-      date.setDate(start.getDate() + index);
-      return date;
-    });
-  }, []);
-
-  return (
-    <div className="calendar-board">
-      {days.map((day) => {
-        const nextDay = new Date(day);
-        nextDay.setDate(day.getDate() + 1);
-        const items = appointments.filter((appointment) => {
-          const start = new Date(appointment.startAt);
-          return start >= day && start < nextDay;
-        });
-        return (
-          <div className="calendar-day" key={day.toISOString()}>
-            <strong>{new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).format(day)}</strong>
-            {items.length === 0 ? <span className="muted" style={{ fontSize: 12 }}>Livre</span> : null}
-            {items.map((appointment) => (
-              <button className="appointment-chip clickable" key={appointment.id} onClick={() => onOpen(appointment)} title="Ver detalhes" type="button">
-                <span>{formatDateTime(appointment.startAt)}</span>
-                <strong>{appointment.customer?.name ?? "-"}</strong>
-                <span>{preset.labels.professional}: {appointment.professional?.name ?? "-"}</span>
-              </button>
-            ))}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 type TimeOff = {
   id: string;
   professionalId: string;
@@ -448,6 +404,10 @@ export function AgendaPage() {
   const [filters, setFilters] = useState<AgendaFilterValues>({});
   const [view, setView] = useState<"cards" | "table" | "week">("week");
   const [referenceDate, setReferenceDate] = useState<Date>(new Date());
+  // Filtros visuais do redesenho da semana (não vão para a API; aplicados
+  // client-side em cima do `appointments` já carregado).
+  const [activeProfessionalIds, setActiveProfessionalIds] = useState<Set<string>>(() => new Set());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDayWeek(new Date()));
   const [error, setError] = useState("");
   const [selectedAppointment, setSelectedAppointment] = useState<AnyRecord | null>(null);
   const [editingAppointment, setEditingAppointment] = useState<AnyRecord | null>(null);
@@ -482,6 +442,55 @@ export function AgendaPage() {
   const [editError, setEditError] = useState("");
 
   const appointmentFields = fields.filter((field) => field.entityType === "APPOINTMENT");
+
+  // ── Derivados do redesenho semanal ─────────────────────────────────────
+  const weekStart = useMemo(() => startOfWeekWeek(referenceDate), [referenceDate]);
+
+  /** Agendamentos visíveis: aplica os chips de profissional sobre o resultado da API. */
+  const filteredAppointments = useMemo(() => {
+    if (activeProfessionalIds.size === 0) return appointments;
+    return appointments.filter((a) => activeProfessionalIds.has(a.professional?.id ?? ""));
+  }, [appointments, activeProfessionalIds]);
+
+  /** Set yyyy-mm-dd com agendamentos — usado pelos pontinhos no mini-calendário. */
+  const daysWithEvents = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of filteredAppointments) {
+      const d = new Date(a.startAt);
+      set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    }
+    return set;
+  }, [filteredAppointments]);
+
+  function toggleProfessional(id: string) {
+    setActiveProfessionalIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function goPrevWeek() {
+    setReferenceDate((d) => addDaysWeek(d, -7));
+  }
+
+  function goNextWeek() {
+    setReferenceDate((d) => addDaysWeek(d, 7));
+  }
+
+  function goWeekToday() {
+    const today = new Date();
+    setReferenceDate(today);
+    setSelectedDate(startOfDayWeek(today));
+  }
+
+  function handleMiniSelectDate(date: Date) {
+    setSelectedDate(startOfDayWeek(date));
+    // Se o dia escolhido cair fora da semana atual, navega.
+    const ws = startOfWeekWeek(date);
+    if (!isSameDayWeek(ws, weekStart)) setReferenceDate(date);
+  }
 
   async function load(nextFilters = filters) {
     setError("");
@@ -853,7 +862,46 @@ export function AgendaPage() {
         ) : view === "table" ? (
           <AgendaTable appointments={appointments} access={access} onCancel={cancel} onEdit={openEdit} onOpen={setSelectedAppointment} preset={preset} />
         ) : (
-          <CalendarBoard appointments={appointments} onOpen={setSelectedAppointment} preset={preset} />
+          <>
+            <WeekToolbar
+              weekStart={weekStart}
+              professionals={professionals}
+              activeProfessionalIds={activeProfessionalIds}
+              onPrev={goPrevWeek}
+              onNext={goNextWeek}
+              onToday={goWeekToday}
+              onToggleProfessional={toggleProfessional}
+            />
+            <div className="ag-grid">
+              <div className="ag-main">
+                <WeekCalendar
+                  appointments={filteredAppointments}
+                  weekStart={weekStart}
+                  onSelectAppointment={setSelectedAppointment}
+                />
+                <StatsStrip
+                  appointments={filteredAppointments}
+                  weekStart={weekStart}
+                  professionalCount={
+                    activeProfessionalIds.size > 0 ? activeProfessionalIds.size : professionals.length
+                  }
+                  showFinancial={access.canSeeFinancial && preset.showFinancial}
+                />
+              </div>
+              <aside className="ag-sidebar">
+                <MiniCalendar
+                  selectedDate={selectedDate}
+                  daysWithEvents={daysWithEvents}
+                  onSelectDate={handleMiniSelectDate}
+                />
+                <DayList
+                  appointments={filteredAppointments}
+                  selectedDate={selectedDate}
+                  onSelectAppointment={setSelectedAppointment}
+                />
+              </aside>
+            </div>
+          </>
         )}
       </section>
 
