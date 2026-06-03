@@ -18,6 +18,7 @@ import {
   HelpCircle,
   LayoutDashboard,
   Link2,
+  Lock,
   LogOut,
   type LucideIcon,
   Menu,
@@ -43,9 +44,17 @@ type Session = {
   role: string;
   company: null | { id: string; name: string; segment: string; status: string; plan: string; slug?: string; publicBookingEnabled?: boolean };
   planFeatures?: Record<string, boolean>;
-  menuItems?: { href: string; label: string; icon: string; section?: string }[];
+  menuItems?: { href: string; label: string; icon: string; section?: string; requiredPlan?: "pro" | "max" }[];
   subscription?: SubscriptionState | null;
 };
+
+const PLAN_ORDER: Record<string, number> = { starter: 0, pro: 1, max: 2 };
+const PLAN_DISPLAY: Record<string, string> = { pro: "Pro", max: "Max" };
+
+function canAccess(required: "pro" | "max" | undefined, plan: string): boolean {
+  if (!required) return true;
+  return (PLAN_ORDER[plan] ?? 0) >= (PLAN_ORDER[required] ?? 0);
+}
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard, CalendarDays, Users, ClipboardList, Briefcase,
@@ -70,26 +79,16 @@ const planLabels: Record<string, string> = {
 
 type MenuItemBase = { href: string; label: string; section?: string };
 
-/** Agrupa os itens do menu por seção para renderizar os labels de seção no sidebar */
+/**
+ * Agrupa itens consecutivos com a mesma seção em blocos.
+ * Uma seção pode aparecer mais de uma vez se houver outra seção no meio
+ * (ex: Configuração → Financeiro → Configuração) — cada bloco renderiza
+ * sua própria label, mas itens consecutivos compartilham uma única label.
+ */
 function groupMenuItems<T extends MenuItemBase>(items: T[] | undefined) {
   if (!items) return [];
 
-  // Definir seções baseadas no href
   const sectionMap: Record<string, string> = {
-    "/dashboard": "Operação",
-    "/agenda": "Operação",
-    "/clientes": "Operação",
-    "/profissionais": "Operação",
-    "/servicos": "Operação",
-    "/link-agenda": "Operação",
-    "/financeiro": "Financeiro",
-    "/notas-fiscais": "Financeiro",
-    "/relatorios": "Financeiro",
-    "/checklists": "Configuração",
-    "/configuracoes/bot": "Configuração",
-    "/configuracoes": "Configuração",
-    "/usuarios": "Configuração",
-    "/logs": "Configuração",
     // Master
     "/master": "Visão geral",
     "/master/empresas": "Tenants",
@@ -105,7 +104,7 @@ function groupMenuItems<T extends MenuItemBase>(items: T[] | undefined) {
   };
 
   const groups: { section: string; items: T[] }[] = [];
-  let lastSection = "";
+  let lastSection: string | null = null;
 
   for (const item of items) {
     const section = item.section ?? sectionMap[item.href] ?? "";
@@ -156,13 +155,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [router]);
 
+  const planSlug = session?.company?.plan ?? "starter";
   const links = useMemo(() => {
     if (!session) return [];
     return (session.menuItems ?? []).map((item) => ({
       ...item,
-      icon: iconMap[item.icon] ?? LayoutDashboard
+      icon: iconMap[item.icon] ?? LayoutDashboard,
+      locked: !canAccess(item.requiredPlan, planSlug)
     }));
-  }, [session]);
+  }, [session, planSlug]);
 
   const menuGroups = useMemo(() => groupMenuItems(links), [links]);
   const pageTitle = useMemo(() => getPageTitle(pathname, links), [pathname, links]);
@@ -181,7 +182,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  const planSlug = session?.company?.plan ?? "starter";
   const subscription = session?.subscription ?? null;
   const showTrialBanner = subscription?.isTrial && !subscription.isBlocked;
   const showBlockingModal = subscription?.isBlocked ?? false;
@@ -232,6 +232,21 @@ export function AppShell({ children }: { children: ReactNode }) {
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const active = pathname === item.href || (item.href !== "/dashboard" && item.href !== "/master" && pathname.startsWith(`${item.href}/`));
+                if (item.locked) {
+                  const required = item.requiredPlan ? PLAN_DISPLAY[item.requiredPlan] ?? item.requiredPlan : "";
+                  return (
+                    <div
+                      key={item.href}
+                      className="nav-link nav-link--locked"
+                      title={required ? `Disponível no plano ${required}` : "Indisponível no seu plano"}
+                      aria-disabled="true"
+                    >
+                      <Icon size={17} />
+                      <span>{item.label}</span>
+                      <Lock size={12} className="nav-link__lock" aria-label="Bloqueado" />
+                    </div>
+                  );
+                }
                 return (
                   <Link
                     className={`nav-link ${active ? "active" : ""}`}

@@ -373,6 +373,30 @@ button:disabled {
   color: var(--teal-300);
 }
 
+.nav-link--locked {
+  cursor: not-allowed;
+  color: #64748b;
+  opacity: 0.7;
+}
+
+.nav-link--locked:hover {
+  background: rgba(255, 255, 255, 0.02);
+  color: #94a3b8;
+}
+
+.nav-link--locked svg {
+  color: #64748b;
+}
+
+.nav-link__lock {
+  margin-left: auto;
+  color: rgba(251, 191, 36, 0.85);
+}
+
+.nav-link--locked:hover .nav-link__lock {
+  color: var(--gold);
+}
+
 /* ─── Sidebar Footer ─── */
 .sidebar-footer {
   margin-top: auto;

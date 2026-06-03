@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { handleApiError, ok } from "@/lib/api/errors";
 import { requireAnyAuth } from "@/lib/security/auth";
 import { featuresToBooleanMap, resolvePlanFeatures } from "@/lib/security/plan-guard";
-import { getVisibleMenuItems, MASTER_MENU_ITEMS } from "@/lib/security/permissions";
+import { getVisibleMenuItems, MASTER_MENU_ITEMS, type MenuItem } from "@/lib/security/permissions";
 import { getSubscriptionState, type SubscriptionState } from "@/lib/services/subscription";
 
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const context = await requireAnyAuth(request);
 
     let planFeatures: Record<string, boolean> = {};
-    let menuItems: { href: string; label: string; icon: string }[] = [];
+    let menuItems: MenuItem[] = [];
     let subscription: SubscriptionState | null = null;
 
     if (context.kind === "tenant") {
