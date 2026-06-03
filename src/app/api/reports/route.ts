@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     const period = { from: from.toISOString(), to: to.toISOString() };
 
     if (tab === "overview") {
-      const [statusCounts, newCustomers, revenueAgg, appointments] = await Promise.all([
+      const [statusCounts, newCustomers, revenueAgg, appointments, revenueRecords, topServiceRows, profRanking] = await Promise.all([
         prisma.appointment.groupBy({
           by: ["status"],
           where: { companyId: cid, startAt: dateFilter },
@@ -62,6 +62,25 @@ export async function GET(request: NextRequest) {
         prisma.appointment.findMany({
           where: { companyId: cid, startAt: dateFilter },
           select: { startAt: true }
+        }),
+        prisma.financialRecord.findMany({
+          where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PAID", paidAt: dateFilter },
+          select: { paidAt: true, amount: true }
+        }),
+        prisma.appointmentService.groupBy({
+          by: ["serviceId"],
+          where: { companyId: cid, appointment: { startAt: dateFilter } },
+          _count: { id: true },
+          orderBy: { _count: { id: "desc" } },
+          take: 6
+        }),
+        prisma.appointment.groupBy({
+          by: ["professionalId"],
+          where: { companyId: cid, startAt: dateFilter, status: "COMPLETED", totalValue: { not: null } },
+          _sum: { totalValue: true },
+          _count: { id: true },
+          orderBy: { _sum: { totalValue: "desc" } },
+          take: 5
         })
       ]);
 
@@ -69,6 +88,7 @@ export async function GET(request: NextRequest) {
       const byStatus = (status: string) =>
         statusCounts.find((s) => s.status === status)?._count.id ?? 0;
 
+      // Agendamentos por dia (count)
       const dayMap = new Map<string, number>();
       for (const a of appointments) {
         const key = isoDay(a.startAt);
@@ -77,6 +97,69 @@ export async function GET(request: NextRequest) {
       const appointmentsByDay = Array.from(dayMap.entries())
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, count]) => ({ date, count }));
+
+      // Receita por dia
+      const revByDay = new Map<string, number>();
+      for (const r of revenueRecords) {
+        if (!r.paidAt) continue;
+        const key = isoDay(r.paidAt);
+        revByDay.set(key, (revByDay.get(key) ?? 0) + Number(r.amount));
+      }
+      const allDays = new Set<string>([...dayMap.keys(), ...revByDay.keys()]);
+      const revenueByDay = Array.from(allDays)
+        .sort()
+        .map(date => ({
+          date,
+          count: dayMap.get(date) ?? 0,
+          revenue: Number((revByDay.get(date) ?? 0).toFixed(2))
+        }));
+
+      // Top serviços por contagem de agendamentos
+      const topServiceIds = topServiceRows.map(r => r.serviceId);
+      const topServiceMeta = topServiceIds.length > 0
+        ? await prisma.service.findMany({ where: { id: { in: topServiceIds } }, select: { id: true, name: true } })
+        : [];
+      const topServiceMap = new Map(topServiceMeta.map(s => [s.id, s.name]));
+      const topServices = topServiceRows.map(r => ({
+        id: r.serviceId,
+        name: topServiceMap.get(r.serviceId) ?? "—",
+        count: r._count.id
+      }));
+
+      // Heatmap: 12 horas (08-19) × 7 dias (Seg-Dom)
+      const heatmapRaw: Record<string, number[]> = {};
+      for (let h = 8; h <= 19; h++) {
+        heatmapRaw[String(h).padStart(2, "0")] = [0, 0, 0, 0, 0, 0, 0];
+      }
+      for (const a of appointments) {
+        const hour = a.startAt.getHours();
+        if (hour < 8 || hour > 19) continue;
+        const hourKey = String(hour).padStart(2, "0");
+        const jsDay = a.startAt.getDay();
+        const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
+        if (heatmapRaw[hourKey]) heatmapRaw[hourKey][dayIdx]++;
+      }
+      const maxHeat = Math.max(0, ...Object.values(heatmapRaw).flat());
+      const occupancyHeatmap: Record<string, number[]> = {};
+      for (const [k, v] of Object.entries(heatmapRaw)) {
+        occupancyHeatmap[k] = maxHeat > 0 ? v.map(n => Math.round((n / maxHeat) * 5)) : v;
+      }
+
+      // Ranking de profissionais (top 5)
+      const rankingIds = profRanking.map(r => r.professionalId);
+      const rankingMeta = rankingIds.length > 0
+        ? await prisma.professional.findMany({
+            where: { id: { in: rankingIds } },
+            select: { id: true, name: true }
+          })
+        : [];
+      const rankingMetaMap = new Map(rankingMeta.map(p => [p.id, p.name]));
+      const professionalRanking = profRanking.map(r => ({
+        id: r.professionalId,
+        name: rankingMetaMap.get(r.professionalId) ?? "—",
+        revenue: Number(r._sum.totalValue ?? 0),
+        appointmentCount: r._count.id
+      }));
 
       return ok({
         period,
@@ -88,7 +171,11 @@ export async function GET(request: NextRequest) {
           noShowAppointments: byStatus("NO_SHOW"),
           newCustomers,
           revenue: Number(revenueAgg._sum.amount ?? 0),
-          appointmentsByDay
+          appointmentsByDay,
+          revenueByDay,
+          topServices,
+          occupancyHeatmap,
+          professionalRanking
         }
       });
     }

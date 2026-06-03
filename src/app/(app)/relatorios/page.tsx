@@ -1,21 +1,31 @@
 "use client";
 
 import {
+  ArrowRight,
+  Award,
   Briefcase,
+  Calendar,
   CalendarDays,
+  Clock,
   DollarSign,
   Download,
   FileSpreadsheet,
+  Globe,
   LayoutDashboard,
+  Lightbulb,
   Lock,
+  Plus,
+  Star,
   TrendingDown,
   TrendingUp,
   UserCog,
+  UserPlus,
   Users
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";
+import "./relatorios.css";
 
 type PlanFeatures = {
   planSlug: string;
@@ -31,6 +41,10 @@ type OverviewData = {
   newCustomers: number;
   revenue: number;
   appointmentsByDay: { date: string; count: number }[];
+  revenueByDay: { date: string; count: number; revenue: number }[];
+  topServices: { id: string; name: string; count: number }[];
+  occupancyHeatmap: Record<string, number[]>;
+  professionalRanking: { id: string; name: string; revenue: number; appointmentCount: number }[];
 };
 
 type ServiceRow = {
@@ -84,14 +98,15 @@ type ApiResponse = {
   financial?: FinancialData;
 };
 
-type TabId = "overview" | "services" | "professionals" | "customers" | "financial" | "custom";
+type TabId = "overview" | "financial" | "customers" | "professionals" | "services" | "occupancy" | "custom";
 
 const TABS: { id: TabId; label: string; icon: typeof LayoutDashboard; planFeature: keyof PlanFeatures | null }[] = [
   { id: "overview", label: "Visão geral", icon: LayoutDashboard, planFeature: null },
-  { id: "services", label: "Serviços", icon: Briefcase, planFeature: "allowAdvancedReports" },
-  { id: "professionals", label: "Profissionais", icon: UserCog, planFeature: "allowAdvancedReports" },
-  { id: "customers", label: "Clientes", icon: Users, planFeature: "allowAdvancedReports" },
   { id: "financial", label: "Financeiro", icon: DollarSign, planFeature: "allowAdvancedReports" },
+  { id: "customers", label: "Clientes", icon: Users, planFeature: "allowAdvancedReports" },
+  { id: "professionals", label: "Profissionais", icon: Award, planFeature: "allowAdvancedReports" },
+  { id: "services", label: "Serviços", icon: Briefcase, planFeature: "allowAdvancedReports" },
+  { id: "occupancy", label: "Ocupação", icon: Calendar, planFeature: null },
   { id: "custom", label: "Personalizado", icon: Download, planFeature: "allowAdvancedReports" }
 ];
 
@@ -148,7 +163,8 @@ export default function RelatoriosPage() {
 
   const load = useCallback(async (tab: TabId, currentRange: Range) => {
     if (tab === "custom") return;
-    const tabForApi = tab === "overview" ? "overview" : tab;
+    // "occupancy" reusa o endpoint overview (heatmap está lá)
+    const tabForApi = tab === "overview" || tab === "occupancy" ? "overview" : tab;
     setLoading(true);
     setError("");
     try {
@@ -181,29 +197,26 @@ export default function RelatoriosPage() {
         title="Relatórios"
         subtitle="Visão analítica do seu negócio"
         actions={
-          <div style={{ display: "flex", gap: 4, background: "var(--surface-muted)", padding: 4, borderRadius: 9 }}>
-            {RANGES.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => setRange(r.id)}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "none",
-                  background: range === r.id ? "var(--surface)" : "transparent",
-                  color: range === r.id ? "var(--text)" : "var(--muted)",
-                  fontWeight: range === r.id ? 600 : 500,
-                  fontSize: 12.5,
-                  cursor: "pointer",
-                  boxShadow: range === r.id ? "var(--shadow-sm)" : "none",
-                  transition: "all var(--transition)"
-                }}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="range-pill" role="tablist" aria-label="Período">
+              {RANGES.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  className={range === r.id ? "is-active" : ""}
+                  onClick={() => setRange(r.id)}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="btn btn-ghost" onClick={() => alert("Exportar PDF em breve.")}>
+              <Download size={15} /> Exportar PDF
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => alert("Agendamento de envio em breve.")}>
+              <Plus size={15} /> Agendar envio
+            </button>
+          </>
         }
       />
 
@@ -224,6 +237,8 @@ export default function RelatoriosPage() {
         </div>
       ) : activeTab === "overview" && data.overview ? (
         <OverviewTab data={data.overview} />
+      ) : activeTab === "occupancy" && data.overview ? (
+        <OccupancyTab data={data.overview} />
       ) : activeTab === "services" && data.services ? (
         <ServicesTab rows={data.services.rows} />
       ) : activeTab === "professionals" && data.professionals ? (
@@ -251,21 +266,10 @@ function TabBar({
   onSelect: (tab: TabId) => void;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 4,
-        padding: 4,
-        background: "var(--surface-muted)",
-        borderRadius: "var(--radius)",
-        marginBottom: 24,
-        flexWrap: "wrap"
-      }}
-    >
+    <div className="rep-tabs">
       {TABS.map((tab) => {
         const Icon = tab.icon;
         const locked = !!(tab.planFeature && !planFeatures?.[tab.planFeature]);
-        const isActive = activeTab === tab.id;
         return (
           <button
             key={tab.id}
@@ -273,22 +277,7 @@ function TabBar({
             onClick={() => onSelect(tab.id)}
             disabled={locked}
             title={locked ? "Disponível no plano Pro e Max" : tab.label}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "none",
-              background: isActive ? "var(--surface)" : "transparent",
-              color: isActive ? "var(--text)" : "var(--muted)",
-              fontWeight: isActive ? 600 : 500,
-              fontSize: 13.5,
-              cursor: locked ? "not-allowed" : "pointer",
-              boxShadow: isActive ? "var(--shadow-sm)" : "none",
-              opacity: locked ? 0.55 : 1,
-              transition: "all var(--transition)"
-            }}
+            className={`rep-tab${activeTab === tab.id ? " is-on" : ""}`}
           >
             <Icon size={14} />
             {tab.label}
@@ -328,64 +317,377 @@ function KpiCard({
   );
 }
 
+const SERVICE_BAR_COLORS = [
+  "linear-gradient(90deg, var(--primary), var(--primary-hover))",
+  "linear-gradient(90deg, var(--info), #60a5fa)",
+  "linear-gradient(90deg, #db2777, #f472b6)",
+  "linear-gradient(90deg, #9333ea, #a855f7)",
+  "linear-gradient(90deg, var(--accent), var(--gold))",
+  "linear-gradient(90deg, var(--success), #22c55e)"
+];
+
+const MEDAL_STYLES = [
+  "linear-gradient(135deg, #fbbf24, #d97706)",
+  "linear-gradient(135deg, #cbd5e1, #94a3b8)",
+  "linear-gradient(135deg, #fda4af, #f43f5e)"
+];
+
+const PRO_BAR_COLORS = [
+  "linear-gradient(90deg, var(--primary), var(--primary-hover))",
+  "linear-gradient(90deg, var(--info), #60a5fa)",
+  "linear-gradient(90deg, var(--accent), var(--gold))",
+  "linear-gradient(90deg, #9333ea, #a855f7)",
+  "linear-gradient(90deg, #db2777, #f472b6)"
+];
+
+const AVATAR_COLORS = [
+  "#0d9488", "#2563eb", "#d97706", "#9333ea",
+  "#dc2626", "#16a34a", "#0891b2", "#c2410c"
+];
+
+function hashString(s: string): number {
+  let h = 0;
+  for (const c of s) h = c.charCodeAt(0) + ((h << 5) - h);
+  return Math.abs(h);
+}
+
+function avatarColor(name: string): string {
+  return AVATAR_COLORS[hashString(name) % AVATAR_COLORS.length];
+}
+
+function initials(name: string): string {
+  return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "?";
+}
+
+const DAYS_LABEL = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const HEAT_HOURS = ["08","09","10","11","12","13","14","15","16","17","18","19"];
+
+function buildInsight(data: OverviewData): { title: string; description: string } {
+  const heatmap = data.occupancyHeatmap;
+  if (!heatmap || Object.keys(heatmap).length === 0) {
+    return {
+      title: "Comece a registrar dados",
+      description: "Conforme os agendamentos forem entrando, mostraremos análises personalizadas aqui."
+    };
+  }
+  let bestDay = -1;
+  let bestVal = -1;
+  const dayTotals = [0, 0, 0, 0, 0, 0, 0];
+  for (const arr of Object.values(heatmap)) {
+    for (let i = 0; i < 7; i++) dayTotals[i] += arr[i] ?? 0;
+  }
+  for (let i = 0; i < 7; i++) {
+    if (dayTotals[i] > bestVal) { bestVal = dayTotals[i]; bestDay = i; }
+  }
+  const total = dayTotals.reduce((a, b) => a + b, 0);
+  const pct = total > 0 ? Math.round((dayTotals[bestDay] / total) * 100) : 0;
+  if (bestDay < 0 || pct === 0) {
+    return {
+      title: "Distribuição equilibrada",
+      description: "Os agendamentos do período estão distribuídos de forma uniforme entre os dias da semana."
+    };
+  }
+  return {
+    title: `${DAYS_LABEL[bestDay]} é seu dia de ouro`,
+    description: `${pct}% da intensidade de agendamentos do período se concentra em ${DAYS_LABEL[bestDay].toLowerCase()}.`
+  };
+}
+
+function RevenueLineChart({ data }: { data: { date: string; revenue: number; count: number }[] }) {
+  if (!data.length) {
+    return (
+      <div className="empty" style={{ padding: 30, textAlign: "center" }}>
+        Sem dados de faturamento no período.
+      </div>
+    );
+  }
+  const W = 600;
+  const H = 200;
+  const maxRev = Math.max(1, ...data.map(d => d.revenue));
+  const maxCnt = Math.max(1, ...data.map(d => d.count));
+  const step = data.length > 1 ? W / (data.length - 1) : W;
+  const revPointsArr = data.map((d, i) =>
+    [i * step, H - (d.revenue / maxRev) * (H - 20)] as const
+  );
+  const cntPointsArr = data.map((d, i) =>
+    [i * step, H - (d.count / maxCnt) * (H - 40)] as const
+  );
+  const revPoints = revPointsArr.map(([x, y]) => `${x},${y}`).join(" ");
+  const cntPoints = cntPointsArr.map(([x, y]) => `${x},${y}`).join(" ");
+  const areaPath = `M${revPoints} L${W},${H} L0,${H} Z`;
+  const labelStep = Math.max(1, Math.floor(data.length / 6));
+
+  return (
+    <div className="linechart">
+      <div className="lcleg">
+        <span><i style={{ background: "var(--primary)" }} /> Faturamento (R$)</span>
+        <span><i style={{ background: "var(--accent)" }} /> Atendimentos</span>
+      </div>
+      <svg className="lc-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        {[40, 80, 120, 160].map(y => (
+          <line key={y} x1="0" y1={y} x2={W} y2={y} stroke="#e2e8f0" strokeDasharray="3,3" />
+        ))}
+        <path fill="rgba(13,148,136,0.12)" d={areaPath} />
+        <polyline fill="none" stroke="#0d9488" strokeWidth="2.5" strokeLinejoin="round" points={revPoints} />
+        <polyline fill="none" stroke="#d97706" strokeWidth="2" strokeDasharray="4,3" strokeLinejoin="round" points={cntPoints} />
+        {revPointsArr
+          .filter((_, i) => i % labelStep === 0 || i === revPointsArr.length - 1)
+          .map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r="3" fill="#0d9488" />
+          ))}
+      </svg>
+      <div className="lcaxis">
+        {data
+          .filter((_, i) => i % labelStep === 0 || i === data.length - 1)
+          .map(d => (
+            <span key={d.date}>{formatDayShort(d.date)}</span>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+function OccupancyHeatmap({ data }: { data: Record<string, number[]> }) {
+  return (
+    <>
+      <div className="heatmap">
+        <div className="hh" />
+        {DAYS_LABEL.map(d => <div key={d} className="hd">{d}</div>)}
+        {HEAT_HOURS.map(h => (
+          <Fragment key={h}>
+            <div className="hh">{h}h</div>
+            {(data[h] ?? [0, 0, 0, 0, 0, 0, 0]).map((v, i) => (
+              <div
+                key={`${h}-${i}`}
+                className={`cell v${Math.max(0, Math.min(5, v))}`}
+                title={`${h}h ${DAYS_LABEL[i]} — intensidade ${v}`}
+              />
+            ))}
+          </Fragment>
+        ))}
+      </div>
+      <div className="heat-legend">
+        Menos
+        <span className="squares">
+          {["#f1f5f9", "#ccfbf1", "#5eead4", "#14b8a6", "var(--primary-hover)", "#134e4a"].map(c => (
+            <span key={c} style={{ background: c }} />
+          ))}
+        </span>
+        Mais
+      </div>
+    </>
+  );
+}
+
+const TEMPLATES = [
+  { icon: DollarSign, color: ["var(--primary-ghost)", "var(--primary-hover)"], name: "Fechamento mensal",       desc: "DRE · Fluxo · Comissões" },
+  { icon: Award,      color: ["var(--accent-light)",  "var(--accent)"],         name: "Comissões da equipe",     desc: "Detalhamento por profissional" },
+  { icon: Users,      color: ["var(--info-light)",    "var(--info)"],           name: "Aniversariantes",         desc: "Próximos 30 dias" },
+  { icon: Star,       color: ["#f3e8ff",              "#7c3aed"],               name: "Clientes VIP",            desc: "Top 36 do salão" },
+  { icon: TrendingUp, color: ["var(--success-light)", "var(--success)"],        name: "Performance de serviços", desc: "Receita por serviço" },
+  { icon: Globe,      color: ["#fce7f3",              "#db2777"],               name: "Clientes inativos",       desc: "Não voltam há 90+ dias" }
+];
+
 function OverviewTab({ data }: { data: OverviewData }) {
-  const maxBar = data.appointmentsByDay.reduce((m, d) => Math.max(m, d.count), 0) || 1;
-  const last30 = data.appointmentsByDay.slice(-30);
+  const insight = buildInsight(data);
+  const cancelled = data.cancelledAppointments + data.noShowAppointments;
+  const completionPct = data.totalAppointments > 0
+    ? Math.round((data.completedAppointments / data.totalAppointments) * 100)
+    : 0;
+  const last30Series = data.revenueByDay.slice(-30);
+  const topServices = data.topServices;
+  const maxServiceCount = topServices[0]?.count ?? 1;
+  const ranking = data.professionalRanking;
+  const topRevenue = ranking[0]?.revenue ?? 1;
 
   return (
     <>
-      <div className="grid cols-4" style={{ marginBottom: 16 }}>
-        <KpiCard
-          label="Total de agendamentos"
-          value={data.totalAppointments}
-          icon={<CalendarDays size={20} />}
-          variant="info"
-        />
-        <KpiCard
-          label="Concluídos"
-          value={data.completedAppointments}
-          hint={pct(data.completedAppointments, data.totalAppointments) + " do total"}
-          icon={<TrendingUp size={20} />}
-          variant="success"
-        />
-        <KpiCard
-          label="Cancelados / no-show"
-          value={data.cancelledAppointments + data.noShowAppointments}
-          hint={pct(data.cancelledAppointments + data.noShowAppointments, data.totalAppointments) + " do total"}
-          icon={<TrendingDown size={20} />}
-          variant="danger"
-        />
-        <KpiCard
-          label="Novos clientes"
-          value={data.newCustomers}
-          hint={formatMoney(data.revenue) + " em receita paga"}
-          icon={<Users size={20} />}
-          variant="warning"
-        />
+      <div className="insight-banner">
+        <span className="insight-banner__ico"><Lightbulb size={18} /></span>
+        <div>
+          <h4>💡 {insight.title}</h4>
+          <p>{insight.description}</p>
+        </div>
       </div>
+
+      <section className="kpi-row">
+        <div className="rk">
+          <div className="rk__l" style={{ color: "var(--primary-hover)" }}>
+            <DollarSign size={13} />
+            Faturamento
+          </div>
+          <div className="rk__v">{formatMoney(data.revenue)}</div>
+          <div className="rk__d">{data.totalAppointments} agendamentos no período</div>
+        </div>
+        <div className="rk">
+          <div className="rk__l" style={{ color: "var(--accent)" }}>
+            <CalendarDays size={13} />
+            Atendimentos
+          </div>
+          <div className="rk__v">{data.totalAppointments}</div>
+          <div className="rk__d">
+            <strong>{completionPct}%</strong>concluídos · {cancelled} cancelados
+          </div>
+        </div>
+        <div className="rk">
+          <div className="rk__l" style={{ color: "var(--info)" }}>
+            <UserPlus size={13} />
+            Novos clientes
+          </div>
+          <div className="rk__v">{data.newCustomers}</div>
+          <div className="rk__d">no período selecionado</div>
+        </div>
+        <div className="rk">
+          <div className="rk__l" style={{ color: "#9333ea" }}>
+            <Clock size={13} />
+            Taxa de conclusão
+          </div>
+          <div className="rk__v">{completionPct}%</div>
+          <div className="rk__d">{data.completedAppointments} concluídos</div>
+        </div>
+      </section>
+
+      <section className="grid-big">
+        <article className="panel">
+          <div className="panel__head">
+            <div>
+              <div className="panel__title">Faturamento por dia</div>
+              <div className="panel__sub">Receita paga e atendimentos · {last30Series.length} dias</div>
+            </div>
+          </div>
+          <RevenueLineChart data={last30Series} />
+        </article>
+
+        <article className="panel">
+          <div className="panel__head">
+            <div>
+              <div className="panel__title">Top serviços</div>
+              <div className="panel__sub">Mais procurados no período</div>
+            </div>
+          </div>
+          {topServices.length === 0 ? (
+            <div className="empty" style={{ padding: 30, textAlign: "center" }}>
+              Sem serviços agendados.
+            </div>
+          ) : (
+            <div className="hbars">
+              {topServices.map((svc, i) => (
+                <div key={svc.id} className="hbar">
+                  <div className="hbar__l">{svc.name}</div>
+                  <div className="hbar__b">
+                    <div style={{
+                      width: `${(svc.count / maxServiceCount) * 92}%`,
+                      background: SERVICE_BAR_COLORS[i % SERVICE_BAR_COLORS.length]
+                    }} />
+                  </div>
+                  <div className="hbar__v">{svc.count}×</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
+      </section>
+
+      <section className="grid-2">
+        <article className="panel">
+          <div className="panel__head">
+            <div>
+              <div className="panel__title">Ocupação por hora × dia</div>
+              <div className="panel__sub">Concentração de agendamentos</div>
+            </div>
+          </div>
+          <OccupancyHeatmap data={data.occupancyHeatmap} />
+        </article>
+
+        <article className="panel">
+          <div className="panel__head">
+            <div>
+              <div className="panel__title">Ranking de profissionais</div>
+              <div className="panel__sub">Top {ranking.length} por receita</div>
+            </div>
+          </div>
+          {ranking.length === 0 ? (
+            <div className="empty" style={{ padding: 30, textAlign: "center" }}>
+              Sem dados de profissionais.
+            </div>
+          ) : (
+            ranking.map((pro, i) => (
+              <div key={pro.id} className="rank-row">
+                <span
+                  className="rank-row__pos"
+                  style={i < 3 ? { background: MEDAL_STYLES[i], color: "#fff" } : undefined}
+                >
+                  {i + 1}
+                </span>
+                <div className="rank-row__nm">
+                  <span className="rank-row__avatar" style={{ background: avatarColor(pro.name) }}>
+                    {initials(pro.name)}
+                  </span>
+                  <div className="col">
+                    <span className="nm">{pro.name}</span>
+                    <span className="sub">{pro.appointmentCount} atendimentos</span>
+                  </div>
+                </div>
+                <div className="rank-row__count">{formatMoney(pro.revenue)}</div>
+                <div className="rank-row__bar">
+                  <div style={{
+                    width: `${topRevenue > 0 ? (pro.revenue / topRevenue) * 96 : 0}%`,
+                    background: PRO_BAR_COLORS[i % PRO_BAR_COLORS.length]
+                  }} />
+                </div>
+              </div>
+            ))
+          )}
+        </article>
+      </section>
 
       <section className="panel">
         <div className="panel__head">
           <div>
-            <div className="panel__title">Agendamentos por dia</div>
-            <div className="panel__sub">Últimos {last30.length} dias</div>
+            <div className="panel__title">Relatórios pré-prontos</div>
+            <div className="panel__sub">Modelos para exportar em PDF ou Excel</div>
           </div>
         </div>
-        <div className="panel__body">
-          {last30.length === 0 ? (
-            <div className="empty-state">
-              <h3>Sem agendamentos no período</h3>
-            </div>
-          ) : (
-            <BarChart
-              data={last30.map((d) => ({ label: formatDayShort(d.date), value: d.count }))}
-              max={maxBar}
-              valueFormatter={(v) => String(v)}
-            />
-          )}
+        <div style={{ padding: "4px 20px 20px" }}>
+          <div className="tpl-grid">
+            {TEMPLATES.map(tpl => {
+              const Icon = tpl.icon;
+              return (
+                <button
+                  key={tpl.name}
+                  type="button"
+                  className="tpl"
+                  onClick={() => alert(`Exportar "${tpl.name}" em breve.`)}
+                >
+                  <span className="tpl__ico" style={{ background: tpl.color[0], color: tpl.color[1] }}>
+                    <Icon size={16} />
+                  </span>
+                  <div>
+                    <div className="tpl__nm">{tpl.name}</div>
+                    <div className="tpl__d">{tpl.desc}</div>
+                  </div>
+                  <span className="tpl__go"><ArrowRight size={14} /></span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
     </>
+  );
+}
+
+function OccupancyTab({ data }: { data: OverviewData }) {
+  return (
+    <section className="panel">
+      <div className="panel__head">
+        <div>
+          <div className="panel__title">Ocupação por hora × dia</div>
+          <div className="panel__sub">Heatmap dos agendamentos do período · escala 0-5</div>
+        </div>
+      </div>
+      <OccupancyHeatmap data={data.occupancyHeatmap} />
+    </section>
   );
 }
 
