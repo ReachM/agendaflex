@@ -42,9 +42,11 @@ export async function GET(request: NextRequest) {
     // Aggregate appointments per professional (last 30 days)
     const now = new Date();
     const last30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
     const professionalIds = professionals.map(p => p.id);
 
-    const [appointmentAggs, revenueAggs, upcomingMap] = professionalIds.length > 0
+    const [appointmentAggs, revenueAggs, upcomingMap, todayAggs, todayRevenueAgg] = professionalIds.length > 0
       ? await Promise.all([
           prisma.appointment.findMany({
             where: {
@@ -75,9 +77,32 @@ export async function GET(request: NextRequest) {
             },
             select: { professionalId: true, startAt: true },
             orderBy: { startAt: "asc" }
+          }),
+          prisma.appointment.groupBy({
+            by: ["professionalId"],
+            where: {
+              companyId: context.companyId,
+              professionalId: { in: professionalIds },
+              startAt: { gte: startOfToday, lt: endOfToday },
+              status: { notIn: ["CANCELLED", "NO_SHOW"] }
+            },
+            _count: { id: true }
+          }),
+          prisma.appointment.aggregate({
+            where: {
+              companyId: context.companyId,
+              professionalId: { in: professionalIds },
+              startAt: { gte: startOfToday, lt: endOfToday },
+              status: "COMPLETED",
+              totalValue: { not: null }
+            },
+            _sum: { totalValue: true }
           })
         ])
-      : [[], [], []];
+      : [[], [], [], [], { _sum: { totalValue: null } } as { _sum: { totalValue: number | null } }];
+
+    const todayCountMap = new Map<string, number>();
+    for (const t of todayAggs) todayCountMap.set(t.professionalId, t._count.id);
 
     const minutesMap = new Map<string, number>();
     const completedMap = new Map<string, number>();
@@ -124,6 +149,7 @@ export async function GET(request: NextRequest) {
         services: p.services.map(ps => ps.service),
         stats: {
           appointmentsLast30d: appointmentAggs.filter(a => a.professionalId === p.id).length,
+          appointmentsToday: todayCountMap.get(p.id) ?? 0,
           completedTotal: completedMap.get(p.id) ?? 0,
           revenueTotal: rev.sum,
           revenueCount: rev.count,
@@ -144,7 +170,8 @@ export async function GET(request: NextRequest) {
         avgOccupancy: enriched.length > 0
           ? Math.round(enriched.reduce((acc, p) => acc + p.stats.occupancyRate, 0) / enriched.length)
           : 0,
-        totalRevenue: enriched.reduce((acc, p) => acc + p.stats.revenueTotal, 0)
+        totalRevenue: enriched.reduce((acc, p) => acc + p.stats.revenueTotal, 0),
+        revenueToday: Number(todayRevenueAgg._sum.totalValue ?? 0)
       }
     });
   } catch (error) {

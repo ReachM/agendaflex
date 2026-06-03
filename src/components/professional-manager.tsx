@@ -1,16 +1,15 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Activity,
   Briefcase,
-  CalendarDays,
+  Calendar,
   Clock,
-  DollarSign,
-  Edit2,
+  Pencil,
   Plus,
   Save,
+  UserPlus,
   Users,
   X
 } from "lucide-react";
@@ -39,6 +38,7 @@ type Professional = {
   serviceIds: string[];
   stats: {
     appointmentsLast30d: number;
+    appointmentsToday: number;
     completedTotal: number;
     revenueTotal: number;
     revenueCount: number;
@@ -57,6 +57,7 @@ type Response = {
     activeProfessionals: number;
     avgOccupancy: number;
     totalRevenue: number;
+    revenueToday: number;
   };
 };
 
@@ -70,23 +71,118 @@ const WEEKDAYS: { id: Weekday; label: string; short: string }[] = [
   { id: "sunday", label: "Domingo", short: "Dom" }
 ];
 
+/** Map UI grid order (Seg..Dom) → JS getDay() (Dom=0..Sáb=6) */
+const WEEK_GRID = [
+  { short: "Seg", jsDay: 1, key: "monday" as Weekday },
+  { short: "Ter", jsDay: 2, key: "tuesday" as Weekday },
+  { short: "Qua", jsDay: 3, key: "wednesday" as Weekday },
+  { short: "Qui", jsDay: 4, key: "thursday" as Weekday },
+  { short: "Sex", jsDay: 5, key: "friday" as Weekday },
+  { short: "Sáb", jsDay: 6, key: "saturday" as Weekday },
+  { short: "Dom", jsDay: 0, key: "sunday" as Weekday }
+];
+
+const COVER_VARIANTS = ["a", "b", "c", "d", "e", "f"] as const;
+type CoverVariant = (typeof COVER_VARIANTS)[number];
+
+const COVER_BAR_GRADIENT: Record<CoverVariant, string> = {
+  a: "linear-gradient(90deg, #0d9488, #14b8a6)",
+  b: "linear-gradient(90deg, #2563eb, #60a5fa)",
+  c: "linear-gradient(90deg, #d97706, #fbbf24)",
+  d: "linear-gradient(90deg, #9333ea, #a855f7)",
+  e: "linear-gradient(90deg, #db2777, #f472b6)",
+  f: "linear-gradient(90deg, #16a34a, #4ade80)"
+};
+
+const AVATAR_COLORS = [
+  "#0d9488", "#2563eb", "#d97706", "#9333ea",
+  "#dc2626", "#16a34a", "#0891b2", "#c2410c"
+];
+
 function formatMoney(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
-function initials(name: string) {
-  return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+function getInitials(name: string) {
+  return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "?";
 }
 
-function formatRelative(value: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  const diff = date.getTime() - Date.now();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 60) return `em ${minutes}min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `em ${hours}h`;
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
+function hashString(s: string): number {
+  let h = 0;
+  for (const c of s) h = c.charCodeAt(0) + ((h << 5) - h);
+  return Math.abs(h);
+}
+
+function getCoverVariant(id: string): CoverVariant {
+  return COVER_VARIANTS[hashString(id) % COVER_VARIANTS.length];
+}
+
+function getAvatarColor(name: string): string {
+  return AVATAR_COLORS[hashString(name) % AVATAR_COLORS.length];
+}
+
+function parseSpecialties(specialty: string | null): string[] {
+  if (!specialty) return [];
+  return specialty
+    .split(/[,;]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function workDaysFromHours(wh: WorkingHours | null): number[] {
+  if (!wh) return [];
+  const result: number[] = [];
+  for (const entry of WEEK_GRID) {
+    if (wh[entry.key]?.open) result.push(entry.jsDay);
+  }
+  return result;
+}
+
+function formatHoursLabel(wh: WorkingHours | null): string {
+  if (!wh) return "Sem horários definidos";
+
+  type Range = { from: string; to: string };
+  const groups: { days: string[]; range: Range }[] = [];
+
+  for (const entry of WEEK_GRID) {
+    const day = wh[entry.key];
+    if (!day?.open || !day.from || !day.to) continue;
+    const range = { from: day.from, to: day.to };
+    const last = groups[groups.length - 1];
+    if (last && last.range.from === range.from && last.range.to === range.to) {
+      last.days.push(entry.short);
+    } else {
+      groups.push({ days: [entry.short], range });
+    }
+  }
+
+  if (groups.length === 0) return "Sem horários definidos";
+
+  function fmtRange(g: { days: string[]; range: Range }) {
+    const span = g.days.length > 1 ? `${g.days[0]}-${g.days[g.days.length - 1]}` : g.days[0];
+    return `${span} ${g.range.from}–${g.range.to}`;
+  }
+
+  return groups.map(fmtRange).join(" · ");
+}
+
+type ProfessionalStatus = "available" | "in_service" | "off_today" | "inactive";
+
+function deriveStatus(pro: Professional): { status: ProfessionalStatus; label: string } {
+  if (!pro.isActive) return { status: "inactive", label: "Inativo" };
+
+  const today = new Date().getDay();
+  const worksToday = workDaysFromHours(pro.workingHours).includes(today);
+  if (!worksToday) return { status: "off_today", label: "Folga hoje" };
+
+  if (pro.nextAppointmentAt) {
+    const nextAt = new Date(pro.nextAppointmentAt);
+    const diffMin = (nextAt.getTime() - Date.now()) / 60000;
+    if (diffMin < 0 && diffMin > -180) {
+      return { status: "in_service", label: "Em atendimento" };
+    }
+  }
+  return { status: "available", label: "Disponível" };
 }
 
 const EMPTY_WH: WorkingHours = {
@@ -194,18 +290,6 @@ export function ProfessionalManager() {
     }
   }
 
-  async function toggleActive(p: Professional) {
-    try {
-      await apiFetch(`/api/professionals/${p.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ isActive: !p.isActive })
-      });
-      await load();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-
   function updateDay(day: Weekday, patch: Partial<DayHours>) {
     setForm(prev => ({
       ...prev,
@@ -225,58 +309,62 @@ export function ProfessionalManager() {
     }));
   }
 
+  // ── Derivados para o summary ────────────────────────
+  const availableNow = useMemo(() => {
+    if (!data) return 0;
+    return data.professionals.filter(p => deriveStatus(p).status === "available").length;
+  }, [data]);
+
   const modalOpen = creating || editing;
 
   return (
     <>
       <PageHeader
         title="Profissionais"
-        subtitle={data ? `${data.metrics.activeProfessionals} ativos · ocupação média ${data.metrics.avgOccupancy}%` : "Equipe de atendimento"}
+        subtitle="Gerencie a equipe, horários de trabalho e serviços oferecidos por cada um."
         actions={
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            <Plus size={15} /> Adicionar profissional
-          </button>
+          <>
+            <button type="button" className="btn btn-ghost" onClick={() => alert("Horários padrão em breve.")}>
+              <Clock size={15} />
+              Horários padrão
+            </button>
+            <button type="button" className="btn btn-primary" onClick={openCreate}>
+              <UserPlus size={15} />
+              Adicionar profissional
+            </button>
+          </>
         }
       />
 
       {error ? <div className="error-box">{error}</div> : null}
 
-      {data ? (
+      {!data ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+          <div className="loading-spinner" />
+        </div>
+      ) : (
         <>
-          {/* KPIs */}
-          <div className="grid cols-3" style={{ marginBottom: 16 }}>
-            <div className="stat-card stat-card--info">
-              <div className="stat-card__header">
-                <div>
-                  <div className="stat-card__label">Profissionais</div>
-                  <div className="stat-card__value">{data.metrics.totalProfessionals}</div>
-                </div>
-                <div className="stat-card__icon"><Users size={18} /></div>
-              </div>
-              <div className="stat-card__footer">{data.metrics.activeProfessionals} ativos</div>
+          {/* Summary */}
+          <section className="summary">
+            <div className="summary-card">
+              <div className="v">{data.metrics.totalProfessionals}</div>
+              <div className="l">Total de profissionais</div>
             </div>
-            <div className="stat-card stat-card--warning">
-              <div className="stat-card__header">
-                <div>
-                  <div className="stat-card__label">Ocupação média (30d)</div>
-                  <div className="stat-card__value">{data.metrics.avgOccupancy}%</div>
-                </div>
-                <div className="stat-card__icon"><Activity size={18} /></div>
-              </div>
+            <div className="summary-card">
+              <div className="v" style={{ color: "var(--success)" }}>{availableNow}</div>
+              <div className="l">Disponíveis agora</div>
             </div>
-            <div className="stat-card stat-card--success">
-              <div className="stat-card__header">
-                <div>
-                  <div className="stat-card__label">Receita gerada</div>
-                  <div className="stat-card__value" style={{ fontSize: 22 }}>{formatMoney(data.metrics.totalRevenue)}</div>
-                </div>
-                <div className="stat-card__icon"><DollarSign size={18} /></div>
-              </div>
-              <div className="stat-card__footer">Atendimentos concluídos</div>
+            <div className="summary-card">
+              <div className="v" style={{ color: "var(--accent)" }}>{data.metrics.avgOccupancy}%</div>
+              <div className="l">Ocupação média</div>
             </div>
-          </div>
+            <div className="summary-card">
+              <div className="v">{formatMoney(data.metrics.revenueToday)}</div>
+              <div className="l">Receita gerada hoje</div>
+            </div>
+          </section>
 
-          {/* Professional cards grid */}
+          {/* Grid de cards */}
           {data.professionals.length === 0 ? (
             <section className="panel">
               <div className="panel__body">
@@ -288,94 +376,23 @@ export function ProfessionalManager() {
               </div>
             </section>
           ) : (
-            <div className="grid cols-3" style={{ gap: 16 }}>
-              {data.professionals.map((p, idx) => {
-                const occupancyClass = p.stats.occupancyRate >= 70 ? "var(--success)" : p.stats.occupancyRate >= 40 ? "var(--warning)" : "var(--muted)";
-                return (
-                  <section key={p.id} className="panel" style={{ overflow: "hidden" }}>
-                    <div className="panel__body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      <div style={{ display: "flex", gap: 12 }}>
-                        {p.avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.avatarUrl} alt={p.name} style={{ width: 52, height: 52, borderRadius: 12, objectFit: "cover" }} />
-                        ) : (
-                          <div className={`avatar avatar--lg av-${(idx % 8) + 1}`} style={{ borderRadius: 12 }}>{initials(p.name)}</div>
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <strong style={{ fontSize: 15 }}>{p.name}</strong>
-                            <span className={`pill ${p.isActive ? "pill--success" : "pill--muted"}`}>
-                              {p.isActive ? "Ativo" : "Inativo"}
-                            </span>
-                          </div>
-                          {p.specialty ? <div style={{ fontSize: 12, color: "var(--muted)" }}>{p.specialty}</div> : null}
-                          {p.phone ? <div style={{ fontSize: 11, color: "var(--muted)" }}>{p.phone}</div> : null}
-                        </div>
-                      </div>
+            <section className="pros-grid">
+              {data.professionals.map(p => (
+                <ProfessionalCard
+                  key={p.id}
+                  professional={p}
+                  onEdit={() => openEdit(p)}
+                />
+              ))}
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12, color: "var(--text-secondary)" }}>
-                        <div>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                            <span>Ocupação 30d</span>
-                            <strong style={{ color: occupancyClass }}>{p.stats.occupancyRate}%</strong>
-                          </div>
-                          <div className="progress-bar" style={{ height: 6 }}>
-                            <div className="progress-bar__fill" style={{ width: `${p.stats.occupancyRate}%`, background: occupancyClass }} />
-                          </div>
-                          <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
-                            {p.stats.bookedHoursLast30d}h de {p.stats.availableHoursLast30d}h
-                          </div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 11, color: "var(--muted)" }}>Receita</div>
-                          <strong style={{ fontSize: 14, color: "var(--primary)" }}>{formatMoney(p.stats.revenueTotal)}</strong>
-                          <div style={{ fontSize: 10, color: "var(--muted)" }}>
-                            {p.stats.completedTotal} atendimentos
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                        {p.services.length === 0 ? (
-                          <span style={{ fontSize: 11, color: "var(--muted)" }}>Sem serviços vinculados</span>
-                        ) : (
-                          <>
-                            {p.services.slice(0, 4).map(s => (
-                              <span key={s.id} className="pill pill--muted" style={{ fontSize: 10 }}>{s.name}</span>
-                            ))}
-                            {p.services.length > 4 ? <span style={{ fontSize: 11, color: "var(--muted)" }}>+{p.services.length - 4}</span> : null}
-                          </>
-                        )}
-                      </div>
-
-                      {p.nextAppointmentAt ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--muted)", padding: "6px 8px", background: "var(--surface-muted)", borderRadius: 6 }}>
-                          <Clock size={11} /> Próximo: {formatRelative(p.nextAppointmentAt)}
-                        </div>
-                      ) : null}
-
-                      <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
-                        <Link href={`/agenda?professional=${p.id}`} className="btn btn-sm btn-ghost" style={{ flex: 1 }}>
-                          <CalendarDays size={12} /> Agenda
-                        </Link>
-                        <button type="button" className="btn btn-sm btn-ghost" onClick={() => openEdit(p)} style={{ flex: 1 }}>
-                          <Edit2 size={12} /> Editar
-                        </button>
-                        <button type="button" className={`btn btn-sm ${p.isActive ? "btn-danger-ghost" : "btn-ghost"}`} onClick={() => toggleActive(p)} title={p.isActive ? "Desativar" : "Ativar"}>
-                          {p.isActive ? "Pausar" : "Ativar"}
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
+              <button type="button" className="pro-add" onClick={openCreate}>
+                <Plus size={38} strokeWidth={1.8} />
+                <div className="t">Adicionar profissional</div>
+                <div className="s">Configure nome, especialidades e horários de atendimento</div>
+              </button>
+            </section>
           )}
         </>
-      ) : (
-        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-          <div className="loading-spinner" />
-        </div>
       )}
 
       {/* Edit/Create modal */}
@@ -401,7 +418,7 @@ export function ProfessionalManager() {
                 </div>
                 <div className="field">
                   <label>Especialidade</label>
-                  <input className="input" value={form.specialty} onChange={e => setForm({ ...form, specialty: e.target.value })} placeholder="Ex.: Cabeleireira, Manicure" />
+                  <input className="input" value={form.specialty} onChange={e => setForm({ ...form, specialty: e.target.value })} placeholder="Ex.: Cabelo, Coloração, Hidratação" />
                 </div>
                 <div className="field">
                   <label>Telefone</label>
@@ -429,7 +446,6 @@ export function ProfessionalManager() {
                 </div>
               </div>
 
-              {/* Working hours */}
               <div className="panel" style={{ marginTop: 0 }}>
                 <div className="panel__head">
                   <div>
@@ -464,7 +480,6 @@ export function ProfessionalManager() {
                 </div>
               </div>
 
-              {/* Services */}
               <div className="panel">
                 <div className="panel__head">
                   <div>
@@ -505,5 +520,109 @@ export function ProfessionalManager() {
         </div>
       ) : null}
     </>
+  );
+}
+
+function ProfessionalCard({
+  professional: pro,
+  onEdit
+}: {
+  professional: Professional;
+  onEdit: () => void;
+}) {
+  const today = new Date().getDay();
+  const variant = getCoverVariant(pro.id);
+  const initials = getInitials(pro.name);
+  const avatarColor = getAvatarColor(pro.name);
+  const specialties = parseSpecialties(pro.specialty);
+  const workDays = workDaysFromHours(pro.workingHours);
+  const hoursLabel = formatHoursLabel(pro.workingHours);
+  const { status, label } = deriveStatus(pro);
+  const isOff = status !== "available" && status !== "in_service";
+
+  return (
+    <article className="pro">
+      <div className={`pro__cover pro__cover--${variant}`}>
+        <span className={`pro__status${isOff ? " pro__status--off" : ""}`}>
+          <span className="dot" />
+          {label}
+        </span>
+      </div>
+
+      <div className="pro__head">
+        <div className="pro__head-row">
+          <div className="pro__avt" style={{ background: avatarColor }}>
+            {initials}
+          </div>
+        </div>
+
+        <div className="pro__name">{pro.name}</div>
+        {specialties.length > 0 ? (
+          <div className="pro__role">{specialties[0]}</div>
+        ) : null}
+
+        {specialties.length > 0 ? (
+          <div className="pro__tags">
+            {specialties.slice(0, 3).map(s => (
+              <span key={s} className="chip">{s}</span>
+            ))}
+            {specialties.length > 3 ? (
+              <span className="chip">+{specialties.length - 3}</span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="pro__stats">
+        <div>
+          <div className="v">{pro.stats.appointmentsToday}</div>
+          <div className="l">Hoje</div>
+        </div>
+        <div>
+          <div className="v">{pro.stats.occupancyRate > 0 ? `${pro.stats.occupancyRate}%` : "—"}</div>
+          <div className="l">Ocupação</div>
+        </div>
+        <div>
+          <div className="v">{pro.stats.completedTotal}</div>
+          <div className="l">Concluídos</div>
+        </div>
+      </div>
+
+      <div className="pro__schedule">
+        <div className="lbl">Disponibilidade semanal</div>
+        <div className="week">
+          {WEEK_GRID.map(({ short, jsDay }) => {
+            const isToday = jsDay === today;
+            const isOn = workDays.includes(jsDay);
+            const cls = isToday ? "today" : isOn ? "on" : "off";
+            return (
+              <div key={short} className={`week__day ${cls}`}>
+                {short}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="pro__hours">
+          <Clock size={13} />
+          {hoursLabel}
+        </div>
+
+        <div className="occ">
+          <div style={{ width: `${pro.stats.occupancyRate}%`, background: COVER_BAR_GRADIENT[variant] }} />
+        </div>
+      </div>
+
+      <div className="pro__foot">
+        <Link href={`/agenda?professional=${pro.id}`} className="btn btn-ghost btn-sm">
+          <Calendar size={13} />
+          Ver agenda
+        </Link>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onEdit}>
+          <Pencil size={13} />
+          Editar
+        </button>
+      </div>
+    </article>
   );
 }
