@@ -78,6 +78,10 @@ html {
   min-height: 100%;
 }
 
+html, body {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100%;
@@ -88,6 +92,31 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Global responsive safety net ─────────────────── */
+input, select, textarea {
+  max-width: 100%;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Wrapper for any table that may overflow on narrow viewports.
+   Stays as a global utility — components opt in by wrapping their
+   <table> with <div class="table-scroll">. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* iOS Safari zooma quando input tem font-size < 16px no focus. */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
 
 a {

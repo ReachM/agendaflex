@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: import.meta.dirname,
   },
+  async redirects() {
+    return [
+      { source: "/cadastro", destination: "/register", permanent: true }
+    ];
+  },
   // node-cron usa APIs nativas do Node (child_process). Mantém fora do bundle
   // do webpack para ser carregado em runtime (usado pelo agendador interno via
   // src/instrumentation.ts).
