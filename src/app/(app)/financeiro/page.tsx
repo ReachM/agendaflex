@@ -14,12 +14,10 @@ import {
   Download,
   FolderTree,
   MoreVertical,
-  Plus,
   Search,
   Settings2,
   Tag,
   TrendingUp,
-  Wallet,
   X
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";

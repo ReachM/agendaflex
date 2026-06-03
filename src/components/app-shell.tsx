@@ -155,6 +155,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [router]);
 
+  // Esc fecha o drawer da sidebar no mobile
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
   const planSlug = session?.company?.plan ?? "starter";
   const links = useMemo(() => {
     if (!session) return [];

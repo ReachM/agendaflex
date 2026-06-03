@@ -284,8 +284,8 @@ export function ServiceManager() {
   }
 
   // ── Derivados ─────────────────────────────────────
-  const services = data?.services ?? [];
-  const categories = data?.categories ?? [];
+  const services = useMemo(() => data?.services ?? [], [data]);
+  const categories = useMemo(() => data?.categories ?? [], [data]);
   const metrics = data?.metrics;
 
   // Contagem de serviços por categoria (ativos apenas)

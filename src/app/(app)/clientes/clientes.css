@@ -231,7 +231,57 @@
   position: sticky;
   top: 16px;
 }
-@media (max-width: 1180px) { .cl-detail { position: static; } }
+
+/* Botão de fechar — visível apenas no drawer mobile */
+.cl-detail__close {
+  display: none;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Backdrop — só renderiza no mobile (oculto no desktop) */
+.cl-detail-overlay { display: none; }
+
+/* ≤1180px: detalhe vira bottom-sheet deslizante */
+@media (max-width: 1180px) {
+  .cl-detail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 85;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: 20px 20px 0 0;
+    box-shadow: var(--shadow-xl);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .cl-detail.is-open { transform: translateY(0); }
+
+  .cl-detail__close { display: inline-flex; }
+
+  .cl-detail-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 84;
+    background: rgba(15, 23, 42, 0.5);
+    animation: fadeIn 0.2s ease-out;
+  }
+}
 
 .cl-detail__empty {
   padding: 48px 22px;

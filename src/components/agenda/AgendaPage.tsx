@@ -333,7 +333,7 @@ export function AgendaPage() {
   const [fields, setFields] = useState<CustomField[]>([]);
   const [preset, setPreset] = useState<AgendaPreset>(getAgendaPreset(null));
   const [access, setAccess] = useState<AgendaAccess>(emptyAccess());
-  const [filters, setFilters] = useState<AgendaFilterValues>({});
+  const [filters] = useState<AgendaFilterValues>({});
   const [referenceDate, setReferenceDate] = useState<Date>(new Date());
   // Filtros visuais do redesenho da semana (não vão para a API; aplicados
   // client-side em cima do `appointments` já carregado).

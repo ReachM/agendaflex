@@ -18,7 +18,6 @@ import {
   Star,
   TrendingDown,
   TrendingUp,
-  UserCog,
   UserPlus,
   Users
 } from "lucide-react";
@@ -146,11 +145,6 @@ function formatMonthLabel(key: string): string {
 function formatDayShort(iso: string): string {
   const d = new Date(`${iso}T12:00:00`);
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function pct(part: number, total: number): string {
-  if (total === 0) return "0%";
-  return `${((part / total) * 100).toFixed(1)}%`;
 }
 
 export default function RelatoriosPage() {
@@ -1053,43 +1047,6 @@ function CustomTab({ range }: { range: Range }) {
         </div>
       </div>
     </section>
-  );
-}
-
-function BarChart({
-  data,
-  max,
-  valueFormatter
-}: {
-  data: { label: string; value: number }[];
-  max: number;
-  valueFormatter: (v: number) => string;
-}) {
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 220, paddingTop: 12 }}>
-      {data.map((d, i) => {
-        const heightPct = max > 0 ? (d.value / max) * 100 : 0;
-        return (
-          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
-            <div
-              style={{
-                width: "100%",
-                background: "linear-gradient(180deg, var(--primary) 0%, var(--primary-hover) 100%)",
-                borderRadius: "4px 4px 0 0",
-                height: `${heightPct}%`,
-                minHeight: d.value > 0 ? 2 : 0,
-                position: "relative",
-                transition: "height var(--transition)"
-              }}
-              title={`${d.label}: ${valueFormatter(d.value)}`}
-            />
-            <span style={{ fontSize: 9.5, color: "var(--muted)", marginTop: 6, transform: "rotate(-45deg)", transformOrigin: "center", whiteSpace: "nowrap" }}>
-              {d.label}
-            </span>
-          </div>
-        );
-      })}
-    </div>
   );
 }
 

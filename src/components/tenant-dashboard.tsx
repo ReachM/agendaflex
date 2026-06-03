@@ -21,7 +21,6 @@ import {
   UserPlus,
   Users
 } from "lucide-react";
-import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";
 import { AppointmentPreviewModal } from "@/components/appointment-preview";
 

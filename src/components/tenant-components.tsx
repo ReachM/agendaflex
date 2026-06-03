@@ -23,7 +23,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Star,
-  Trash2,
   Users,
   UserPlus,
   X
@@ -313,6 +312,16 @@ export function CustomerManager() {
     () => customers.find(c => c.id === selectedId) ?? null,
     [customers, selectedId]
   );
+
+  // Esc fecha o painel de detalhe (relevante no drawer mobile)
+  useEffect(() => {
+    if (!selectedId) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSelectedId(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedId]);
 
   const from = customers.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, customers.length);
@@ -757,17 +766,32 @@ export function CustomerManager() {
           )}
         </div>
 
-        {/* Painel de detalhe */}
-        <aside className="cl-detail">
+        {/* Backdrop do drawer no mobile (≤1180px) */}
+        {selectedCustomer ? (
+          <div className="cl-detail-overlay" onClick={() => setSelectedId(null)} />
+        ) : null}
+
+        {/* Painel de detalhe (vira bottom-sheet no mobile) */}
+        <aside className={`cl-detail ${selectedCustomer ? "is-open" : ""}`}>
           {selectedCustomer ? (
-            <CustomerDetailPanel
-              customer={selectedCustomer}
-              isHealthSegment={isHealthSegment}
-              onEdit={() => openEdit(selectedCustomer)}
-              onAnonymize={() => anonymize(selectedCustomer.id)}
-              onWhatsApp={() => handleWhatsApp(selectedCustomer.whatsapp ?? selectedCustomer.phone)}
-              formatMoney={formatMoney}
-            />
+            <>
+              <button
+                type="button"
+                className="cl-detail__close"
+                onClick={() => setSelectedId(null)}
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+              <CustomerDetailPanel
+                customer={selectedCustomer}
+                isHealthSegment={isHealthSegment}
+                onEdit={() => openEdit(selectedCustomer)}
+                onAnonymize={() => anonymize(selectedCustomer.id)}
+                onWhatsApp={() => handleWhatsApp(selectedCustomer.whatsapp ?? selectedCustomer.phone)}
+                formatMoney={formatMoney}
+              />
+            </>
           ) : (
             <div className="cl-detail__empty">
               <Users size={32} />
