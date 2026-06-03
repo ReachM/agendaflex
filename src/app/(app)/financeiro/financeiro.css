@@ -1,0 +1,511 @@
+/* ═══════════════════════════════════════════════════
+   FINANCEIRO — Redesign dashboard
+   Escopo: src/app/(app)/financeiro
+   Prefixos: fkpi, dre, cashflow, bars14, cat-list,
+             tx-filter, tx-table, donut-pm, pm-legend,
+             ar-row, fin-bar, date-range, grid-main
+   ═══════════════════════════════════════════════════ */
+
+/* ── Barra de período ─────────────────────────── */
+.fin-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.fin-bar__left {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.fin-bar__right {
+  display: flex; gap: 8px; align-items: center;
+}
+
+.date-range {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 13px; font-weight: 600;
+  color: var(--text);
+}
+.date-range svg { color: var(--muted); }
+.date-range .arrows { display: inline-flex; margin-left: 4px; gap: 2px; }
+.date-range .arrows button {
+  width: 22px; height: 22px; border-radius: 5px; color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; cursor: pointer;
+}
+.date-range .arrows button:hover { background: var(--surface-muted); color: var(--text); }
+
+/* ── KPI grid (4 cards) ───────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+@media (max-width: 1180px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .kpi-grid { grid-template-columns: 1fr; } }
+
+.fkpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+.fkpi::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--success);
+}
+.fkpi--out::before { background: var(--danger); }
+.fkpi--bal::before { background: var(--primary); }
+.fkpi--rec::before { background: var(--accent); }
+
+.fkpi__row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.fkpi__label {
+  font-size: 12px; font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.fkpi__icon {
+  width: 32px; height: 32px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--success-light); color: var(--success);
+}
+.fkpi--out .fkpi__icon { background: var(--danger-light);   color: var(--danger); }
+.fkpi--bal .fkpi__icon { background: var(--primary-ghost);  color: var(--primary-hover); }
+.fkpi--rec .fkpi__icon { background: var(--accent-light);   color: var(--accent); }
+
+.fkpi__value {
+  font-size: 26px; font-weight: 800; letter-spacing: -0.025em;
+  color: var(--text); line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.fkpi__value .unit {
+  font-size: 14px; font-weight: 700; color: var(--muted);
+  margin-right: 4px;
+}
+.fkpi__delta {
+  font-size: 12px; color: var(--muted);
+  margin-top: 6px;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.fkpi__delta strong {
+  font-weight: 700; padding: 1px 6px; border-radius: 4px;
+  background: var(--success-light); color: var(--success);
+}
+.fkpi__delta strong.down { background: var(--danger-light); color: var(--danger); }
+.fkpi__delta strong.warn { background: var(--accent-light); color: var(--accent); }
+.fkpi__sparkline {
+  margin-top: 10px;
+  height: 28px;
+  width: 100%;
+  display: block;
+}
+
+/* ── DRE simplificado (4 cards) ──────────────── */
+.dre {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+@media (max-width: 980px) { .dre { grid-template-columns: 1fr 1fr; } }
+
+.dre-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-xs);
+}
+.dre-card--profit {
+  background: linear-gradient(135deg, var(--primary-ghost), transparent);
+  border-color: var(--primary);
+}
+.dre-card--profit .dre-card__l,
+.dre-card--profit .dre-card__v { color: var(--primary-hover); }
+.dre-card__l {
+  font-size: 11px; color: var(--muted); font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.dre-card__v {
+  font-size: 18px; font-weight: 800;
+  letter-spacing: -0.02em; margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.dre-card__d {
+  font-size: 11px; color: var(--muted); margin-top: 4px;
+}
+
+/* ── Grid principal (2 colunas) ──────────────── */
+.grid-main {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+@media (max-width: 1180px) {
+  .grid-main { grid-template-columns: 1fr; }
+}
+
+/* ── Fluxo de caixa (14 barras) ──────────────── */
+.cashflow {
+  padding: 4px 20px 22px;
+}
+.cashflow__legend {
+  display: flex; gap: 16px; align-items: center;
+  padding: 6px 0 14px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.cashflow__legend span {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-secondary); font-weight: 500;
+}
+.cashflow__legend i {
+  width: 10px; height: 10px; border-radius: 3px;
+  display: inline-block;
+}
+.bars14 {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 6px;
+  align-items: end;
+  height: 220px;
+}
+.bars14 .col {
+  position: relative;
+  display: flex; flex-direction: column;
+  height: 100%; justify-content: flex-end;
+}
+.bars14 .col .stack { display: flex; flex-direction: column; width: 100%; }
+.bars14 .col .in {
+  width: 100%;
+  background: linear-gradient(180deg, #22c55e, var(--success));
+  border-radius: 4px 4px 0 0;
+}
+.bars14 .col .out {
+  width: 100%;
+  background: linear-gradient(180deg, #ef4444, var(--danger));
+  border-radius: 0 0 4px 4px;
+}
+.bars14 .col .tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #0f172a; color: #fff;
+  font-size: 11px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: all var(--transition);
+  z-index: 5;
+  font-family: var(--mono);
+}
+.bars14 .col .tip strong { color: #5eead4; }
+.bars14 .col:hover .tip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.x-axis {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── Top despesas ────────────────────────────── */
+.cat-list {
+  padding: 4px 20px 22px;
+  display: flex; flex-direction: column;
+  gap: 14px;
+}
+.cat-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+.cat-row__ico {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cat-row__main { min-width: 0; }
+.cat-row__name {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px; font-weight: 600; color: var(--text);
+  margin-bottom: 6px;
+}
+.cat-row__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+.cat-row__bar > div {
+  height: 100%;
+  border-radius: 999px;
+}
+.cat-row__money {
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.cat-row__money em {
+  color: var(--muted); font-style: normal;
+  font-size: 11px; font-weight: 500;
+}
+
+/* ── Filtro de lançamentos ───────────────────── */
+.tx-filter {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.pill-tab {
+  height: 32px; padding: 0 12px;
+  border-radius: 7px;
+  font-size: 12.5px; font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-muted);
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; cursor: pointer;
+}
+.pill-tab.is-on {
+  background: var(--primary-ghost);
+  color: var(--primary-hover);
+}
+.pill-tab:hover:not(.is-on) { color: var(--text); }
+.pill-tab .count {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  background: rgba(0,0,0,0.06);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.pill-tab.is-on .count {
+  background: var(--primary);
+  color: #fff;
+}
+.tx-filter .grow {
+  flex: 1; min-width: 160px;
+  position: relative;
+}
+.tx-filter .grow svg {
+  position: absolute;
+  left: 10px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+.tx-filter .grow input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px 0 32px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+}
+.tx-filter .grow input:focus {
+  outline: 0;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ghost);
+}
+
+/* ── Tabela de lançamentos ───────────────────── */
+.tx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.tx-table thead th {
+  text-align: left;
+  padding: 11px 18px;
+  font-size: 11px; font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+  white-space: nowrap;
+}
+.tx-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+}
+.tx-table tbody tr:hover { background: var(--surface-hover); }
+.tx-table td {
+  padding: 12px 18px;
+  vertical-align: middle;
+}
+.ico-cell {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: var(--success-light);
+  color: var(--success);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.tx-table tr.is-out .ico-cell {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+.desc-cell {
+  display: flex; align-items: center; gap: 12px;
+}
+.desc-main { font-weight: 600; }
+.desc-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.tx-table .money {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.tx-table tr:not(.is-out) .money { color: var(--success); }
+.tx-table tr.is-out .money { color: var(--danger); }
+.row-actions {
+  display: flex; gap: 4px;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.tx-table tbody tr:hover .row-actions { opacity: 1; }
+.row-btn {
+  width: 26px; height: 26px; border-radius: 6px;
+  color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; cursor: pointer;
+}
+.row-btn:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+/* ── Donut chart (formas de pagamento) ───────── */
+.donut-pm {
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  margin: 16px auto 12px;
+  position: relative;
+  display: grid; place-items: center;
+}
+.donut-pm::after {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.donut-pm__center {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+.donut-pm__v {
+  font-size: 18px; font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+.donut-pm__l {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  font-weight: 700;
+}
+.pm-legend {
+  display: flex; flex-direction: column;
+  gap: 8px;
+  padding: 0 18px 18px;
+}
+.pm-legend__row {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 9px;
+  align-items: center;
+  font-size: 12.5px;
+}
+.pm-legend__row .dot {
+  width: 10px; height: 10px; border-radius: 3px;
+}
+.pm-legend__row .nm {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.pm-legend__row .v {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── A receber (aging) ───────────────────────── */
+.ar-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.ar-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 16px;
+}
+.ar-row__main { min-width: 0; }
+.ar-row__nm {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.ar-row__b {
+  background: var(--surface-muted);
+  height: 8px;
+  border-radius: 999px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.ar-row__b > div {
+  height: 100%;
+  border-radius: 999px;
+}
+.ar-row__v {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+/* ── Helpers ─────────────────────────────────── */
+.fin-link {
+  color: var(--primary-hover);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+.fin-link:hover { text-decoration: underline; }

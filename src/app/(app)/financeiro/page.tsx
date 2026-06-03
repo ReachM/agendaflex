@@ -2,23 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowDownCircle,
-  ArrowUpCircle,
+  ArrowDownLeft,
+  ArrowUpRight,
   Building2,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
   CreditCard,
   DollarSign,
   Download,
   FolderTree,
-  PiggyBank,
+  MoreVertical,
   Plus,
+  Search,
   Settings2,
-  TrendingDown,
+  Tag,
   TrendingUp,
   Wallet,
   X
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";
+import "./financeiro.css";
 
 type FlowType = "REVENUE" | "COST" | "EXPENSE";
 type PaymentStatus = "PENDING" | "PAID" | "PARTIALLY_PAID" | "CANCELLED" | "REFUNDED";
@@ -117,21 +123,98 @@ const STATUS_LABELS: Record<PaymentStatus, string> = {
   REFUNDED: "Estornado"
 };
 
-const STATUS_CLASS: Record<PaymentStatus, string> = {
-  PENDING: "pill--warn",
-  PAID: "pill--success",
-  PARTIALLY_PAID: "pill--info",
-  CANCELLED: "pill--cancelled",
-  REFUNDED: "pill--muted"
-};
-
 function formatMoney(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+}
+
+function formatCompact(value: number): string {
+  if (value >= 1000) return `R$ ${(value / 1000).toFixed(1).replace(".", ",")}k`;
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(value));
+}
+
+function formatDateShort(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(new Date(value));
+}
+
+function formatPeriodLabel(range: Range): string {
+  const now = new Date();
+  if (range === "today") {
+    return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(now);
+  }
+  if (range === "week") {
+    const start = new Date(now);
+    start.setDate(start.getDate() - start.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const sFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" });
+    return `${sFmt.format(start)} – ${sFmt.format(end)}`;
+  }
+  if (range === "month") {
+    return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(now);
+  }
+  if (range === "quarter") {
+    const q = Math.floor(now.getMonth() / 3) + 1;
+    return `${q}º trimestre ${now.getFullYear()}`;
+  }
+  return String(now.getFullYear());
+}
+
+const PAYMENT_GROUP_COLOR: Record<string, string> = {
+  PIX: "var(--primary)",
+  CREDIT_CARD: "var(--info)",
+  DEBIT_CARD: "var(--accent)",
+  CASH: "#cbd5e1",
+  BOLETO: "#a78bfa",
+  TRANSFER: "#475569",
+  OTHER: "#94a3b8"
+};
+
+const CATEGORY_GRADIENTS = [
+  { color: "var(--accent)", colorLight: "var(--accent-light)", gradient: "linear-gradient(90deg, var(--accent), #fbbf24)" },
+  { color: "#9333ea",       colorLight: "#f3e8ff",            gradient: "linear-gradient(90deg, #9333ea, #a855f7)" },
+  { color: "var(--info)",   colorLight: "var(--info-light)",  gradient: "linear-gradient(90deg, var(--info), #60a5fa)" },
+  { color: "var(--danger)", colorLight: "var(--danger-light)", gradient: "linear-gradient(90deg, var(--danger), #f87171)" },
+  { color: "var(--success)", colorLight: "var(--success-light)", gradient: "linear-gradient(90deg, var(--success), #4ade80)" },
+  { color: "#0891b2",       colorLight: "#cffafe",            gradient: "linear-gradient(90deg, #0891b2, #06b6d4)" }
+];
+
+function hashString(s: string): number {
+  let h = 0;
+  for (const c of s) h = c.charCodeAt(0) + ((h << 5) - h);
+  return Math.abs(h);
+}
+
+function categoryStyle(name: string) {
+  return CATEGORY_GRADIENTS[hashString(name) % CATEGORY_GRADIENTS.length];
+}
+
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  if (!data?.length) return <div className="fkpi__sparkline" />;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const w = 200;
+  const h = 40;
+  const step = data.length > 1 ? w / (data.length - 1) : w;
+  const points = data.map((v, i) => `${i * step},${(h - 2) - ((v - min) / range) * (h - 6)}`).join(" ");
+  const area = `${points} ${w},${h} 0,${h}`;
+  const fill = color + "20";
+
+  return (
+    <svg className="fkpi__sparkline" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+      <polyline fill={fill} stroke="none" points={area} />
+      <polyline fill="none" stroke={color} strokeWidth="2" points={points} />
+    </svg>
+  );
 }
 
 function rangeBounds(range: Range): { from: string; to: string } {
@@ -160,6 +243,7 @@ export default function FinanceiroPage() {
   const [range, setRange] = useState<Range>("month");
   const [accountFilter, setAccountFilter] = useState<string>("");
   const [tab, setTab] = useState<"all" | "REVENUE" | "EXPENSE">("all");
+  const [txSearch, setTxSearch] = useState("");
   const [newRecordOpen, setNewRecordOpen] = useState<null | "REVENUE" | "EXPENSE">(null);
   const [manageOpen, setManageOpen] = useState(false);
 
@@ -183,15 +267,118 @@ export default function FinanceiroPage() {
 
   const filteredRecords = useMemo(() => {
     if (!data) return [];
-    if (tab === "all") return data.records;
-    if (tab === "REVENUE") return data.records.filter(r => r.flowType === "REVENUE");
-    return data.records.filter(r => r.flowType === "EXPENSE" || r.flowType === "COST");
-  }, [data, tab]);
+    let list = data.records;
+    if (tab === "REVENUE") list = list.filter(r => r.flowType === "REVENUE");
+    else if (tab === "EXPENSE") list = list.filter(r => r.flowType === "EXPENSE" || r.flowType === "COST");
+    if (txSearch.trim()) {
+      const q = txSearch.trim().toLowerCase();
+      list = list.filter(r =>
+        (r.description ?? "").toLowerCase().includes(q) ||
+        (r.category?.name ?? "").toLowerCase().includes(q) ||
+        (r.customer?.name ?? "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [data, tab, txSearch]);
+
+  const txCounts = useMemo(() => {
+    if (!data) return { all: 0, revenue: 0, expense: 0 };
+    const revenue = data.records.filter(r => r.flowType === "REVENUE").length;
+    const expense = data.records.filter(r => r.flowType !== "REVENUE").length;
+    return { all: data.records.length, revenue, expense };
+  }, [data]);
+
+  const sparklines = useMemo(() => {
+    if (!data) return { income: [], expense: [], balance: [], receivable: [] as number[] };
+    const income = data.cashFlow14d.map(d => d.revenue);
+    const expense = data.cashFlow14d.map(d => d.expense);
+    const balance = data.cashFlow14d.map(d => d.revenue - d.expense);
+    return { income, expense, balance, receivable: [] as number[] };
+  }, [data]);
+
+  const overdueCount = useMemo(() => {
+    if (!data) return 0;
+    return data.agingItems.filter(i => i.bucket !== "upcoming").length;
+  }, [data]);
 
   const cashFlowMax = useMemo(() => {
     if (!data?.cashFlow14d.length) return 1;
     return Math.max(...data.cashFlow14d.flatMap(d => [d.revenue, d.expense]), 1);
   }, [data]);
+
+  const accumulated = useMemo(() => {
+    if (!data) return 0;
+    return data.cashFlow14d.reduce((acc, d) => acc + (d.revenue - d.expense), 0);
+  }, [data]);
+
+  const cashflowSubtitle = useMemo(() => {
+    if (!data) return "";
+    return data.records.length > 0
+      ? `Últimos 7 dias · ${data.records.length} lançamentos`
+      : "Últimos 7 dias";
+  }, [data]);
+
+  const topExpensesNormalized = useMemo(() => {
+    if (!data?.topExpenseCategories.length) return [];
+    const totalAll = data.topExpenseCategories.reduce((acc, c) => acc + c.total, 0) || 1;
+    const max = Math.max(...data.topExpenseCategories.map(c => c.total), 1);
+    return data.topExpenseCategories.slice(0, 6).map(c => {
+      const style = categoryStyle(c.categoryName);
+      return {
+        ...c,
+        pct: Math.round((c.total / totalAll) * 100),
+        barWidth: Math.round((c.total / max) * 100),
+        ...style
+      };
+    });
+  }, [data]);
+
+  const payment = useMemo(() => {
+    if (!data?.paymentDistribution.length) {
+      return { total: 0, pix: 0, credit: 0, debit: 0, cash: 0, other: 0, pixPct: 0, creditPct: 0, debitPct: 0, cashPct: 0, otherPct: 0 };
+    }
+    const byMethod = (m: string) => data.paymentDistribution.find(p => p.method === m)?.total ?? 0;
+    const pix = byMethod("PIX");
+    const credit = byMethod("CREDIT_CARD");
+    const debit = byMethod("DEBIT_CARD");
+    const cash = byMethod("CASH");
+    const otherKnown = pix + credit + debit + cash;
+    const total = data.paymentDistribution.reduce((acc, p) => acc + p.total, 0);
+    const other = Math.max(0, total - otherKnown);
+    const pct = (v: number) => total > 0 ? Math.round((v / total) * 100) : 0;
+    return {
+      total,
+      pix, credit, debit, cash, other,
+      pixPct: pct(pix),
+      creditPct: pct(credit),
+      debitPct: pct(debit),
+      cashPct: pct(cash),
+      otherPct: pct(other)
+    };
+  }, [data]);
+
+  const aging = useMemo(() => {
+    if (!data) return null;
+    const { upcoming, overdue1to7, overdue8to30, overdue30plus } = data.aging;
+    const total = upcoming + overdue1to7 + overdue8to30 + overdue30plus;
+    const pct = (v: number) => total > 0 ? Math.round((v / total) * 100) : 0;
+    return {
+      total,
+      count: data.agingItems.length,
+      upcoming, overdue7: overdue1to7, overdue30: overdue8to30, overdueOld: overdue30plus,
+      upcomingPct: pct(upcoming),
+      overdue7Pct: pct(overdue1to7),
+      overdue30Pct: pct(overdue8to30),
+      overdueOldPct: pct(overdue30plus)
+    };
+  }, [data]);
+
+  function txMeta(r: FinancialRecord): string {
+    if (r.customer?.name) return r.customer.name;
+    if (r.account?.name) return r.account.name;
+    if (r.appointment?.id) return "Agendamento";
+    return STATUS_LABELS[r.paymentStatus];
+  }
 
   function exportCsv() {
     if (!data) return;
@@ -218,6 +405,8 @@ export default function FinanceiroPage() {
     URL.revokeObjectURL(url);
   }
 
+  const totalExpensesPeriod = data ? data.summary.cost + data.summary.expense : 0;
+
   return (
     <>
       <PageHeader
@@ -225,31 +414,6 @@ export default function FinanceiroPage() {
         subtitle="Fluxo de caixa, lançamentos e DRE simplificado"
         actions={
           <>
-            <div className="range-pill" role="tablist" aria-label="Período">
-              {RANGE_LABELS.map(r => (
-                <button
-                  key={r.id}
-                  type="button"
-                  className={range === r.id ? "is-active" : ""}
-                  onClick={() => setRange(r.id)}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            {data?.accounts.length ? (
-              <select
-                className="select"
-                value={accountFilter}
-                onChange={e => setAccountFilter(e.target.value)}
-                style={{ width: "auto", minWidth: 160 }}
-              >
-                <option value="">Todas as contas</option>
-                {data.accounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            ) : null}
             <button type="button" className="btn btn-ghost" onClick={() => setManageOpen(true)}>
               <Settings2 size={15} />
               Gerenciar
@@ -259,16 +423,57 @@ export default function FinanceiroPage() {
               Exportar
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setNewRecordOpen("EXPENSE")}>
-              <ArrowDownCircle size={15} />
+              <ArrowDownLeft size={15} />
               Nova despesa
             </button>
             <button type="button" className="btn btn-primary" onClick={() => setNewRecordOpen("REVENUE")}>
-              <Plus size={15} />
+              <ArrowUpRight size={15} />
               Nova entrada
             </button>
           </>
         }
       />
+
+      {/* ── Barra de período ── */}
+      <div className="fin-bar">
+        <div className="fin-bar__left">
+          <div className="date-range">
+            <Calendar size={14} />
+            {formatPeriodLabel(range)}
+            <span className="arrows">
+              <button type="button" aria-label="Período anterior"><ChevronLeft size={11} /></button>
+              <button type="button" aria-label="Próximo período"><ChevronRight size={11} /></button>
+            </span>
+          </div>
+          <div className="range-pill" role="tablist" aria-label="Período">
+            {RANGE_LABELS.map(r => (
+              <button
+                key={r.id}
+                type="button"
+                className={range === r.id ? "is-active" : ""}
+                onClick={() => setRange(r.id)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="fin-bar__right">
+          {data?.accounts.length ? (
+            <select
+              className="select"
+              value={accountFilter}
+              onChange={e => setAccountFilter(e.target.value)}
+              style={{ height: 34, width: "auto", minWidth: 160 }}
+            >
+              <option value="">Todas as contas</option>
+              {data.accounts.map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          ) : null}
+        </div>
+      </div>
 
       {error ? <div className="error-box">{error}</div> : null}
 
@@ -278,251 +483,372 @@ export default function FinanceiroPage() {
         </div>
       ) : data ? (
         <>
-          {/* ─── KPIs ─── */}
-          <div className="grid cols-4" style={{ marginBottom: 16 }}>
-            <KpiCard
-              label="Entradas"
-              value={formatMoney(data.summary.revenue)}
-              icon={<TrendingUp size={20} />}
-              variant="success"
-              hint={`${data.records.filter(r => r.flowType === "REVENUE").length} lançamentos`}
-            />
-            <KpiCard
-              label="Saídas"
-              value={formatMoney(data.summary.cost + data.summary.expense)}
-              icon={<TrendingDown size={20} />}
-              variant="danger"
-              hint={`${data.records.filter(r => r.flowType !== "REVENUE").length} lançamentos`}
-            />
-            <KpiCard
-              label="Saldo do período"
-              value={formatMoney(data.summary.profit)}
-              icon={<DollarSign size={20} />}
-              variant={data.summary.profit >= 0 ? "info" : "danger"}
-              hint={`Margem ${data.summary.margin}%`}
-            />
-            <KpiCard
-              label="A receber"
-              value={formatMoney(data.summary.receivable)}
-              icon={<Wallet size={20} />}
-              variant="warning"
-              hint={`${data.summary.receivableCount} lançamentos pendentes`}
-            />
-          </div>
+          {/* ── KPIs ── */}
+          <section className="kpi-grid">
+            <article className="fkpi">
+              <div className="fkpi__row">
+                <span className="fkpi__label">Entradas</span>
+                <span className="fkpi__icon"><ArrowUpRight size={16} /></span>
+              </div>
+              <div className="fkpi__value">
+                <span className="unit">R$</span>
+                {formatNumber(data.summary.revenue)}
+              </div>
+              <div className="fkpi__delta">
+                <strong>{txCounts.revenue}</strong>
+                lançamentos no período
+              </div>
+              <Sparkline data={sparklines.income} color="#16a34a" />
+            </article>
 
-          {/* ─── DRE + Fluxo de caixa ─── */}
-          <div className="grid cols-2" style={{ marginBottom: 16 }}>
-            <div className="panel">
-              <div className="panel__head">
-                <div>
-                  <div className="panel__title">DRE simplificado</div>
-                  <div className="panel__sub">Receita − Custos − Despesas = Lucro</div>
-                </div>
+            <article className="fkpi fkpi--out">
+              <div className="fkpi__row">
+                <span className="fkpi__label">Saídas</span>
+                <span className="fkpi__icon"><ArrowDownLeft size={16} /></span>
               </div>
-              <div className="panel__body">
-                <div className="metric-row">
-                  <span className="metric-row__label"><ArrowUpCircle size={14} /> Receita bruta</span>
-                  <span className="metric-row__value metric-row__value--success">{formatMoney(data.dre.revenue)}</span>
-                </div>
-                <div className="metric-row">
-                  <span className="metric-row__label"><ArrowDownCircle size={14} /> (−) Custos diretos</span>
-                  <span className="metric-row__value metric-row__value--danger">{formatMoney(data.dre.cost)}</span>
-                </div>
-                <div className="metric-row">
-                  <span className="metric-row__label"><ArrowDownCircle size={14} /> (−) Despesas operacionais</span>
-                  <span className="metric-row__value metric-row__value--danger">{formatMoney(data.dre.expense)}</span>
-                </div>
-                <div className="metric-row" style={{ borderTop: "2px solid var(--border)", marginTop: 6 }}>
-                  <span className="metric-row__label"><PiggyBank size={14} /> = Lucro líquido</span>
-                  <span className="metric-row__value metric-row__value--primary">{formatMoney(data.dre.profit)}</span>
-                </div>
-                <div className="metric-row" style={{ borderBottom: 0 }}>
-                  <span className="metric-row__label">Margem</span>
-                  <span className="metric-row__value">{data.dre.margin}%</span>
-                </div>
+              <div className="fkpi__value">
+                <span className="unit">R$</span>
+                {formatNumber(totalExpensesPeriod)}
               </div>
+              <div className="fkpi__delta">
+                <strong className="down">{txCounts.expense}</strong>
+                lançamentos no período
+              </div>
+              <Sparkline data={sparklines.expense} color="#dc2626" />
+            </article>
+
+            <article className="fkpi fkpi--bal">
+              <div className="fkpi__row">
+                <span className="fkpi__label">Saldo do período</span>
+                <span className="fkpi__icon"><TrendingUp size={16} /></span>
+              </div>
+              <div className="fkpi__value">
+                <span className="unit">R$</span>
+                {formatNumber(data.summary.profit)}
+              </div>
+              <div className="fkpi__delta">
+                <strong>{data.summary.margin}%</strong>
+                margem de lucro
+              </div>
+              <Sparkline data={sparklines.balance} color="#0d9488" />
+            </article>
+
+            <article className="fkpi fkpi--rec">
+              <div className="fkpi__row">
+                <span className="fkpi__label">A receber</span>
+                <span className="fkpi__icon"><Clock size={16} /></span>
+              </div>
+              <div className="fkpi__value">
+                <span className="unit">R$</span>
+                {formatNumber(data.summary.receivable)}
+              </div>
+              <div className="fkpi__delta">
+                <strong className="warn">{data.summary.receivableCount} títulos</strong>
+                {overdueCount > 0 ? `${overdueCount} vencido${overdueCount > 1 ? "s" : ""}` : "em dia"}
+              </div>
+              <Sparkline data={sparklines.receivable.length > 0 ? sparklines.receivable : [0,0,0,0]} color="#d97706" />
+            </article>
+          </section>
+
+          {/* ── DRE simplificado ── */}
+          <section className="dre">
+            <div className="dre-card">
+              <div className="dre-card__l">Receita bruta</div>
+              <div className="dre-card__v">{formatMoney(data.dre.revenue)}</div>
+              <div className="dre-card__d">{txCounts.revenue} entradas</div>
             </div>
+            <div className="dre-card">
+              <div className="dre-card__l">(−) Custos diretos</div>
+              <div className="dre-card__v" style={{ color: "var(--danger)" }}>{formatMoney(data.dre.cost)}</div>
+              <div className="dre-card__d">Produtos · comissões</div>
+            </div>
+            <div className="dre-card">
+              <div className="dre-card__l">(−) Despesas operacionais</div>
+              <div className="dre-card__v" style={{ color: "var(--danger)" }}>{formatMoney(data.dre.expense)}</div>
+              <div className="dre-card__d">Aluguel · luz · marketing</div>
+            </div>
+            <div className="dre-card dre-card--profit">
+              <div className="dre-card__l">= Lucro líquido</div>
+              <div className="dre-card__v">{formatMoney(data.dre.profit)}</div>
+              <div className="dre-card__d">Margem {data.dre.margin}%</div>
+            </div>
+          </section>
 
-            <div className="panel">
+          {/* ── Grid principal: Cashflow + Top despesas ── */}
+          <section className="grid-main">
+            <article className="panel">
               <div className="panel__head">
                 <div>
                   <div className="panel__title">Fluxo de caixa — últimos 14 dias</div>
-                  <div className="panel__sub">Entradas vs Saídas por dia</div>
+                  <div className="panel__sub">Entradas e saídas diárias</div>
                 </div>
               </div>
-              <div className="panel__body" style={{ paddingTop: 16 }}>
-                <div className="bar-chart" style={{ height: 180 }}>
-                  {data.cashFlow14d.map((d) => {
-                    const revPct = (d.revenue / cashFlowMax) * 100;
-                    const expPct = (d.expense / cashFlowMax) * 100;
+              <div className="cashflow">
+                <div className="cashflow__legend">
+                  <span><i style={{ background: "var(--success)" }} /> Entradas</span>
+                  <span><i style={{ background: "var(--danger)" }} /> Saídas</span>
+                  <span style={{ marginLeft: "auto", color: "var(--muted)" }}>
+                    Acumulado:{" "}
+                    <strong style={{ color: accumulated >= 0 ? "var(--primary-hover)" : "var(--danger)" }}>
+                      {accumulated >= 0 ? "+" : ""}{formatMoney(accumulated)}
+                    </strong>
+                  </span>
+                </div>
+                <div className="bars14">
+                  {data.cashFlow14d.map(d => {
+                    const inH = Math.max((d.revenue / cashFlowMax) * 100, d.revenue > 0 ? 2 : 0);
+                    const outH = Math.max((d.expense / cashFlowMax) * 100, d.expense > 0 ? 2 : 0);
                     return (
-                      <div key={d.date} style={{ flex: 1, display: "flex", gap: 2, alignItems: "flex-end", minWidth: 0 }}>
-                        <div style={{ flex: 1, background: "linear-gradient(180deg, var(--success), #15803d)", borderRadius: "4px 4px 0 0", height: `${Math.max(revPct, 2)}%` }} title={`Entrada ${formatMoney(d.revenue)}`} />
-                        <div style={{ flex: 1, background: "linear-gradient(180deg, var(--danger), #b91c1c)", borderRadius: "4px 4px 0 0", height: `${Math.max(expPct, 2)}%` }} title={`Saída ${formatMoney(d.expense)}`} />
+                      <div key={d.date} className="col">
+                        <div className="tip">
+                          <strong>+{formatCompact(d.revenue)}</strong> / -{formatCompact(d.expense)}
+                        </div>
+                        <div className="stack">
+                          <div className="in" style={{ height: `${inH}%` }} />
+                          <div className="out" style={{ height: `${outH}%` }} />
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-                <div style={{ display: "flex", gap: 16, marginTop: 16, fontSize: 12, color: "var(--muted)" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--success)" }} /> Entradas
-                  </span>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--danger)" }} /> Saídas
-                  </span>
+                <div className="x-axis">
+                  {data.cashFlow14d.map(d => (
+                    <span key={d.date}>{formatDateShort(d.date)}</span>
+                  ))}
                 </div>
               </div>
-            </div>
-          </div>
+            </article>
 
-          {/* ─── Top despesas + Aging + Pagamento ─── */}
-          <div className="grid cols-3" style={{ marginBottom: 16 }}>
-            <div className="panel">
+            <article className="panel">
               <div className="panel__head">
                 <div>
-                  <div className="panel__title">Top despesas por categoria</div>
+                  <div className="panel__title">Top despesas — período</div>
+                  <div className="panel__sub">{cashflowSubtitle.replace("Últimos 7 dias · ", "").replace("Últimos 7 dias", "")} Por categoria</div>
                 </div>
               </div>
-              <div className="panel__body">
-                {data.topExpenseCategories.length === 0 ? (
-                  <EmptyMini text="Sem despesas categorizadas no período." />
-                ) : (
-                  <div className="hbar">
-                    {data.topExpenseCategories.map(c => {
-                      const max = Math.max(...data.topExpenseCategories.map(x => x.total), 1);
-                      const pct = (c.total / max) * 100;
-                      return (
-                        <div key={c.categoryId ?? c.categoryName} className="hbar__item">
-                          <span className="hbar__label">{c.categoryName}</span>
-                          <div className="hbar__track">
-                            <div className="hbar__fill" style={{ width: `${pct}%` }}>{formatMoney(c.total)}</div>
-                          </div>
+              {topExpensesNormalized.length === 0 ? (
+                <div className="empty" style={{ padding: 20 }}>Sem despesas categorizadas no período.</div>
+              ) : (
+                <div className="cat-list">
+                  {topExpensesNormalized.map(cat => (
+                    <div key={cat.categoryId ?? cat.categoryName} className="cat-row">
+                      <span className="cat-row__ico" style={{ background: cat.colorLight, color: cat.color }}>
+                        <Tag size={14} />
+                      </span>
+                      <div className="cat-row__main">
+                        <div className="cat-row__name">
+                          {cat.categoryName}
+                          <span className="cat-row__money">{formatMoney(cat.total)} <em>· {cat.pct}%</em></span>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel__head">
-                <div>
-                  <div className="panel__title">A receber — aging</div>
-                </div>
-              </div>
-              <div className="panel__body">
-                <div className="metric-row">
-                  <span className="metric-row__label">A vencer</span>
-                  <span className="metric-row__value metric-row__value--success">{formatMoney(data.aging.upcoming)}</span>
-                </div>
-                <div className="metric-row">
-                  <span className="metric-row__label">Vencido 1–7d</span>
-                  <span className="metric-row__value">{formatMoney(data.aging.overdue1to7)}</span>
-                </div>
-                <div className="metric-row">
-                  <span className="metric-row__label">Vencido 8–30d</span>
-                  <span className="metric-row__value metric-row__value--danger">{formatMoney(data.aging.overdue8to30)}</span>
-                </div>
-                <div className="metric-row" style={{ borderBottom: 0 }}>
-                  <span className="metric-row__label">Vencido +30d</span>
-                  <span className="metric-row__value metric-row__value--danger">{formatMoney(data.aging.overdue30plus)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel__head">
-                <div>
-                  <div className="panel__title">Formas de pagamento</div>
-                </div>
-              </div>
-              <div className="panel__body">
-                {data.paymentDistribution.length === 0 ? (
-                  <EmptyMini text="Sem pagamentos no período." />
-                ) : (
-                  <div className="hbar">
-                    {data.paymentDistribution.map(p => {
-                      const total = data.paymentDistribution.reduce((acc, x) => acc + x.total, 0) || 1;
-                      const pct = (p.total / total) * 100;
-                      return (
-                        <div key={p.method ?? "-"} className="hbar__item">
-                          <span className="hbar__label">{p.method ? (PAYMENT_METHOD_LABELS[p.method] ?? p.method) : "—"}</span>
-                          <div className="hbar__track">
-                            <div className="hbar__fill" style={{ width: `${pct}%` }}>{formatMoney(p.total)}</div>
-                          </div>
+                        <div className="cat-row__bar">
+                          <div style={{ width: `${cat.barWidth}%`, background: cat.gradient }} />
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+          </section>
 
-          {/* ─── Tabela ─── */}
-          <div className="panel">
-            <div className="panel__head" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {/* ── Grid 2: Lançamentos + (A receber + Formas pgto) ── */}
+          <section className="grid-main">
+            <article className="panel">
+              <div className="panel__head">
                 <div>
                   <div className="panel__title">Lançamentos recentes</div>
-                  <div className="panel__sub">{filteredRecords.length} lançamentos exibidos</div>
-                </div>
-                <div className="tabs">
-                  <button type="button" className={`tab ${tab === "all" ? "active" : ""}`} onClick={() => setTab("all")}>Todos</button>
-                  <button type="button" className={`tab ${tab === "REVENUE" ? "active" : ""}`} onClick={() => setTab("REVENUE")}>Entradas</button>
-                  <button type="button" className={`tab ${tab === "EXPENSE" ? "active" : ""}`} onClick={() => setTab("EXPENSE")}>Saídas</button>
+                  <div className="panel__sub">{data.records.length} lançamentos no período</div>
                 </div>
               </div>
-            </div>
-            <div className="panel__body panel__body--flush">
+
+              <div className="tx-filter">
+                <button type="button"
+                  className={`pill-tab${tab === "all" ? " is-on" : ""}`}
+                  onClick={() => setTab("all")}>
+                  Todos<span className="count">{txCounts.all}</span>
+                </button>
+                <button type="button"
+                  className={`pill-tab${tab === "REVENUE" ? " is-on" : ""}`}
+                  onClick={() => setTab("REVENUE")}>
+                  Entradas<span className="count">{txCounts.revenue}</span>
+                </button>
+                <button type="button"
+                  className={`pill-tab${tab === "EXPENSE" ? " is-on" : ""}`}
+                  onClick={() => setTab("EXPENSE")}>
+                  Saídas<span className="count">{txCounts.expense}</span>
+                </button>
+                <div className="grow">
+                  <Search size={14} />
+                  <input
+                    type="search"
+                    placeholder="Buscar lançamento…"
+                    value={txSearch}
+                    onChange={e => setTxSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
               {filteredRecords.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-state__icon"><DollarSign size={24} /></div>
-                  <h3>Nenhum lançamento no período</h3>
-                  <p>Crie sua primeira entrada ou despesa para começar a acompanhar.</p>
+                  <h3>Nenhum lançamento</h3>
+                  <p>Ajuste o filtro ou cadastre uma nova entrada/despesa.</p>
                 </div>
               ) : (
-                <div className="table-wrap" style={{ borderRadius: 0, border: 0, boxShadow: "none" }}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Descrição</th>
-                        <th className="col-hide-mobile">Categoria</th>
-                        <th className="col-hide-mobile">Conta</th>
-                        <th className="col-hide-mobile">Método</th>
-                        <th>Data</th>
-                        <th className="col-hide-mobile">Vencimento</th>
-                        <th>Status</th>
-                        <th style={{ textAlign: "right" }}>Valor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRecords.map(r => (
-                        <tr key={r.id}>
+                <table className="tx-table">
+                  <thead>
+                    <tr>
+                      <th>Descrição</th>
+                      <th>Categoria</th>
+                      <th>Pagamento</th>
+                      <th>Data</th>
+                      <th style={{ textAlign: "right" }}>Valor</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRecords.slice(0, 30).map(r => {
+                      const isOut = r.flowType !== "REVENUE";
+                      const catStyle = r.category?.name ? categoryStyle(r.category.name) : null;
+                      return (
+                        <tr key={r.id} className={isOut ? "is-out" : ""}>
                           <td>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                              <strong style={{ fontSize: 13 }}>{r.description ?? "—"}</strong>
-                              {r.customer?.name ? <span className="muted" style={{ fontSize: 11 }}>{r.customer.name}</span> : null}
+                            <div className="desc-cell">
+                              <span className="ico-cell">
+                                {isOut ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                              </span>
+                              <div>
+                                <div className="desc-main">{r.description ?? "—"}</div>
+                                <div className="desc-sub">{txMeta(r)}</div>
+                              </div>
                             </div>
                           </td>
-                          <td className="col-hide-mobile">{r.category?.name ?? "—"}</td>
-                          <td className="col-hide-mobile">{r.account?.name ?? "—"}</td>
-                          <td className="col-hide-mobile">{r.paymentMethod ? (PAYMENT_METHOD_LABELS[r.paymentMethod] ?? r.paymentMethod) : "—"}</td>
-                          <td>{formatDate(r.paidAt ?? r.createdAt)}</td>
-                          <td className="col-hide-mobile">{r.dueDate ? formatDate(r.dueDate) : "—"}</td>
-                          <td><span className={`pill ${STATUS_CLASS[r.paymentStatus]}`}>{STATUS_LABELS[r.paymentStatus]}</span></td>
-                          <td style={{ textAlign: "right", fontWeight: 700, color: r.flowType === "REVENUE" ? "var(--success)" : "var(--danger)" }}>
-                            {r.flowType === "REVENUE" ? "+" : "−"} {formatMoney(r.amount)}
+                          <td>
+                            {r.category?.name ? (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  padding: "2px 8px",
+                                  borderRadius: 5,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  background: catStyle?.colorLight ?? "var(--surface-muted)",
+                                  color: catStyle?.color ?? "var(--muted)"
+                                }}
+                              >
+                                {r.category.name}
+                              </span>
+                            ) : (
+                              <span style={{ color: "var(--muted)", fontSize: 11 }}>—</span>
+                            )}
+                          </td>
+                          <td>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 12 }}>
+                              {r.paymentMethod ? (PAYMENT_METHOD_LABELS[r.paymentMethod] ?? r.paymentMethod) : "—"}
+                            </span>
+                          </td>
+                          <td style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--muted)" }}>
+                            {formatDate(r.paidAt ?? r.createdAt)}
+                          </td>
+                          <td className="money">
+                            {isOut ? "− " : "+ "}{formatMoney(r.amount)}
+                          </td>
+                          <td>
+                            <div className="row-actions">
+                              <button type="button" className="row-btn" aria-label="Mais opções">
+                                <MoreVertical size={13} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      );
+                    })}
+                  </tbody>
+                </table>
               )}
+            </article>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              {/* A receber — aging */}
+              {aging ? (
+                <article className="panel">
+                  <div className="panel__head">
+                    <div>
+                      <div className="panel__title">A receber — aging</div>
+                      <div className="panel__sub">{aging.count} títulos · {formatMoney(aging.total)}</div>
+                    </div>
+                  </div>
+                  {([
+                    { label: "A vencer (próximos 30d)", value: aging.upcoming,    color: "var(--success)", barColor: "var(--success)", pct: aging.upcomingPct },
+                    { label: "Vencido 1–7 dias",        value: aging.overdue7,    color: "var(--accent)",  barColor: "var(--accent)",  pct: aging.overdue7Pct },
+                    { label: "Vencido 8–30 dias",       value: aging.overdue30,   color: "var(--danger)",  barColor: "var(--danger)",  pct: aging.overdue30Pct },
+                    { label: "Vencido +30 dias",        value: aging.overdueOld,  color: "var(--danger)",  barColor: "#7f1d1d",        pct: aging.overdueOldPct }
+                  ]).map(row => (
+                    <div key={row.label} className="ar-row">
+                      <div className="ar-row__main">
+                        <div className="ar-row__nm">{row.label}</div>
+                        <div className="ar-row__b">
+                          <div style={{ width: `${row.pct}%`, background: row.barColor }} />
+                        </div>
+                      </div>
+                      <div className="ar-row__v" style={{ color: row.color }}>{formatMoney(row.value)}</div>
+                    </div>
+                  ))}
+                </article>
+              ) : null}
+
+              {/* Formas de pagamento */}
+              <article className="panel">
+                <div className="panel__head">
+                  <div>
+                    <div className="panel__title">Formas de pagamento</div>
+                    <div className="panel__sub">Distribuição no período</div>
+                  </div>
+                </div>
+
+                {payment.total === 0 ? (
+                  <div className="empty" style={{ padding: 20 }}>Sem pagamentos no período.</div>
+                ) : (
+                  <>
+                    <div
+                      className="donut-pm"
+                      style={{
+                        background: `conic-gradient(
+                          var(--primary) 0 ${payment.pixPct}%,
+                          var(--info) ${payment.pixPct}% ${payment.pixPct + payment.creditPct}%,
+                          var(--accent) ${payment.pixPct + payment.creditPct}% ${payment.pixPct + payment.creditPct + payment.debitPct}%,
+                          #cbd5e1 ${payment.pixPct + payment.creditPct + payment.debitPct}% ${payment.pixPct + payment.creditPct + payment.debitPct + payment.cashPct}%,
+                          #94a3b8 ${payment.pixPct + payment.creditPct + payment.debitPct + payment.cashPct}% 100%
+                        )`
+                      }}
+                    >
+                      <div className="donut-pm__center">
+                        <div className="donut-pm__v">{formatCompact(payment.total)}</div>
+                        <div className="donut-pm__l">Total</div>
+                      </div>
+                    </div>
+
+                    <div className="pm-legend">
+                      {[
+                        { label: "PIX",      color: PAYMENT_GROUP_COLOR.PIX,         value: payment.pix,    pct: payment.pixPct,    show: payment.pix > 0 },
+                        { label: "Crédito",  color: PAYMENT_GROUP_COLOR.CREDIT_CARD, value: payment.credit, pct: payment.creditPct, show: payment.credit > 0 },
+                        { label: "Débito",   color: PAYMENT_GROUP_COLOR.DEBIT_CARD,  value: payment.debit,  pct: payment.debitPct,  show: payment.debit > 0 },
+                        { label: "Dinheiro", color: PAYMENT_GROUP_COLOR.CASH,        value: payment.cash,   pct: payment.cashPct,   show: payment.cash > 0 },
+                        { label: "Outros",   color: PAYMENT_GROUP_COLOR.OTHER,       value: payment.other,  pct: payment.otherPct,  show: payment.other > 0 }
+                      ].filter(i => i.show).map(item => (
+                        <div key={item.label} className="pm-legend__row">
+                          <span className="dot" style={{ background: item.color }} />
+                          <span className="nm">{item.label}</span>
+                          <span className="v">{formatMoney(item.value)} · {item.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </article>
             </div>
-          </div>
+          </section>
         </>
       ) : null}
 
@@ -546,37 +872,6 @@ export default function FinanceiroPage() {
       ) : null}
     </>
   );
-}
-
-function KpiCard({ label, value, icon, variant, hint }: {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-  variant: "success" | "danger" | "info" | "warning";
-  hint?: string;
-}) {
-  const classMap: Record<string, string> = {
-    success: "stat-card--success",
-    danger: "stat-card--danger",
-    info: "stat-card--info",
-    warning: "stat-card--warning"
-  };
-  return (
-    <div className={`stat-card ${classMap[variant]}`}>
-      <div className="stat-card__header">
-        <div>
-          <div className="stat-card__label">{label}</div>
-          <div className="stat-card__value">{value}</div>
-        </div>
-        <div className="stat-card__icon">{icon}</div>
-      </div>
-      {hint ? <div className="stat-card__footer">{hint}</div> : null}
-    </div>
-  );
-}
-
-function EmptyMini({ text }: { text: string }) {
-  return <div className="empty" style={{ padding: 20 }}>{text}</div>;
 }
 
 function NewRecordModal({
