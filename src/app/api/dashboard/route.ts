@@ -242,6 +242,19 @@ export async function GET(request: NextRequest) {
         id: p.professionalId,
         name: p.professional.name
       })),
+      professionalsToday: (() => {
+        const counts = new Map<string, { id: string; name: string; count: number }>();
+        for (const a of todayFullAppointments) {
+          if (!a.professional) continue;
+          const k = a.professional.id;
+          const prev = counts.get(k) ?? { id: k, name: a.professional.name, count: 0 };
+          prev.count += 1;
+          counts.set(k, prev);
+        }
+        const list = Array.from(counts.values()).sort((a, b) => b.count - a.count);
+        const max = list.reduce((m, p) => Math.max(m, p.count), 0);
+        return list.map(p => ({ ...p, max }));
+      })(),
       topServices: topServicesResult,
       vipCustomers,
       upcomingBirthdays,
@@ -254,7 +267,20 @@ export async function GET(request: NextRequest) {
     };
 
     if (planFeatures.allowFinancialControl) {
-      const [dayRevenue, periodRevenue, monthRevenue, prevMonthRevenue, monthExpense, receivable] = await Promise.all([
+      const start14d = new Date(startOfDay);
+      start14d.setDate(start14d.getDate() - 13);
+      const start28d = new Date(startOfDay);
+      start28d.setDate(start28d.getDate() - 27);
+
+      const [
+        dayRevenue,
+        periodRevenue,
+        monthRevenue,
+        prevMonthRevenue,
+        monthExpense,
+        receivable,
+        last28dRevenue
+      ] = await Promise.all([
         prisma.financialRecord.aggregate({
           where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PAID", paidAt: { gte: startOfDay, lt: endOfDay } },
           _sum: { amount: true }
@@ -279,8 +305,41 @@ export async function GET(request: NextRequest) {
           where: { companyId: cid, flowType: "REVENUE", paymentStatus: "PENDING" },
           _sum: { amount: true },
           _count: { id: true }
+        }),
+        prisma.financialRecord.findMany({
+          where: {
+            companyId: cid,
+            flowType: "REVENUE",
+            paymentStatus: "PAID",
+            paidAt: { gte: start28d, lt: endOfDay }
+          },
+          select: { paidAt: true, amount: true }
         })
       ]);
+
+      const dayMs = 24 * 60 * 60 * 1000;
+      const revenue14d: { date: string; current: number; previous: number }[] = [];
+      for (let i = 0; i < 14; i++) {
+        const dayStart = new Date(start14d.getTime() + i * dayMs);
+        const prevStart = new Date(dayStart.getTime() - 14 * dayMs);
+        revenue14d.push({
+          date: dayStart.toISOString(),
+          current: 0,
+          previous: 0
+        });
+        void prevStart;
+      }
+      for (const r of last28dRevenue) {
+        if (!r.paidAt) continue;
+        const t = new Date(r.paidAt).getTime();
+        const diffDays = Math.floor((t - start28d.getTime()) / dayMs);
+        const amount = Number(r.amount);
+        if (diffDays >= 0 && diffDays < 14) {
+          revenue14d[diffDays].previous += amount;
+        } else if (diffDays >= 14 && diffDays < 28) {
+          revenue14d[diffDays - 14].current += amount;
+        }
+      }
 
       const monthRev = Number(monthRevenue._sum.amount ?? 0);
       const prevRev = Number(prevMonthRevenue._sum.amount ?? 0);
@@ -295,7 +354,8 @@ export async function GET(request: NextRequest) {
         monthExpense: Number(monthExpense._sum.amount ?? 0),
         monthBalance: monthRev - Number(monthExpense._sum.amount ?? 0),
         receivable: Number(receivable._sum.amount ?? 0),
-        receivableCount: receivable._count.id
+        receivableCount: receivable._count.id,
+        revenue14d
       };
     }
 
