@@ -33,7 +33,10 @@ export async function GET(request: NextRequest) {
       },
       include: {
         category: { select: { id: true, name: true, color: true } },
-        checklistTemplate: { select: { id: true, name: true, status: true } }
+        checklistTemplate: { select: { id: true, name: true, status: true } },
+        professionals: {
+          include: { professional: { select: { id: true, name: true } } }
+        }
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       take: 200

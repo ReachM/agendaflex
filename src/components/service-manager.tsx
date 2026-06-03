@@ -2,17 +2,22 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Activity,
+  AlignJustify,
   Ban,
-  CheckCircle,
+  Briefcase,
+  Circle,
   Clock,
   DollarSign,
-  Edit2,
-  Eye,
-  EyeOff,
   FolderPlus,
+  MoreVertical,
   Plus,
   Save,
+  Search,
+  Sliders,
   Sparkles,
+  Tag,
+  TrendingUp,
   X
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -25,6 +30,10 @@ type Category = {
   sortOrder: number;
   isActive: boolean;
   _count?: { services: number };
+};
+
+type ProfessionalLink = {
+  professional: { id: string; name: string };
 };
 
 type Service = {
@@ -41,6 +50,7 @@ type Service = {
   category: { id: string; name: string; color: string | null } | null;
   checklistTemplate: { id: string; name: string; status: string } | null;
   stats: { count: number; totalRevenue: number };
+  professionals?: ProfessionalLink[];
 };
 
 type Metrics = {
@@ -58,22 +68,84 @@ type Response = {
   metrics: Metrics;
 };
 
+type SortKey = "popular" | "price_desc" | "price_asc" | "name";
+
+const AVATAR_COLORS = [
+  "#0d9488", "#2563eb", "#d97706", "#9333ea",
+  "#dc2626", "#16a34a", "#0891b2", "#c2410c"
+];
+
 function formatMoney(value: number | null) {
   if (value === null || value === undefined) return "—";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
+function formatPriceInt(value: number | null) {
+  if (value === null || value === undefined) return "—";
+  const rounded = Math.round(value);
+  if (Math.abs(value - rounded) < 0.005) {
+    return new Intl.NumberFormat("pt-BR").format(rounded);
+  }
+  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+}
+
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string): string {
+  return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "?";
+}
+
+function hexToRgba(hex: string | null | undefined, alpha = 0.16): string {
+  if (!hex) return "rgba(100, 116, 139, 0.16)";
+  const m = hex.replace("#", "").match(/^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!m) return hex;
+  const [, r, g, b] = m;
+  return `rgba(${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)}, ${alpha})`;
+}
+
+function getServiceGradient(name: string, fallbackColor?: string | null): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("color")) return "linear-gradient(135deg, #d97706, #b45309)";
+  if (lower.includes("corte")) return "linear-gradient(135deg, #0d9488, #0f766e)";
+  if (lower.includes("manicure")) return "linear-gradient(135deg, #db2777, #9d174d)";
+  if (lower.includes("pedicure")) return "linear-gradient(135deg, #db2777, #be185d)";
+  if (lower.includes("progressiva") || lower.includes("alisamento")) return "linear-gradient(135deg, #9333ea, #7e22ce)";
+  if (lower.includes("hidrat")) return "linear-gradient(135deg, #2563eb, #1d4ed8)";
+  if (lower.includes("mecha") || lower.includes("luzes")) return "linear-gradient(135deg, #fbbf24, #d97706)";
+  if (lower.includes("sobrancelha")) return "linear-gradient(135deg, #16a34a, #15803d)";
+  if (lower.includes("escova")) return "linear-gradient(135deg, #0891b2, #0e7490)";
+  if (lower.includes("barba")) return "linear-gradient(135deg, #475569, #1e293b)";
+  if (lower.includes("massa")) return "linear-gradient(135deg, #14b8a6, #0d9488)";
+  if (lower.includes("limpeza")) return "linear-gradient(135deg, #0ea5e9, #0284c7)";
+  if (fallbackColor) return `linear-gradient(135deg, ${fallbackColor}, ${fallbackColor})`;
+  return "linear-gradient(135deg, var(--primary), var(--primary-hover))";
+}
+
 function formatDuration(minutes: number) {
-  if (minutes < 60) return `${minutes}min`;
+  if (minutes < 60) return `${minutes} min`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m === 0 ? `${h}h` : `${h}h${m}`;
 }
 
+type GroupedCategory = {
+  id: string;
+  name: string;
+  color: string;
+  colorLight: string;
+  services: Service[];
+};
+
 export function ServiceManager() {
   const [data, setData] = useState<Response | null>(null);
   const [error, setError] = useState("");
-  const [category, setCategory] = useState<string>("all");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortKey>("popular");
   const [showForm, setShowForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -86,7 +158,7 @@ export function ServiceManager() {
 
   // Category form
   const [catName, setCatName] = useState("");
-  const [catColor, setCatColor] = useState("");
+  const [catColor, setCatColor] = useState("#0d9488");
 
   // Edit
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -97,15 +169,13 @@ export function ServiceManager() {
 
   const load = useCallback(async () => {
     try {
-      const params = new URLSearchParams();
-      if (category !== "all") params.set("category", category);
-      const result = await apiFetch<Response>(`/api/services?${params}`);
+      const result = await apiFetch<Response>("/api/services");
       setData(result);
       setError("");
     } catch (err) {
       setError((err as Error).message);
     }
-  }, [category]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -143,7 +213,7 @@ export function ServiceManager() {
         method: "POST",
         body: JSON.stringify({ name: catName, color: catColor || null })
       });
-      setCatName(""); setCatColor("");
+      setCatName(""); setCatColor("#0d9488");
       setShowCategoryForm(false);
       await load();
     } catch (err) {
@@ -164,6 +234,15 @@ export function ServiceManager() {
       isPublic: s.isPublic,
       isActive: s.isActive
     });
+  }
+
+  function openCreateInCategory(categoryId: string) {
+    setForm({
+      name: "", description: "", basePrice: "", durationMinutes: "60",
+      categoryId: categoryId === "none" ? "" : categoryId,
+      isPublic: true, isActive: true
+    });
+    setShowForm(true);
   }
 
   async function submitEdit(e: FormEvent<HTMLFormElement>) {
@@ -204,53 +283,133 @@ export function ServiceManager() {
     }
   }
 
-  async function togglePublic(s: Service) {
-    try {
-      await apiFetch(`/api/services/${s.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ isPublic: !s.isPublic })
-      });
-      await load();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
+  // ── Derivados ─────────────────────────────────────
+  const services = data?.services ?? [];
+  const categories = data?.categories ?? [];
+  const metrics = data?.metrics;
 
-  async function removeCategory(id: string) {
-    if (!confirm("Desativar esta categoria? Serviços vinculados ficarão sem categoria.")) return;
-    try {
-      await apiFetch(`/api/service-categories/${id}`, { method: "DELETE" });
-      if (category === id) setCategory("all");
-      await load();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-
-  const groupedByCategory = useMemo(() => {
-    if (!data) return [];
-    const groups = new Map<string, { name: string; services: Service[] }>();
-    for (const s of data.services) {
+  // Contagem de serviços por categoria (ativos apenas)
+  const categoryCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const cat of categories) map.set(cat.id, 0);
+    map.set("__none", 0);
+    for (const s of services) {
+      if (!s.isActive) continue;
       const key = s.categoryId ?? "__none";
-      const name = s.category?.name ?? "Sem categoria";
-      if (!groups.has(key)) groups.set(key, { name, services: [] });
-      groups.get(key)!.services.push(s);
+      map.set(key, (map.get(key) ?? 0) + 1);
     }
-    return Array.from(groups.entries()).map(([id, g]) => ({ id, ...g }));
-  }, [data]);
+    return map;
+  }, [services, categories]);
+
+  const groupedServices = useMemo<GroupedCategory[]>(() => {
+    let filtered: Service[];
+    if (activeCategory === "inactive") {
+      filtered = services.filter(s => !s.isActive);
+    } else if (activeCategory === "all") {
+      filtered = services.filter(s => s.isActive);
+    } else if (activeCategory === "none") {
+      filtered = services.filter(s => s.isActive && !s.categoryId);
+    } else {
+      filtered = services.filter(s => s.isActive && s.categoryId === activeCategory);
+    }
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
+    }
+
+    filtered = [...filtered].sort((a, b) => {
+      if (sortBy === "popular") return b.stats.count - a.stats.count;
+      if (sortBy === "price_desc") return (b.basePrice ?? 0) - (a.basePrice ?? 0);
+      if (sortBy === "price_asc") return (a.basePrice ?? 0) - (b.basePrice ?? 0);
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
+
+    if (activeCategory === "all") {
+      const groups = new Map<string, GroupedCategory>();
+      for (const cat of categories) {
+        groups.set(cat.id, {
+          id: cat.id,
+          name: cat.name,
+          color: cat.color ?? "var(--primary)",
+          colorLight: hexToRgba(cat.color),
+          services: []
+        });
+      }
+      groups.set("none", {
+        id: "none",
+        name: "Sem categoria",
+        color: "var(--muted)",
+        colorLight: "var(--surface-muted)",
+        services: []
+      });
+      for (const svc of filtered) {
+        const key = svc.categoryId ?? "none";
+        groups.get(key)?.services.push(svc);
+      }
+      return [...groups.values()].filter(g => g.services.length > 0);
+    }
+
+    if (activeCategory === "inactive") {
+      return [{
+        id: "inactive",
+        name: "Serviços inativos",
+        color: "var(--muted)",
+        colorLight: "var(--surface-muted)",
+        services: filtered
+      }];
+    }
+
+    if (activeCategory === "none") {
+      return [{
+        id: "none",
+        name: "Sem categoria",
+        color: "var(--muted)",
+        colorLight: "var(--surface-muted)",
+        services: filtered
+      }];
+    }
+
+    const cat = categories.find(c => c.id === activeCategory);
+    if (!cat) return [];
+    return [{
+      id: cat.id,
+      name: cat.name,
+      color: cat.color ?? "var(--primary)",
+      colorLight: hexToRgba(cat.color),
+      services: filtered
+    }];
+  }, [services, categories, activeCategory, search, sortBy]);
+
+  const sectionTitle = useMemo(() => {
+    if (activeCategory === "all") return "Todos os serviços";
+    if (activeCategory === "inactive") return "Serviços inativos";
+    if (activeCategory === "none") return "Sem categoria";
+    return categories.find(c => c.id === activeCategory)?.name ?? "Serviços";
+  }, [activeCategory, categories]);
+
+  const subtitle = metrics
+    ? `${metrics.activeServices} serviços ativos em ${categories.length} categorias · ticket médio ${formatMoney(metrics.avgTicket)}`
+    : "Catálogo de serviços";
 
   return (
     <>
       <PageHeader
         title="Serviços"
-        subtitle={data ? `${data.metrics.activeServices} ativos · ${data.categories.length} categorias` : "Catálogo de serviços"}
+        subtitle={subtitle}
         actions={
           <>
+            <button type="button" className="btn btn-ghost" onClick={() => alert("Reordenação em breve.")}>
+              <AlignJustify size={15} />
+              Reordenar
+            </button>
             <button type="button" className="btn btn-ghost" onClick={() => setShowCategoryForm(s => !s)}>
-              <FolderPlus size={15} /> Nova categoria
+              <FolderPlus size={15} />
+              Nova categoria
             </button>
             <button type="button" className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
-              <Plus size={15} /> Novo serviço
+              <Plus size={15} />
+              Novo serviço
             </button>
           </>
         }
@@ -258,63 +417,42 @@ export function ServiceManager() {
 
       {error ? <div className="error-box">{error}</div> : null}
 
-      {data ? (
+      {!data ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+          <div className="loading-spinner" />
+        </div>
+      ) : (
         <>
-          {/* Cards */}
-          <div className="grid cols-3" style={{ marginBottom: 16 }}>
-            <div className="stat-card stat-card--info">
-              <div className="stat-card__header">
+          {/* Top Stats */}
+          {metrics ? (
+            <section className="top-stats">
+              <div className="ts-card">
+                <div className="ts-card__ico"><Briefcase size={18} /></div>
                 <div>
-                  <div className="stat-card__label">Serviços ativos</div>
-                  <div className="stat-card__value">{data.metrics.activeServices}</div>
+                  <div className="ts-card__v">{metrics.activeServices}</div>
+                  <div className="ts-card__l">Serviços ativos</div>
                 </div>
-                <div className="stat-card__icon"><CheckCircle size={18} /></div>
               </div>
-              <div className="stat-card__footer">{data.metrics.inactiveServices} inativos</div>
-            </div>
-            <div className="stat-card stat-card--warning">
-              <div className="stat-card__header">
+              <div className="ts-card ts-card--ok">
+                <div className="ts-card__ico"><Activity size={18} /></div>
                 <div>
-                  <div className="stat-card__label">Serviço mais procurado</div>
-                  <div className="stat-card__value" style={{ fontSize: 18 }}>{data.metrics.topService?.name ?? "—"}</div>
+                  <div className="ts-card__v">{metrics.topService?.name ?? "—"}</div>
+                  <div className="ts-card__l">
+                    Mais procurado · {metrics.topService?.count ?? 0}×
+                  </div>
                 </div>
-                <div className="stat-card__icon"><Sparkles size={18} /></div>
               </div>
-              <div className="stat-card__footer">{data.metrics.topService?.count ?? 0}x agendado</div>
-            </div>
-            <div className="stat-card stat-card--success">
-              <div className="stat-card__header">
+              <div className="ts-card ts-card--accent">
+                <div className="ts-card__ico"><DollarSign size={18} /></div>
                 <div>
-                  <div className="stat-card__label">Ticket médio</div>
-                  <div className="stat-card__value" style={{ fontSize: 22 }}>{formatMoney(data.metrics.avgTicket)}</div>
+                  <div className="ts-card__v">{formatMoney(metrics.avgTicket)}</div>
+                  <div className="ts-card__l">Ticket médio dos serviços</div>
                 </div>
-                <div className="stat-card__icon"><DollarSign size={18} /></div>
               </div>
-              <div className="stat-card__footer">{data.metrics.totalAppointmentServices} agendamentos</div>
-            </div>
-          </div>
+            </section>
+          ) : null}
 
-          {/* Category tabs */}
-          <div className="panel" style={{ marginBottom: 16 }}>
-            <div className="panel__head" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
-              <div className="tabs" style={{ flexWrap: "wrap" }}>
-                <button type="button" className={`tab ${category === "all" ? "active" : ""}`} onClick={() => setCategory("all")}>
-                  Todos
-                </button>
-                {data.categories.map(c => (
-                  <button key={c.id} type="button" className={`tab ${category === c.id ? "active" : ""}`} onClick={() => setCategory(c.id)}>
-                    {c.color ? <span style={{ width: 8, height: 8, borderRadius: 999, background: c.color, marginRight: 6, display: "inline-block" }} /> : null}
-                    {c.name} {c._count ? <span style={{ marginLeft: 4, color: "var(--muted)" }}>({c._count.services})</span> : null}
-                  </button>
-                ))}
-                <button type="button" className={`tab ${category === "uncategorized" ? "active" : ""}`} onClick={() => setCategory("uncategorized")}>
-                  Sem categoria
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Forms */}
+          {/* Formulário inline de nova categoria */}
           {showCategoryForm ? (
             <section className="panel" style={{ marginBottom: 16 }}>
               <div className="panel__head">
@@ -323,28 +461,16 @@ export function ServiceManager() {
               <div className="panel__body">
                 <form onSubmit={submitCategory} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10 }}>
                   <input className="input" required placeholder="Ex.: Cabelo, Unhas, Estética" value={catName} onChange={e => setCatName(e.target.value)} />
-                  <input className="input" type="color" value={catColor || "#0d9488"} onChange={e => setCatColor(e.target.value)} style={{ width: 60 }} />
+                  <input className="input" type="color" value={catColor} onChange={e => setCatColor(e.target.value)} style={{ width: 60 }} />
                   <button type="submit" className="btn btn-primary" disabled={saving}>
                     <FolderPlus size={14} /> Adicionar
                   </button>
                 </form>
-                {data.categories.length > 0 ? (
-                  <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {data.categories.map(c => (
-                      <span key={c.id} className="pill pill--muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                        {c.color ? <span style={{ width: 8, height: 8, borderRadius: 999, background: c.color }} /> : null}
-                        {c.name} ({c._count?.services ?? 0})
-                        <button type="button" onClick={() => removeCategory(c.id)} style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--danger)", padding: 0, marginLeft: 4 }}>
-                          <X size={11} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             </section>
           ) : null}
 
+          {/* Formulário inline de novo serviço */}
           {showForm ? (
             <section className="panel" style={{ marginBottom: 16 }}>
               <div className="panel__head">
@@ -360,7 +486,7 @@ export function ServiceManager() {
                     <label>Categoria</label>
                     <select className="select" value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })}>
                       <option value="">— Sem categoria —</option>
-                      {data.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
                   <div className="field">
@@ -392,93 +518,147 @@ export function ServiceManager() {
             </section>
           ) : null}
 
-          {/* Services list grouped by category */}
-          {groupedByCategory.length === 0 ? (
-            <section className="panel">
-              <div className="panel__body">
-                <div className="empty-state">
-                  <div className="empty-state__icon"><Sparkles size={24} /></div>
-                  <h3>Nenhum serviço cadastrado</h3>
-                  <p>Crie categorias e serviços para começar.</p>
+          {/* Grid principal: sidebar + main */}
+          <div className="svc-grid">
+            {/* Sidebar de categorias */}
+            <aside className="cat-list" role="navigation" aria-label="Categorias">
+              <h4>Categorias</h4>
+              <button
+                type="button"
+                className={`cat-list__item${activeCategory === "all" ? " is-active" : ""}`}
+                onClick={() => setActiveCategory("all")}
+              >
+                <span className="ico"><Circle size={14} /></span>
+                Todos
+                <span className="count">{metrics?.activeServices ?? 0}</span>
+              </button>
+
+              {categories.map(cat => {
+                const isActive = activeCategory === cat.id;
+                const color = cat.color ?? "#64748b";
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={`cat-list__item${isActive ? " is-active" : ""}`}
+                    onClick={() => setActiveCategory(cat.id)}
+                  >
+                    <span
+                      className="ico"
+                      style={{
+                        background: isActive ? color : hexToRgba(cat.color),
+                        color: isActive ? "#fff" : color
+                      }}
+                    >
+                      <Tag size={14} />
+                    </span>
+                    {cat.name}
+                    <span className="count">{categoryCounts.get(cat.id) ?? 0}</span>
+                  </button>
+                );
+              })}
+
+              {(categoryCounts.get("__none") ?? 0) > 0 ? (
+                <button
+                  type="button"
+                  className={`cat-list__item${activeCategory === "none" ? " is-active" : ""}`}
+                  onClick={() => setActiveCategory("none")}
+                >
+                  <span className="ico"><Circle size={14} /></span>
+                  Sem categoria
+                  <span className="count">{categoryCounts.get("__none") ?? 0}</span>
+                </button>
+              ) : null}
+
+              <div className="divider" />
+
+              <button
+                type="button"
+                className={`cat-list__item${activeCategory === "inactive" ? " is-active" : ""}`}
+                onClick={() => setActiveCategory("inactive")}
+              >
+                <span className="ico"><Ban size={14} /></span>
+                Inativos
+                <span className="count">{metrics?.inactiveServices ?? 0}</span>
+              </button>
+
+              <button type="button" className="cat-list__add" onClick={() => setShowCategoryForm(true)}>
+                <Plus size={14} />
+                Nova categoria
+              </button>
+            </aside>
+
+            {/* Área principal */}
+            <div>
+              <div className="section-bar">
+                <h3>
+                  <Sliders size={18} />
+                  {sectionTitle}
+                </h3>
+                <div className="ctrls">
+                  <div className="svc-search">
+                    <Search size={15} />
+                    <input
+                      type="search"
+                      placeholder="Buscar serviço…"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                    />
+                  </div>
+                  <select value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)}>
+                    <option value="popular">Mais procurados</option>
+                    <option value="price_desc">Maior preço</option>
+                    <option value="price_asc">Menor preço</option>
+                    <option value="name">Nome A-Z</option>
+                  </select>
                 </div>
               </div>
-            </section>
-          ) : (
-            groupedByCategory.map(group => (
-              <section key={group.id} className="panel" style={{ marginBottom: 16 }}>
-                <div className="panel__head">
-                  <div>
-                    <div className="panel__title">{group.name}</div>
-                    <div className="panel__sub">{group.services.length} serviços</div>
-                  </div>
+
+              {groupedServices.length === 0 ? (
+                <div className="svc-empty">
+                  <Sparkles size={32} />
+                  <h3>Nenhum serviço encontrado</h3>
+                  <p>Ajuste a busca ou crie um novo serviço.</p>
                 </div>
-                <div className="panel__body panel__body--flush">
-                  <div className="table-wrap" style={{ borderRadius: 0, border: 0, boxShadow: "none" }}>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Serviço</th>
-                          <th className="col-hide-mobile">Duração</th>
-                          <th style={{ textAlign: "right" }}>Preço</th>
-                          <th className="col-hide-mobile">Agendamentos</th>
-                          <th>Visibilidade</th>
-                          <th>Status</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.services.map(s => (
-                          <tr key={s.id} onClick={() => openEdit(s)} style={{ cursor: "pointer" }}>
-                            <td>
-                              <strong style={{ fontSize: 13 }}>{s.name}</strong>
-                              {s.description ? <div style={{ fontSize: 11, color: "var(--muted)" }}>{s.description}</div> : null}
-                              {s.checklistTemplate ? <div style={{ fontSize: 10, color: "var(--primary)", marginTop: 2 }}>✓ {s.checklistTemplate.name}</div> : null}
-                            </td>
-                            <td className="col-hide-mobile">
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--muted)" }}>
-                                <Clock size={11} /> {formatDuration(s.durationMinutes)}
-                              </span>
-                            </td>
-                            <td style={{ textAlign: "right", fontWeight: 600 }}>{formatMoney(s.basePrice)}</td>
-                            <td className="col-hide-mobile">{s.stats.count}x</td>
-                            <td onClick={e => e.stopPropagation()}>
-                              <button type="button" className="btn btn-sm btn-ghost" onClick={() => togglePublic(s)} title={s.isPublic ? "Ocultar do link público" : "Mostrar no link público"}>
-                                {s.isPublic ? <><Eye size={12} /> Online</> : <><EyeOff size={12} /> Oculto</>}
-                              </button>
-                            </td>
-                            <td>
-                              <span className={`pill ${s.isActive ? "pill--success" : "pill--muted"}`}>
-                                {s.isActive ? "Ativo" : "Inativo"}
-                              </span>
-                            </td>
-                            <td style={{ textAlign: "right" }} onClick={e => e.stopPropagation()}>
-                              <button type="button" className="btn btn-sm btn-ghost" onClick={() => openEdit(s)} title="Editar">
-                                <Edit2 size={13} />
-                              </button>
-                              {s.isActive ? (
-                                <button type="button" className="btn btn-sm btn-danger-ghost" onClick={() => toggleActive(s)} title="Desativar">
-                                  <Ban size={13} />
-                                </button>
-                              ) : (
-                                <button type="button" className="btn btn-sm btn-ghost" onClick={() => toggleActive(s)} title="Reativar">
-                                  <CheckCircle size={13} />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              ) : (
+                groupedServices.map(group => (
+                  <div key={group.id}>
+                    {activeCategory === "all" ? (
+                      <div className="group-header">
+                        <span className="swatch" style={{ background: group.color }} />
+                        {group.name}
+                        <span className="count">· {group.services.length} {group.services.length === 1 ? "serviço" : "serviços"}</span>
+                      </div>
+                    ) : null}
+
+                    <div className="svc-cards">
+                      {group.services.map(svc => (
+                        <ServiceCard
+                          key={svc.id}
+                          service={svc}
+                          onEdit={() => openEdit(svc)}
+                          onToggleActive={() => toggleActive(svc)}
+                        />
+                      ))}
+
+                      {activeCategory !== "inactive" ? (
+                        <button
+                          type="button"
+                          className="svc-add"
+                          onClick={() => openCreateInCategory(group.id)}
+                        >
+                          <Plus size={30} strokeWidth={1.8} />
+                          <div className="t">Novo serviço de {group.name.toLowerCase()}</div>
+                          <div className="s">Nome, duração, preço e profissionais</div>
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              </section>
-            ))
-          )}
+                ))
+              )}
+            </div>
+          </div>
         </>
-      ) : (
-        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-          <div className="loading-spinner" />
-        </div>
       )}
 
       {/* Edit modal */}
@@ -500,7 +680,7 @@ export function ServiceManager() {
                 <label>Categoria</label>
                 <select className="select" value={editForm.categoryId} onChange={e => setEditForm({ ...editForm, categoryId: e.target.value })}>
                   <option value="">— Sem categoria —</option>
-                  {data?.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div className="field">
@@ -538,5 +718,92 @@ export function ServiceManager() {
         </div>
       ) : null}
     </>
+  );
+}
+
+function ServiceCard({
+  service,
+  onEdit,
+  onToggleActive
+}: {
+  service: Service;
+  onEdit: () => void;
+  onToggleActive: () => void;
+}) {
+  const gradient = getServiceGradient(service.name, service.category?.color);
+  const professionals = service.professionals ?? [];
+  const visible = professionals.slice(0, 3);
+  const extra = professionals.length - visible.length;
+
+  return (
+    <article
+      className={`svc${!service.isActive ? " is-inactive" : ""}`}
+      onClick={onEdit}
+    >
+      <div className="svc__head">
+        <div className="svc__color" style={{ background: gradient }}>
+          <Tag size={16} />
+        </div>
+        <div className="svc__name">{service.name}</div>
+        <button
+          type="button"
+          className="svc__menu"
+          onClick={e => { e.stopPropagation(); onToggleActive(); }}
+          title={service.isActive ? "Desativar" : "Reativar"}
+          aria-label="Mais opções"
+        >
+          <MoreVertical size={14} />
+        </button>
+      </div>
+
+      <div className="svc__price">
+        <span className="unit">R$</span>
+        {formatPriceInt(service.basePrice)}
+      </div>
+
+      <div className="svc__meta">
+        <span>
+          <Clock size={12} />
+          {formatDuration(service.durationMinutes)}
+        </span>
+        <span>
+          <TrendingUp size={12} />
+          {service.stats.count}×
+        </span>
+        {!service.isActive ? <span className="svc__inactive">Inativo</span> : null}
+      </div>
+
+      <div className="svc__foot">
+        {professionals.length > 0 ? (
+          <div className="svc__pros">
+            {visible.map(p => (
+              <span
+                key={p.professional.id}
+                className="av"
+                style={{ background: getAvatarColor(p.professional.name) }}
+                title={p.professional.name}
+              >
+                {getInitials(p.professional.name)}
+              </span>
+            ))}
+            {extra > 0 ? <span className="more">+{extra}</span> : null}
+          </div>
+        ) : (
+          <span className="svc__pros--empty">Sem profissionais</span>
+        )}
+
+        {service.isPublic ? (
+          <span className="svc__online">
+            <span className="dot" />
+            Online
+          </span>
+        ) : (
+          <span className="svc__online svc__online--off">
+            <span className="dot" />
+            Oculto
+          </span>
+        )}
+      </div>
+    </article>
   );
 }
