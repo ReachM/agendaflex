@@ -2,15 +2,29 @@
 
 import {
   Ban,
+  Calendar,
   CalendarPlus,
   Check,
-  CheckCircle,
+  Clock,
+  Download,
   Edit2,
   Eye,
+  Mail,
+  MessageCircle,
+  MoreVertical,
+  Package,
   Palette,
+  Pencil,
+  Phone,
+  Plus,
   RefreshCcw,
   Save,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Star,
   Trash2,
+  Users,
   UserPlus,
   X
 } from "lucide-react";
@@ -134,11 +148,69 @@ function ErrorBox({ error }: { error: string }) {
 export { TenantDashboard } from "@/components/tenant-dashboard";
 
 
+const AVATAR_COLORS = [
+  "#0d9488", "#2563eb", "#d97706", "#9333ea",
+  "#dc2626", "#16a34a", "#0891b2", "#c2410c"
+];
+
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string): string {
+  return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "?";
+}
+
+function formatMoneyCompact(value: number): string {
+  if (value >= 1000) return `R$ ${(value / 1000).toFixed(1).replace(".", ",")}k`;
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+}
+
+function formatMonthYear(value: string): string {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(value));
+}
+
+function formatTenure(createdAt: string): string {
+  if (!createdAt) return "";
+  const diff = Date.now() - new Date(createdAt).getTime();
+  const months = Math.floor(diff / (30 * 24 * 60 * 60 * 1000));
+  if (months < 1) return "novo";
+  if (months < 12) return `há ${months} ${months === 1 ? "mês" : "meses"}`;
+  const years = Math.floor(months / 12);
+  return `há ${years} ${years === 1 ? "ano" : "anos"}`;
+}
+
+function formatBirthDate(value: string): string {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(value));
+}
+
+function CustomerTag({ tag }: { tag: string | null }) {
+  if (!tag || tag === "REGULAR") return null;
+  const map: Record<string, { cls: string; label: string }> = {
+    VIP:       { cls: "cl-tag--vip",       label: "⭐ VIP" },
+    NEW:       { cls: "cl-tag--new",       label: "Novo" },
+    RECURRING: { cls: "cl-tag--recurring", label: "Recorrente" },
+    INACTIVE:  { cls: "cl-tag--inactive",  label: "Inativo" }
+  };
+  const entry = map[tag];
+  if (!entry) return null;
+  return <span className={`cl-tag ${entry.cls}`}>{entry.label}</span>;
+}
+
+const PAGE_SIZE = 20;
+
 export function CustomerManager() {
   const [customers, setCustomers] = useState<AnyRecord[]>([]);
   const [metrics, setMetrics] = useState<{ total: number; vipCount: number; newCount: number; newThisMonth: number; inactiveCount: number; avgTicket: number; totalSpent: number } | null>(null);
   const [tagFilter, setTagFilter] = useState<"all" | "VIP" | "NEW" | "INACTIVE">("all");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [fields, setFields] = useState<CustomField[]>([]);
   const [customValues, setCustomValues] = useState<CustomValues>({});
@@ -178,7 +250,7 @@ export function CustomerManager() {
   async function load() {
     const params = new URLSearchParams();
     if (tagFilter !== "all") params.set("tag", tagFilter);
-    if (search.trim()) params.set("search", search.trim());
+    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
     const [customerData, fieldData] = await Promise.all([
       apiFetch<{ customers: AnyRecord[]; segment?: string; metrics?: typeof metrics }>(`/api/customers?${params}`),
       apiFetch<{ customFields: CustomField[] }>("/api/custom-fields?entityType=CUSTOMER")
@@ -189,10 +261,21 @@ export function CustomerManager() {
     if (customerData.metrics) setMetrics(customerData.metrics);
   }
 
+  // Debounce de busca (300ms)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset paginacao quando filtro ou busca mudam
+  useEffect(() => {
+    setPage(1);
+  }, [tagFilter, debouncedSearch]);
+
   useEffect(() => {
     load().catch((err) => setError(err.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tagFilter]);
+  }, [tagFilter, debouncedSearch]);
 
   function formatMoney(value: number) {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -210,16 +293,39 @@ export function CustomerManager() {
     return `${Math.floor(days / 365)}+ anos`;
   }
 
-  function tagPill(tag: string) {
-    const map: Record<string, { label: string; cls: string }> = {
-      VIP: { label: "VIP", cls: "pill--warn" },
-      NEW: { label: "Novo", cls: "pill--info" },
-      RECURRING: { label: "Recorrente", cls: "pill--success" },
-      INACTIVE: { label: "Inativo", cls: "pill--muted" },
-      REGULAR: { label: "Regular", cls: "pill--muted" }
-    };
-    const t = map[tag] ?? map.REGULAR;
-    return <span className={`pill ${t.cls}`}>{t.label}</span>;
+  // Lista paginada client-side (API retorna ate 200)
+  const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE));
+  const pagedCustomers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return customers.slice(start, start + PAGE_SIZE);
+  }, [customers, page]);
+
+  const visiblePages = useMemo(() => {
+    const pages: number[] = [];
+    const maxLeft = Math.max(1, page - 1);
+    const maxRight = Math.min(totalPages, page + 1);
+    for (let p = maxLeft; p <= maxRight; p++) pages.push(p);
+    if (!pages.includes(1)) pages.unshift(1);
+    return [...new Set(pages)];
+  }, [page, totalPages]);
+
+  const selectedCustomer = useMemo(
+    () => customers.find(c => c.id === selectedId) ?? null,
+    [customers, selectedId]
+  );
+
+  const from = customers.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, customers.length);
+
+  function handleWhatsApp(phone: string) {
+    const digits = (phone ?? "").replace(/\D/g, "");
+    if (!digits) return;
+    const num = digits.startsWith("55") ? digits : `55${digits}`;
+    window.open(`https://wa.me/${num}`, "_blank", "noopener");
+  }
+
+  function handleImportCSV() {
+    alert("Importação de CSV em breve.");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -415,80 +521,268 @@ export function CustomerManager() {
     }
   }
 
+  const entityLabel = isHealthSegment ? "paciente" : "cliente";
+  const entityLabelPlural = isHealthSegment ? "pacientes" : "clientes";
+
   return (
     <>
       <PageHeader
         title={isHealthSegment ? "Pacientes" : "Clientes"}
-        subtitle={isHealthSegment ? "Cadastro de pacientes da clínica" : "Clientes finais e histórico de atendimentos"}
+        subtitle={
+          metrics
+            ? `${metrics.total} cadastros · ${metrics.newThisMonth} novos no mês · ${metrics.total - metrics.inactiveCount} ativos`
+            : "Carregando…"
+        }
         actions={
-          <button type="button" className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
-            <UserPlus size={15} /> {showForm ? "Fechar formulário" : `Novo ${isHealthSegment ? "paciente" : "cliente"}`}
-          </button>
+          <>
+            <button type="button" className="btn btn-ghost" onClick={handleImportCSV}>
+              <Download size={15} />
+              Importar CSV
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
+              <Plus size={15} />
+              {showForm ? "Fechar formulário" : `Novo ${entityLabel}`}
+            </button>
+          </>
         }
       />
       <ErrorBox error={error} />
 
-      {/* ─── Cards de métricas ───────────────────────────── */}
+      {/* ─── Stats Strip ─────────────────────────────────── */}
       {metrics ? (
-        <div className="grid cols-4" style={{ marginBottom: 16 }}>
-          <StatCard label={`Total de ${isHealthSegment ? "pacientes" : "clientes"}`} value={metrics.total} />
-          <div className="stat-card stat-card--info">
-            <div className="stat-card__header">
-              <div className="stat-card__label">Novos este mês</div>
-              <div className="stat-card__icon"><UserPlus size={18} /></div>
+        <section className="cl-stats">
+          <div className="cl-stat">
+            <div className="cl-stat__ico"><Users size={18} /></div>
+            <div>
+              <div className="cl-stat__v">{metrics.total}</div>
+              <div className="cl-stat__l">Total de {entityLabelPlural}</div>
             </div>
-            <div className="stat-card__value">{metrics.newThisMonth}</div>
           </div>
-          <div className="stat-card stat-card--warning">
-            <div className="stat-card__header">
-              <div className="stat-card__label">Clientes VIP</div>
-              <div className="stat-card__icon"><CheckCircle size={18} /></div>
+          <div className="cl-stat cl-stat--info">
+            <div className="cl-stat__ico"><UserPlus size={18} /></div>
+            <div>
+              <div className="cl-stat__v">{metrics.newThisMonth}</div>
+              <div className="cl-stat__l">Novos este mês</div>
             </div>
-            <div className="stat-card__value">{metrics.vipCount}</div>
-            <div className="stat-card__footer">≥ 5 visitas ou R$ 1.000</div>
           </div>
-          <div className="stat-card stat-card--success">
-            <div className="stat-card__header">
-              <div className="stat-card__label">Ticket médio</div>
-              <div className="stat-card__icon"><Save size={18} /></div>
+          <div className="cl-stat cl-stat--accent">
+            <div className="cl-stat__ico"><Star size={18} /></div>
+            <div>
+              <div className="cl-stat__v">{metrics.vipCount}</div>
+              <div className="cl-stat__l">VIP (≥ 5 visitas ou R$ 1k)</div>
             </div>
-            <div className="stat-card__value" style={{ fontSize: 22 }}>{formatMoney(metrics.avgTicket)}</div>
-            <div className="stat-card__footer">{formatMoney(metrics.totalSpent)} no histórico</div>
           </div>
-        </div>
+          <div className="cl-stat cl-stat--purple">
+            <div className="cl-stat__ico"><Package size={18} /></div>
+            <div>
+              <div className="cl-stat__v">{formatMoney(metrics.avgTicket)}</div>
+              <div className="cl-stat__l">Ticket médio</div>
+            </div>
+          </div>
+        </section>
       ) : null}
 
-      {/* ─── Tabs + busca ──────────────────────────────── */}
-      <div className="panel" style={{ marginBottom: 16 }}>
-        <div className="panel__head" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-            <div className="tabs">
-              <button type="button" className={`tab ${tagFilter === "all" ? "active" : ""}`} onClick={() => setTagFilter("all")}>Todos</button>
-              <button type="button" className={`tab ${tagFilter === "VIP" ? "active" : ""}`} onClick={() => setTagFilter("VIP")}>VIP {metrics ? `(${metrics.vipCount})` : ""}</button>
-              <button type="button" className={`tab ${tagFilter === "NEW" ? "active" : ""}`} onClick={() => setTagFilter("NEW")}>Novos {metrics ? `(${metrics.newCount})` : ""}</button>
-              <button type="button" className={`tab ${tagFilter === "INACTIVE" ? "active" : ""}`} onClick={() => setTagFilter("INACTIVE")}>Inativos {metrics ? `(${metrics.inactiveCount})` : ""}</button>
+      {/* ─── Formulário de criação inline ────────────────── */}
+      {showForm ? (
+        <section className="form-panel grid" style={{ marginBottom: 20 }}>
+          <h2 className="section-title">Novo {entityLabel}</h2>
+          <div className="tabs" style={{ marginBottom: 12 }}>
+            {tabs.map((tab) => (
+              <button key={tab.key} className={`tab ${formTab === tab.key ? "active" : ""}`} type="button" onClick={() => setFormTab(tab.key as any)}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <form className="form-grid" onSubmit={submit}>
+            {renderFormFields(form, setForm, formTab)}
+            {formTab === "notes" && <DynamicFields fields={fields} values={customValues} onChange={setCustomValues} />}
+            <div className="field full" style={{ display: "flex", gap: 10 }}>
+              <button className="button" type="submit">
+                <Save size={16} />
+                Salvar {entityLabel}
+              </button>
+              <button type="button" className="button secondary" onClick={() => setShowForm(false)}>Cancelar</button>
             </div>
-            <span style={{ fontSize: 12, color: "var(--muted)" }}>{customers.length} exibidos</span>
+          </form>
+        </section>
+      ) : null}
+
+      {/* ─── Grid principal: lista + detalhe ─────────────── */}
+      <div className="cl-grid">
+        {/* Painel lista */}
+        <div className="cl-list-panel">
+          {/* Filter bar */}
+          <div className="cl-filterbar">
+            <div className="cl-search">
+              <Search size={15} />
+              <input
+                type="search"
+                placeholder={`Buscar por nome, telefone, ${isHealthSegment ? "CPF" : "e-mail ou CPF"}…`}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            {([
+              { key: "all",      label: "Todos",    count: metrics?.total ?? 0 },
+              { key: "VIP",      label: "VIP",      count: metrics?.vipCount ?? 0 },
+              { key: "NEW",      label: "Novos",    count: metrics?.newCount ?? 0 },
+              { key: "INACTIVE", label: "Inativos", count: metrics?.inactiveCount ?? 0 }
+            ] as const).map(chip => (
+              <button
+                key={chip.key}
+                type="button"
+                className={`cl-chip${tagFilter === chip.key ? " is-on" : ""}`}
+                onClick={() => setTagFilter(chip.key)}
+              >
+                {chip.label}
+                <span className="count">{chip.count}</span>
+              </button>
+            ))}
+            <button type="button" className="cl-chip" onClick={() => alert("Filtros avançados em breve.") }>
+              <SlidersHorizontal size={13} />
+              Filtros
+            </button>
           </div>
-          <div className="inline-search">
-            <Eye size={14} />
-            <input
-              type="search"
-              placeholder="Buscar por nome, telefone, e-mail ou CPF..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") load().catch(err => setError((err as Error).message)); }}
-            />
-          </div>
+
+          {/* Tabela */}
+          {customers.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state__icon"><UserPlus size={24} /></div>
+              <h3>Nenhum {entityLabel} encontrado</h3>
+              <p>Ajuste o filtro ou cadastre um novo registro.</p>
+            </div>
+          ) : (
+            <>
+              <table className="cl-table">
+                <thead>
+                  <tr>
+                    <th>{isHealthSegment ? "Paciente" : "Cliente"}</th>
+                    <th>Última visita</th>
+                    <th>Visitas</th>
+                    <th>Total gasto</th>
+                    <th>Tag</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedCustomers.map((customer) => {
+                    const name = customer.name as string;
+                    const stats = customer.stats ?? { visitCount: 0, totalSpent: 0, lastVisit: null };
+                    const isSelected = selectedId === customer.id;
+                    return (
+                      <tr
+                        key={customer.id}
+                        className={isSelected ? "is-selected" : ""}
+                        onClick={() => setSelectedId(customer.id)}
+                      >
+                        <td>
+                          <div className="cl-name">
+                            <span
+                              className="cl-avatar cl-avatar--md"
+                              style={{ background: getAvatarColor(name) }}
+                            >
+                              {getInitials(name)}
+                            </span>
+                            <div>
+                              <div className="nm">{name}</div>
+                              <div className="meta">{customer.phone ?? customer.whatsapp ?? "—"}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="cl-num">{formatLastVisit(stats.lastVisit)}</td>
+                        <td className="cl-num">{stats.visitCount}</td>
+                        <td className="cl-money">{formatMoney(stats.totalSpent)}</td>
+                        <td><CustomerTag tag={customer.tag ?? null} /></td>
+                        <td>
+                          <div className="cl-actions">
+                            {(customer.phone || customer.whatsapp) ? (
+                              <button
+                                type="button"
+                                className="cl-rowbtn cl-rowbtn--wa"
+                                title="WhatsApp"
+                                onClick={e => { e.stopPropagation(); handleWhatsApp(customer.whatsapp ?? customer.phone); }}
+                              >
+                                <MessageCircle size={14} />
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="cl-rowbtn"
+                              title="Editar"
+                              onClick={e => { e.stopPropagation(); openEdit(customer); }}
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* Paginação */}
+              {customers.length > PAGE_SIZE ? (
+                <div className="cl-pagination">
+                  <span>Mostrando {from}–{to} de {customers.length}</span>
+                  <div className="cl-pagination__pages">
+                    <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
+                    {visiblePages.map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        className={page === p ? "is-active" : ""}
+                        onClick={() => setPage(p)}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                    {!visiblePages.includes(totalPages) ? (
+                      <>
+                        <span className="dots">…</span>
+                        <button
+                          type="button"
+                          className={page === totalPages ? "is-active" : ""}
+                          onClick={() => setPage(totalPages)}
+                        >
+                          {totalPages}
+                        </button>
+                      </>
+                    ) : null}
+                    <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>›</button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
+
+        {/* Painel de detalhe */}
+        <aside className="cl-detail">
+          {selectedCustomer ? (
+            <CustomerDetailPanel
+              customer={selectedCustomer}
+              isHealthSegment={isHealthSegment}
+              onEdit={() => openEdit(selectedCustomer)}
+              onAnonymize={() => anonymize(selectedCustomer.id)}
+              onWhatsApp={() => handleWhatsApp(selectedCustomer.whatsapp ?? selectedCustomer.phone)}
+              formatMoney={formatMoney}
+            />
+          ) : (
+            <div className="cl-detail__empty">
+              <Users size={32} />
+              <p>Selecione um {entityLabel} para ver os detalhes</p>
+            </div>
+          )}
+        </aside>
       </div>
 
-      {/* ─── Edit Modal ───────────────────────────────────── */}
+      {/* ─── Modal de edição ──────────────────────────────── */}
       {editingId ? (
         <div className="modal-overlay" onClick={closeEdit}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
             <div className="toolbar" style={{ marginBottom: 16 }}>
-              <h2 className="section-title">Editar {isHealthSegment ? "paciente" : "cliente"}</h2>
+              <h2 className="section-title">Editar {entityLabel}</h2>
               <button className="icon-button secondary" onClick={closeEdit} type="button" title="Fechar">
                 <X size={16} />
               </button>
@@ -517,97 +811,143 @@ export function CustomerManager() {
           </div>
         </div>
       ) : null}
+    </>
+  );
+}
 
-      {showForm ? (
-        <section className="form-panel grid">
-          <h2 className="section-title">Novo {isHealthSegment ? "paciente" : "cliente"}</h2>
-          <div className="tabs" style={{ marginBottom: 12 }}>
-            {tabs.map((tab) => (
-              <button key={tab.key} className={`tab ${formTab === tab.key ? "active" : ""}`} type="button" onClick={() => setFormTab(tab.key as any)}>
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <form className="form-grid" onSubmit={submit}>
-            {renderFormFields(form, setForm, formTab)}
-            {formTab === "notes" && <DynamicFields fields={fields} values={customValues} onChange={setCustomValues} />}
-            <div className="field full" style={{ display: "flex", gap: 10 }}>
-              <button className="button" type="submit">
-                <Save size={16} />
-                Salvar {isHealthSegment ? "paciente" : "cliente"}
-              </button>
-              <button type="button" className="button secondary" onClick={() => setShowForm(false)}>Cancelar</button>
+function CustomerDetailPanel({
+  customer,
+  isHealthSegment,
+  onEdit,
+  onAnonymize,
+  onWhatsApp,
+  formatMoney
+}: {
+  customer: AnyRecord;
+  isHealthSegment: boolean;
+  onEdit: () => void;
+  onAnonymize: () => void;
+  onWhatsApp: () => void;
+  formatMoney: (value: number) => string;
+}) {
+  const name = customer.name as string;
+  const stats = customer.stats ?? { visitCount: 0, totalSpent: 0, avgTicket: 0, lastVisit: null };
+  const phone = customer.phone ?? customer.whatsapp ?? "";
+  const initials = getInitials(name);
+  const color = getAvatarColor(name);
+
+  const allergies = customer.allergies && customer.allergies !== "[Restrito]" ? customer.allergies : null;
+  const hasContactRow = phone || customer.email || customer.birthDate;
+
+  function age(birth: string | null | undefined) {
+    if (!birth) return "";
+    const d = new Date(birth);
+    const today = new Date();
+    let a = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) a--;
+    return `${a} anos`;
+  }
+
+  return (
+    <>
+      <div className="cl-detail__hero">
+        <span className="cl-avatar cl-avatar--xl" style={{ background: color }}>
+          {initials}
+        </span>
+        <div className="cl-detail__name">{name}</div>
+        <div className="cl-detail__tags">
+          {customer.tag === "VIP" ? <span className="cl-tag cl-tag--vip">⭐ {isHealthSegment ? "Paciente" : "Cliente"} VIP</span> : null}
+          {customer.tag && customer.tag !== "VIP" ? <CustomerTag tag={customer.tag} /> : null}
+        </div>
+      </div>
+
+      <div className="cl-detail__stats">
+        <div>
+          <div className="v">{stats.visitCount}</div>
+          <div className="l">VISITAS</div>
+        </div>
+        <div>
+          <div className="v">{formatMoneyCompact(stats.totalSpent ?? 0)}</div>
+          <div className="l">TOTAL GASTO</div>
+        </div>
+        <div>
+          <div className="v">{formatMoney(stats.avgTicket ?? 0)}</div>
+          <div className="l">TICKET MÉDIO</div>
+        </div>
+      </div>
+
+      <div className="cl-detail__contacts">
+        {phone ? (
+          <button type="button" className="btn cl-btn-wa" onClick={onWhatsApp}>
+            <MessageCircle size={15} />
+            WhatsApp
+          </button>
+        ) : null}
+        <button type="button" className="btn btn-ghost" onClick={onEdit}>
+          <Pencil size={15} />
+          Editar
+        </button>
+      </div>
+
+      {hasContactRow ? (
+        <div className="cl-detail__section">
+          <h4>Contato e dados</h4>
+          {phone ? (
+            <div className="cl-row">
+              <Phone size={14} />
+              <div className="v">{phone}{customer.whatsapp ? <span className="sm">· WhatsApp</span> : null}</div>
             </div>
-          </form>
-        </section>
+          ) : null}
+          {customer.email ? (
+            <div className="cl-row">
+              <Mail size={14} />
+              <div className="v">{customer.email}</div>
+            </div>
+          ) : null}
+          {customer.birthDate ? (
+            <div className="cl-row">
+              <Calendar size={14} />
+              <div className="v">
+                {formatBirthDate(customer.birthDate)}
+                <span className="sm">· {age(customer.birthDate)}</span>
+              </div>
+            </div>
+          ) : null}
+          {customer.createdAt ? (
+            <div className="cl-row">
+              <Clock size={14} />
+              <div className="v">
+                {isHealthSegment ? "Paciente" : "Cliente"} desde {formatMonthYear(customer.createdAt)}
+                <span className="sm">· {formatTenure(customer.createdAt)}</span>
+              </div>
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
-      <section className="panel">
-        <div className="panel__body panel__body--flush">
-          {customers.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state__icon"><UserPlus size={24} /></div>
-              <h3>Nenhum {isHealthSegment ? "paciente" : "cliente"} encontrado</h3>
-              <p>Ajuste o filtro ou cadastre um novo registro.</p>
-            </div>
-          ) : (
-            <div className="table-wrap" style={{ borderRadius: 0, border: 0, boxShadow: "none" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>{isHealthSegment ? "Paciente" : "Cliente"}</th>
-                    <th className="col-hide-mobile">Contato</th>
-                    <th className="col-hide-mobile">Última visita</th>
-                    <th>Visitas</th>
-                    <th style={{ textAlign: "right" }}>Total gasto</th>
-                    <th>Tag</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.map((customer, idx) => {
-                    const initials = (customer.name as string).split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
-                    const stats = customer.stats ?? { visitCount: 0, totalSpent: 0, lastVisit: null };
-                    return (
-                      <tr key={customer.id} onClick={() => openEdit(customer)} style={{ cursor: "pointer" }}>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span className={`avatar avatar--sm av-${(idx % 8) + 1}`}>{initials || "?"}</span>
-                            <div>
-                              <strong style={{ fontSize: 13 }}>{customer.name}</strong>
-                              <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                                {customer.cpf ?? (customer.birthDate ? calculateAge(customer.birthDate.slice(0, 10)) : "—")}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="col-hide-mobile">
-                          <div style={{ fontSize: 13 }}>{customer.phone ?? customer.whatsapp ?? "—"}</div>
-                          <div style={{ fontSize: 11, color: "var(--muted)" }}>{customer.email ?? "—"}</div>
-                        </td>
-                        <td className="col-hide-mobile" style={{ fontSize: 12, color: "var(--muted)" }}>
-                          {formatLastVisit(stats.lastVisit)}
-                        </td>
-                        <td style={{ fontVariantNumeric: "tabular-nums" }}>{stats.visitCount}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{formatMoney(stats.totalSpent)}</td>
-                        <td>{tagPill(customer.tag ?? "REGULAR")}</td>
-                        <td style={{ textAlign: "right" }} onClick={e => e.stopPropagation()}>
-                          <button className="btn btn-sm btn-ghost" title="Editar" onClick={() => openEdit(customer)} type="button">
-                            <Edit2 size={13} />
-                          </button>
-                          <button className="btn btn-sm btn-danger-ghost" title="Anonimizar (LGPD)" onClick={() => anonymize(customer.id)} type="button">
-                            <Trash2 size={13} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {allergies ? (
+        <div className="cl-detail__section">
+          <h4>Atenção</h4>
+          <div className="cl-allergy-note">
+            <strong>⚠️ Alergias: {allergies}</strong>
+          </div>
         </div>
-      </section>
+      ) : null}
+
+      <div className="cl-detail__section">
+        <h4>Ações</h4>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" className="btn btn-ghost" onClick={onEdit}>
+            <Edit2 size={14} />
+            Editar cadastro
+          </button>
+          <button type="button" className="btn btn-danger-ghost" onClick={onAnonymize}>
+            <ShieldCheck size={14} />
+            Anonimizar (LGPD)
+          </button>
+        </div>
+      </div>
     </>
   );
 }
