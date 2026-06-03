@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Clock, DollarSign, Edit2, Eye, Plus, Save, Trash2, X } from "lucide-react";
+import { Activity, Ban, Check, Clock, DollarSign, Plus, Save, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   getAgendaPreset,
@@ -8,8 +8,8 @@ import {
   isFinancialFieldKey,
   type AgendaPreset
 } from "@/config/agenda-presets";
-import { AgendaFilters, type AgendaFilterValues } from "@/components/agenda/AgendaFilters";
-import { AppointmentCard, canRenderAgendaField, resolveAgendaFieldValue, statusBadgeClass, statusLabels, type AgendaAccess, type AnyRecord } from "@/components/agenda/AppointmentCard";
+import { type AgendaFilterValues } from "@/components/agenda/AgendaFilters";
+import { statusLabels, type AgendaAccess, type AnyRecord } from "@/components/agenda/AppointmentCard";
 import { AppointmentPreview } from "@/components/agenda/AppointmentPreview";
 import { DayList } from "@/components/agenda/DayList";
 import { MiniCalendar } from "@/components/agenda/MiniCalendar";
@@ -18,7 +18,6 @@ import { WeekCalendar } from "@/components/agenda/WeekCalendar";
 import { WeekToolbar } from "@/components/agenda/WeekToolbar";
 import { addDays as addDaysWeek, isSameDay as isSameDayWeek, startOfDay as startOfDayWeek, startOfWeek as startOfWeekWeek } from "@/components/agenda/week-utils";
 import { DynamicFields, type CustomValues } from "@/components/dynamic-fields";
-import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";
 
 type CustomField = {
@@ -315,73 +314,6 @@ function AppointmentForm({
   );
 }
 
-function AgendaTable({
-  appointments,
-  preset,
-  access,
-  onOpen,
-  onEdit,
-  onCancel
-}: {
-  appointments: AnyRecord[];
-  preset: AgendaPreset;
-  access: AgendaAccess;
-  onOpen: (appointment: AnyRecord) => void;
-  onEdit: (appointment: AnyRecord) => void;
-  onCancel: (id: string) => void;
-}) {
-  const columns = preset.tableColumns.filter((column) => canRenderAgendaField(column, access));
-
-  if (appointments.length === 0) return <div className="empty">{preset.emptyState}</div>;
-
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            {columns.map((column) => <th key={`${column.source}:${column.key}`}>{column.label}</th>)}
-            <th>Acoes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {appointments.map((appointment) => (
-            <tr key={appointment.id}>
-              {columns.map((column) => (
-                <td key={`${appointment.id}:${column.source}:${column.key}`}>
-                  {column.key === "status" ? (
-                    <span className={`badge ${statusBadgeClass[appointment.status] ?? ""}`}>
-                      {statusLabels[appointment.status] ?? appointment.status}
-                    </span>
-                  ) : (
-                    resolveAgendaFieldValue(appointment, column) || "-"
-                  )}
-                </td>
-              ))}
-              <td>
-                <div className="toolbar" style={{ gap: 6 }}>
-                  <button className="icon-button secondary" title="Ver detalhes" onClick={() => onOpen(appointment)} type="button">
-                    <Eye size={16} />
-                  </button>
-                  {access.canManage ? (
-                    <button className="icon-button secondary" title="Editar" onClick={() => onEdit(appointment)} type="button">
-                      <Edit2 size={16} />
-                    </button>
-                  ) : null}
-                  {access.canManage && appointment.status !== "CANCELLED" ? (
-                    <button className="icon-button secondary" title="Cancelar" onClick={() => onCancel(appointment.id)} type="button">
-                      <Ban size={16} />
-                    </button>
-                  ) : null}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 type TimeOff = {
   id: string;
   professionalId: string;
@@ -402,7 +334,6 @@ export function AgendaPage() {
   const [preset, setPreset] = useState<AgendaPreset>(getAgendaPreset(null));
   const [access, setAccess] = useState<AgendaAccess>(emptyAccess());
   const [filters, setFilters] = useState<AgendaFilterValues>({});
-  const [view, setView] = useState<"cards" | "table" | "week">("week");
   const [referenceDate, setReferenceDate] = useState<Date>(new Date());
   // Filtros visuais do redesenho da semana (não vão para a API; aplicados
   // client-side em cima do `appointments` já carregado).
@@ -410,7 +341,6 @@ export function AgendaPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDayWeek(new Date()));
   const [error, setError] = useState("");
   const [selectedAppointment, setSelectedAppointment] = useState<AnyRecord | null>(null);
-  const [editingAppointment, setEditingAppointment] = useState<AnyRecord | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -434,12 +364,6 @@ export function AgendaPage() {
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [customValues, setCustomValues] = useState<CustomValues>({});
   const [pricing, setPricing] = useState({ partsValue: "", laborValue: "", discountPercent: "" });
-
-  const [editForm, setEditForm] = useState<AppointmentFormState>({ ...form });
-  const [editServiceIds, setEditServiceIds] = useState<string[]>([]);
-  const [editCustomValues, setEditCustomValues] = useState<CustomValues>({});
-  const [editPricing, setEditPricing] = useState({ partsValue: "", laborValue: "", discountPercent: "" });
-  const [editError, setEditError] = useState("");
 
   const appointmentFields = fields.filter((field) => field.entityType === "APPOINTMENT");
 
@@ -560,20 +484,6 @@ export function AgendaPage() {
     }
   }
 
-  function navigateDays(deltaDays: number) {
-    const next = new Date(referenceDate);
-    next.setDate(next.getDate() + deltaDays);
-    setReferenceDate(next);
-  }
-
-  function navigateToday() {
-    setReferenceDate(new Date());
-  }
-
-  function setProfessionalFilter(professionalId: string) {
-    setFilters({ ...filters, professionalId });
-  }
-
   useEffect(() => {
     load().catch((err) => setError((err as Error).message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -651,56 +561,6 @@ export function AgendaPage() {
     }
   }
 
-  function openEdit(appointment: AnyRecord) {
-    setEditingAppointment(appointment);
-    setEditError("");
-    setEditForm({
-      customerId: appointment.customerId ?? "",
-      professionalId: appointment.professionalId ?? "",
-      startAt: toDateTimeInput(new Date(appointment.startAt)),
-      endAt: toDateTimeInput(new Date(appointment.endAt)),
-      status: appointment.status ?? "SCHEDULED",
-      notes: appointment.notes ?? "",
-      internalNotes: appointment.internalNotes ?? ""
-    });
-    const savedIds = appointment.customValues?._serviceIds;
-    setEditServiceIds(Array.isArray(savedIds) && savedIds.length > 0 ? savedIds : appointment.serviceId ? [appointment.serviceId] : []);
-    setEditPricing({
-      partsValue: appointment.customValues?._partsValue != null ? String(appointment.customValues._partsValue) : appointment.partsValue != null ? String(appointment.partsValue) : "",
-      laborValue: appointment.customValues?._laborValue != null ? String(appointment.customValues._laborValue) : appointment.laborValue != null ? String(appointment.laborValue) : "",
-      discountPercent: appointment.customValues?._discountPercent != null ? String(appointment.customValues._discountPercent) : appointment.discountPercent != null ? String(appointment.discountPercent) : ""
-    });
-    const reservedKeys = new Set(["_serviceIds", "_servicesTotal", "_grandTotal", "_totalPrice", "_partsValue", "_laborValue", "_discountPercent"]);
-    const clean: CustomValues = {};
-    for (const [key, value] of Object.entries(appointment.customValues ?? {})) {
-      if (!reservedKeys.has(key)) clean[key] = value as any;
-    }
-    setEditCustomValues(clean);
-  }
-
-  async function submitEdit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editingAppointment) return;
-    if (editServiceIds.length === 0) {
-      setEditError(`Selecione pelo menos um ${preset.labels.service.toLowerCase()}.`);
-      return;
-    }
-    setEditError("");
-    setSaving(true);
-    try {
-      await apiFetch(`/api/appointments/${editingAppointment.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(payloadFromForm(editForm, editServiceIds, editCustomValues, editPricing))
-      });
-      setEditingAppointment(null);
-      await load();
-    } catch (err) {
-      setEditError((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function changeStatus(id: string, status: string) {
     setError("");
     await apiFetch(`/api/appointments/${id}`, {
@@ -709,14 +569,6 @@ export function AgendaPage() {
     });
     await load();
   }
-
-  async function cancel(id: string) {
-    await changeStatus(id, "CANCELLED");
-  }
-
-  const referenceLabel = useMemo(() => {
-    return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(referenceDate);
-  }, [referenceDate]);
 
   return (
     <>
@@ -727,19 +579,6 @@ export function AgendaPage() {
           <p className="ag-subtitle">Visualize, organize e crie agendamentos com arrastar e soltar.</p>
         </div>
         <div className="ag-page-head__right">
-          <div className="range-pill">
-            {(["Dia", "Semana", "Mês", "Lista"] as const).map((label) => (
-              <button
-                key={label}
-                type="button"
-                className={`range-pill__btn${label === "Semana" ? " is-active" : ""}`}
-                onClick={() => label !== "Semana" && alert("Em breve")}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
           {access.canManage ? (
             <>
               <button type="button" className="btn btn-ghost" onClick={() => setShowBlockModal(true)}>
@@ -915,38 +754,6 @@ export function AgendaPage() {
         </div>
       ) : null}
 
-      {editingAppointment ? (
-        <div className="modal-overlay" onClick={() => setEditingAppointment(null)}>
-          <div className="modal-content" onClick={(event) => event.stopPropagation()}>
-            <div className="toolbar" style={{ marginBottom: 16 }}>
-              <h2 className="section-title">{preset.labels.editAppointment}</h2>
-              <button className="icon-button secondary" onClick={() => setEditingAppointment(null)} title="Fechar" type="button">
-                <X size={16} />
-              </button>
-            </div>
-            <ErrorBox error={editError} />
-            <AppointmentForm
-              access={access}
-              customValues={editCustomValues}
-              customers={customers}
-              fields={appointmentFields}
-              form={editForm}
-              onSubmit={submitEdit}
-              preset={preset}
-              pricing={editPricing}
-              professionals={professionals}
-              saving={saving}
-              selectedServiceIds={editServiceIds}
-              services={services}
-              setCustomValues={setEditCustomValues}
-              setForm={setEditForm}
-              setPricing={setEditPricing}
-              setSelectedServiceIds={setEditServiceIds}
-              submitLabel="Salvar alteracoes"
-            />
-          </div>
-        </div>
-      ) : null}
     </>
   );
 }
