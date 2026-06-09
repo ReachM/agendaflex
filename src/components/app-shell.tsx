@@ -35,6 +35,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { TrialBanner, TrialExpiredModal, type SubscriptionState } from "@/components/subscription-gate";
 import { GlobalSearch } from "@/components/global-search";
+import { ImpersonateBanner } from "@/components/impersonate-banner";
 import { Mark } from "@/components/brand/Mark";
 import { Wordmark } from "@/components/brand/Wordmark";
 
@@ -360,6 +361,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {/* Page content */}
         <div className="page-wrapper">
+          <ImpersonateBanner />
           {showTrialBanner && <TrialBanner daysLeft={subscription!.trialDaysLeft} />}
           {children}
         </div>
