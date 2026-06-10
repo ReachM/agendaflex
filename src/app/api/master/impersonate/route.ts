@@ -71,7 +71,9 @@ export async function POST(request: NextRequest) {
       maxAge: IMP_TTL
     });
     // Cookie legível pelo cliente apenas para exibir o banner (não é credencial).
-    response.cookies.set("marcaiflex_imp_name", encodeURIComponent(company.name), {
+    // cookies.set() já faz o percent-encoding; o banner faz decodeURIComponent ao
+    // ler. Não codificar manualmente aqui (causava dupla codificação: "%20" no UI).
+    response.cookies.set("marcaiflex_imp_name", company.name, {
       httpOnly: false,
       secure,
       sameSite: "strict",

@@ -38,6 +38,7 @@ import { GlobalSearch } from "@/components/global-search";
 import { ImpersonateBanner } from "@/components/impersonate-banner";
 import { Mark } from "@/components/brand/Mark";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { apiFetch } from "@/lib/client-api";
 
 type Session = {
   kind: "super_admin" | "tenant";
@@ -185,6 +186,18 @@ export function AppShell({ children }: { children: ReactNode }) {
     router.refresh();
   }
 
+  async function startUpgrade(targetSlug: "pro" | "max") {
+    try {
+      const res = await apiFetch<{ checkoutUrl?: string }>("/api/subscription/checkout", {
+        method: "POST",
+        body: JSON.stringify({ planSlug: targetSlug })
+      });
+      if (res.checkoutUrl) window.location.href = res.checkoutUrl;
+    } catch {
+      alert("Erro ao iniciar upgrade. Tente novamente.");
+    }
+  }
+
   if (loading) {
     return (
       <main className="content" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
@@ -287,7 +300,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                   ? "Financeiro completo, DRE, Notas Fiscais e Relatórios avançados."
                   : "Bot WhatsApp com lembretes automáticos e agendamento conversacional."}
               </div>
-              <button className="upgrade-card__btn" type="button">
+              <button
+                className="upgrade-card__btn"
+                type="button"
+                onClick={() => startUpgrade(planSlug === "starter" ? "pro" : "max")}
+              >
                 Fazer upgrade
                 <ArrowRight size={13} />
               </button>

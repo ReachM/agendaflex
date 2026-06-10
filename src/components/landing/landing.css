@@ -259,7 +259,9 @@
   padding: 64px 0 96px;
   background: radial-gradient(900px 480px at 78% -8%, var(--primary-ghost), transparent 60%),
     radial-gradient(700px 380px at 10% 4%, var(--accent-light), transparent 55%), var(--surface);
-  overflow: hidden;
+  /* visible para o card flutuante "Novo agendamento" não ser cortado à direita;
+     o transbordo horizontal é contido por .lp (overflow-x: hidden). */
+  overflow: visible;
 }
 .lp-hero__grid {
   display: grid;
