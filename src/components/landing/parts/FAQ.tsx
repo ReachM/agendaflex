@@ -32,7 +32,7 @@ const QUESTIONS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Funciona pro meu tipo de negócio?",
-    a: "Provavelmente sim. Hoje atendemos salões, clínicas, oficinas, barbearias, estéticas, consultórios, pet shops, estúdios e personal trainers — basicamente qualquer negócio que vive de horário marcado. Se ficar na dúvida, manda um zap pra gente."
+    a: "Provavelmente sim. O MarcaiFlex funciona para qualquer negócio que trabalha com horário marcado: clínicas, consultórios, salões, barbearias, estéticas, SPAs, oficinas mecânicas, pet shops, estúdios de tatuagem, personal trainers, psicólogos, dentistas e muito mais. Se ficar na dúvida, manda um zap pra gente."
   }
 ];
 

@@ -23,7 +23,7 @@ import {
 import type { BusinessSegment } from "@prisma/client";
 import "./register.css";
 
-const STEPS = [{ label: "Sua conta" }, { label: "Seu salão" }];
+const STEPS = [{ label: "Sua conta" }, { label: "Seu negócio" }];
 type TeamSize = "solo" | "2-5" | "6-15" | "16+";
 
 const TEAM_OPTIONS: { value: TeamSize; label: string }[] = [
@@ -67,7 +67,7 @@ export default function RegisterPage() {
       return "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.";
     }
     if (state.companyPhone.replace(/\D/g, "").length < 10) {
-      return "Informe o WhatsApp do salão.";
+      return "Informe o WhatsApp do negócio.";
     }
     if (!state.segment) return "Escolha o tipo de negócio.";
     if (!acceptTerms) return "Você precisa aceitar os Termos e a Política de Privacidade.";
@@ -176,7 +176,7 @@ export default function RegisterPage() {
           {step === 1 ? (
             <div className="register-pane">
               <h1 className="auth-form-panel__title">Crie sua conta</h1>
-              <p className="auth-form-panel__sub">Comece o teste grátis de 14 dias. Sem cartão.</p>
+              <p className="auth-form-panel__sub">Comece o teste grátis de 7 dias. Sem cartão.</p>
 
               <GoogleButton label="Cadastrar com Google" />
 
@@ -199,7 +199,7 @@ export default function RegisterPage() {
                 type="email"
                 name="email"
                 icon={<Mail size={18} />}
-                placeholder="voce@salao.com.br"
+                placeholder="voce@seunegocio.com.br"
                 autoComplete="email"
                 value={state.adminEmail}
                 onChange={(e) => update("adminEmail", e.target.value)}
@@ -236,7 +236,7 @@ export default function RegisterPage() {
             </div>
           ) : (
             <div className="register-pane">
-              <h1 className="auth-form-panel__title">Sobre o seu salão</h1>
+              <h1 className="auth-form-panel__title">Sobre o seu negócio</h1>
               <p className="auth-form-panel__sub">Usamos isso para montar sua página de agendamento.</p>
 
               <AuthInput

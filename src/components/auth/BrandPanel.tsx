@@ -17,7 +17,7 @@ const FEATURES: Record<Variant, Feature[]> = {
     { icon: <Receipt size={16} />, text: "Financeiro e notas fiscais integrados" }
   ],
   register: [
-    { icon: <Sparkles size={16} />, text: "14 dias grátis sem cartão" },
+    { icon: <Sparkles size={16} />, text: "7 dias grátis sem cartão" },
     { icon: <Calendar size={16} />, text: "Sua página de agendamento pronta" },
     { icon: <Smartphone size={16} />, text: "Bot do WhatsApp em poucos cliques" },
     { icon: <Wallet size={16} />, text: "Cancele quando quiser" }
@@ -26,14 +26,14 @@ const FEATURES: Record<Variant, Feature[]> = {
 
 const HEADLINES: Record<Variant, { badge: string; title: string; sub: string }> = {
   login: {
-    badge: "A AGENDA DO SEU SALÃO",
+    badge: "A AGENDA DO SEU NEGÓCIO",
     title: "Sua agenda cheia, sem o telefone tocando.",
     sub: "Agendamento online, lembretes no WhatsApp e controle financeiro num só lugar."
   },
   register: {
     badge: "COMECE GRÁTIS",
     title: "Em 2 minutos sua agenda está no ar.",
-    sub: "Teste grátis por 14 dias, sem cartão. Cancele quando quiser."
+    sub: "Teste grátis por 7 dias, sem cartão. Cancele quando quiser."
   }
 };
 
@@ -93,7 +93,7 @@ export function BrandPanel({ variant }: { variant: Variant }) {
           ))}
         </div>
         <div className="auth-brand__social-text">
-          <span className="auth-brand__stars">★★★★★</span> 1.284 salões já organizam a agenda com a MarcaiFlex
+          <span className="auth-brand__stars">★★★★★</span> 1.284 negócios já organizam a agenda com a MarcaiFlex
         </div>
       </div>
     </aside>

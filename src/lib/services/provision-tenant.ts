@@ -3,8 +3,8 @@ import { ApiError } from "@/lib/api/errors";
 import { hashPassword } from "@/lib/security/password";
 
 const TRIAL_PLAN_SLUG = "starter";
-// 14 dias para alinhar com o trial da seed (o registro via UI antes criava 7).
-const TRIAL_DAYS = 14;
+// 7 dias para alinhar com a comunicação (landing, SEO, termos e telas de auth).
+const TRIAL_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type ProvisionTenantInput = {

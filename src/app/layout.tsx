@@ -16,18 +16,18 @@ export const metadata: Metadata = {
     template: "%s | MarcaiFlex"
   },
   description:
-    "Plataforma de agendamento online para salões, barbearias e clínicas. Bot WhatsApp automático, lembretes inteligentes e gestão financeira. Teste grátis 14 dias.",
+    "Plataforma de agendamento online para clínicas, salões, barbearias, oficinas e qualquer negócio com horário marcado. Bot WhatsApp, lembretes automáticos e gestão financeira. Teste grátis 7 dias.",
   keywords: [
-    "agenda online salão de beleza",
-    "software agendamento barbearia",
+    "agenda online",
+    "software agendamento online",
     "bot whatsapp agendamento",
-    "sistema gestão salão",
-    "agendamento online barbearia",
-    "lembretes automáticos whatsapp salão",
-    "agenda online para clínicas",
-    "software gestão estética",
+    "software agendamento clínica",
+    "agenda barbearia online",
+    "agendamento online salão",
+    "lembretes automáticos whatsapp",
+    "sistema gestão agendamento",
     "marcaiflex",
-    "agendamento online gratuito"
+    "marcar horário online"
   ],
   authors: [{ name: "MarcaiFlex", url: SITE_URL }],
   creator: "MarcaiFlex",
@@ -50,13 +50,13 @@ export const metadata: Metadata = {
     siteName: "MarcaiFlex",
     title: "MarcaiFlex — Agenda online com Bot WhatsApp",
     description:
-      "Receba agendamentos 24h, envie lembretes automáticos no WhatsApp e gerencie seu salão em um só lugar. Teste grátis por 14 dias.",
+      "Receba agendamentos 24h pelo link público, envie lembretes automáticos no WhatsApp e gerencie seu negócio em um só lugar. Teste grátis por 7 dias.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "MarcaiFlex — Agenda online com Bot WhatsApp para salões e barbearias"
+        alt: "MarcaiFlex — Agenda online com Bot WhatsApp para qualquer negócio"
       }
     ]
   },
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "MarcaiFlex — Agenda online com Bot WhatsApp",
     description:
-      "Receba agendamentos 24h, envie lembretes automáticos no WhatsApp e gerencie seu salão em um só lugar.",
+      "Receba agendamentos 24h, envie lembretes automáticos no WhatsApp e gerencie seu negócio em um só lugar.",
     images: ["/og-image.png"],
     creator: "@marcaiflex"
   },
