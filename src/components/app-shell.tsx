@@ -327,6 +327,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               type="button"
               aria-label="Ajuda"
               title="Ajuda"
+              onClick={() => router.push("/ajuda")}
               style={{
                 width: 38,
                 height: 38,

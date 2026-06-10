@@ -1,0 +1,57 @@
+.legal-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 48px 24px;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #0f172a;
+}
+.legal-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 48px 56px;
+  box-shadow: 0 4px 24px -8px rgba(15,23,42,0.1);
+}
+.legal-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 36px; padding-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.legal-header .mark {
+  width: 36px; height: 36px; border-radius: 9px;
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+  color: #fff; font-weight: 800; font-size: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.legal-header .word { font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+.legal-header .word strong { color: #0d9488; }
+.legal-wrap h1 {
+  font-size: 28px; font-weight: 800; letter-spacing: -0.025em;
+  color: #0f172a; margin-bottom: 6px;
+}
+.legal-wrap .updated { font-size: 13px; color: #64748b; margin-bottom: 32px; }
+.legal-wrap section { margin-bottom: 28px; }
+.legal-wrap h2 {
+  font-size: 16px; font-weight: 700; color: #0f172a;
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.legal-wrap h3 { font-size: 14px; font-weight: 600; color: #334155; margin: 12px 0 6px; }
+.legal-wrap p { font-size: 14.5px; color: #334155; line-height: 1.7; margin-bottom: 10px; }
+.legal-wrap ul { padding-left: 20px; margin-bottom: 10px; }
+.legal-wrap li { font-size: 14.5px; color: #334155; line-height: 1.7; margin-bottom: 4px; }
+.legal-wrap a { color: #0d9488; font-weight: 600; text-decoration: none; }
+.legal-wrap a:hover { text-decoration: underline; }
+.legal-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 40px; padding-top: 24px; border-top: 1px solid #e2e8f0;
+  font-size: 13.5px;
+}
+@media (max-width: 640px) {
+  .legal-wrap { padding: 28px 20px; }
+  .legal-wrap h1 { font-size: 22px; }
+  .legal-footer { flex-direction: column; gap: 12px; text-align: center; }
+}

@@ -127,7 +127,10 @@ export default function LoginPage() {
             <span className="auth-form-panel__foot-secure">
               <Lock size={12} /> Conexão segura
             </span>
-            <span>Termos · Privacidade · Suporte</span>
+            <span>
+              <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a> ·{" "}
+              <a href="mailto:contato@marcaiflex.com.br">Suporte</a>
+            </span>
           </div>
         </form>
       </section>
