@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useCookieConsent } from "@/components/cookie-banner";
 import "./public-booking.css";
 
 type CompanyInfo = {
@@ -112,9 +113,12 @@ function groupSlots(slots: Slot[]) {
   return { morning, afternoon, evening };
 }
 
-export default function PublicBookingPage() {
+export default function PublicBookingClient() {
   const params = useParams();
   const slug = params.slug as string;
+
+  const { consent } = useCookieConsent();
+  const hasConsent = consent === "accepted";
 
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [services, setServices] = useState<Service[]>([]);
@@ -633,12 +637,22 @@ export default function PublicBookingPage() {
                 Continuar <ChevronRight size={16} />
               </button>
             ) : (
-              <button type="submit" className="pb-cta" disabled={submitting}>
-                {submitting ? "Agendando…" : "Confirmar agendamento"}
-                {!submitting && <Check size={16} />}
+              <button type="submit" className="pb-cta" disabled={!hasConsent || submitting}>
+                {submitting
+                  ? "Agendando…"
+                  : !hasConsent
+                    ? "Aceite os cookies para continuar"
+                    : "Confirmar agendamento"}
+                {!submitting && hasConsent && <Check size={16} />}
               </button>
             )}
           </div>
+
+          {step === totalSteps && !hasConsent && (
+            <p style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 8 }}>
+              ⚠️ Aceite os cookies no banner abaixo para continuar com o agendamento.
+            </p>
+          )}
         </form>
 
         {/* ─── Info bar (estática, sem dados sensíveis) ─── */}

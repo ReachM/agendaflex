@@ -3,8 +3,10 @@ import Link from "next/link";
 import "../termos/legal.css";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade — MarcaiFlex",
-  description: "Como a MarcaiFlex coleta, usa e protege seus dados pessoais.",
+  title: "Política de Privacidade",
+  description: "Como a MarcaiFlex coleta, usa e protege seus dados pessoais. Em conformidade com a LGPD.",
+  alternates: { canonical: "/privacidade" },
+  robots: { index: true, follow: true }
 };
 
 export default function PrivacidadePage() {

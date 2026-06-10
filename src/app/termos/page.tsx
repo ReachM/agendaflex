@@ -3,8 +3,10 @@ import Link from "next/link";
 import "./legal.css";
 
 export const metadata: Metadata = {
-  title: "Termos de Uso — MarcaiFlex",
-  description: "Termos e condições de uso da plataforma MarcaiFlex.",
+  title: "Termos de Uso",
+  description: "Termos e condições de uso da plataforma MarcaiFlex para gestão de agendamentos.",
+  alternates: { canonical: "/termos" },
+  robots: { index: true, follow: true }
 };
 
 export default function TermosPage() {
