@@ -325,6 +325,9 @@
 /* Hero mockup */
 .lp-hero__visual {
   position: relative;
+  /* visible para os float cards (toast/wa) não serem cortados nas bordas;
+     o transbordo horizontal é contido por .lp (overflow-x: hidden). */
+  overflow: visible;
 }
 .lp-mockup {
   position: relative;
@@ -526,14 +529,17 @@
   font-size: 10px;
 }
 .lp-float-card--toast {
-  top: 14%;
-  right: -8%;
+  top: 8%;
+  right: -6%;
   animation-delay: 0s;
+  max-width: 180px;
+  white-space: nowrap;
 }
 .lp-float-card--wa {
-  bottom: 12%;
-  left: -10%;
+  bottom: 10%;
+  left: -8%;
   animation-delay: 1.5s;
+  white-space: nowrap;
 }
 .lp-float-card__ic {
   width: 28px;
@@ -1476,12 +1482,12 @@
   }
   /* Floats trazidos pra borda do mockup */
   .lp-float-card--toast {
-    right: -4%;
-    top: -4%;
+    right: -2%;
+    top: -2%;
   }
   .lp-float-card--wa {
-    bottom: -4%;
-    left: -4%;
+    bottom: -2%;
+    left: -2%;
   }
   .lp-split__grid {
     grid-template-columns: 1fr;
