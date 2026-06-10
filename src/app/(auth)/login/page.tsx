@@ -61,7 +61,7 @@ export default function LoginPage() {
 
         <form className="auth-form-panel__body" onSubmit={onSubmit} noValidate>
           <h1 className="auth-form-panel__title">Bem-vindo de volta</h1>
-          <p className="auth-form-panel__sub">Entre para acessar a agenda do seu salão.</p>
+          <p className="auth-form-panel__sub">Entre para acessar a agenda do seu negócio.</p>
 
           {error ? (
             <div className="auth-error" role="alert">

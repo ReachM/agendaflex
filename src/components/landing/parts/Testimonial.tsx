@@ -11,14 +11,14 @@ export function Testimonial() {
           </div>
           <div className="lp-testi__content">
             <blockquote className="lp-testi__quote">
-              Sumiu o caderno e o caos do zap. O bot confirma sozinho — eu só apareço pra cortar
-              cabelo. Faturei 30% mais no primeiro mês só por parar de perder horário.
+              Acabou o caderno e o caos no WhatsApp. O bot confirma sozinho — eu só apareço pra
+              atender. Faturei 30% mais no primeiro mês só por parar de perder horário.
             </blockquote>
             <figcaption className="lp-testi__author">
               <div className="lp-testi__av">JM</div>
               <div>
                 <strong>Júlia Moraes</strong>
-                <span>Salão da Júlia · Curitiba/PR · 4 profissionais</span>
+                <span>Studio JM · Curitiba/PR · 4 profissionais</span>
               </div>
             </figcaption>
           </div>

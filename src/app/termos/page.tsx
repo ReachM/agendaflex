@@ -28,7 +28,7 @@ export default function TermosPage() {
 
         <section>
           <h2>2. Descrição do Serviço</h2>
-          <p>A MarcaiFlex é uma plataforma SaaS de gestão de agendamentos voltada para salões de beleza, barbearias, clínicas e estabelecimentos similares. Os serviços incluem agenda online, link público de agendamento, gestão de clientes, controle financeiro e bot de WhatsApp.</p>
+          <p>A MarcaiFlex é uma plataforma SaaS de gestão de agendamentos para negócios que trabalham com horário marcado. Atende clínicas, consultórios, salões, barbearias, estéticas, SPAs, oficinas, pet shops, estúdios, personal trainers e qualquer prestador de serviço que gerencie agenda com clientes. Os serviços incluem agenda online, link público de agendamento, gestão de clientes, controle financeiro e bot de WhatsApp.</p>
         </section>
 
         <section>
@@ -41,11 +41,11 @@ export default function TermosPage() {
           <h2>4. Planos e Pagamentos</h2>
           <p>A MarcaiFlex oferece planos pagos com diferentes funcionalidades:</p>
           <ul>
-            <li><strong>Starter (R$ 49/mês):</strong> Funcionalidades operacionais básicas.</li>
-            <li><strong>Pro (R$ 99/mês):</strong> Inclui módulo financeiro, relatórios e notas fiscais.</li>
-            <li><strong>Max (R$ 179/mês):</strong> Inclui Bot WhatsApp com lembretes automáticos.</li>
+            <li><strong>Starter (R$ 49/mês):</strong> Operacional completo: dashboard, agenda, clientes, profissionais, serviços e link de agendamento.</li>
+            <li><strong>Pro (R$ 99/mês):</strong> Tudo do Starter + módulo financeiro completo, notas fiscais e relatórios avançados.</li>
+            <li><strong>Max (R$ 179/mês):</strong> Tudo do Pro + Bot WhatsApp com lembretes automáticos e agendamento conversacional.</li>
           </ul>
-          <p>O período de teste gratuito é de 14 dias, sem necessidade de cartão de crédito. Após o período de teste, o acesso será limitado até a contratação de um plano.</p>
+          <p>O período de teste gratuito é de 7 dias, sem necessidade de cartão de crédito. Após o período de teste, o acesso será limitado até a contratação de um plano.</p>
           <p>Os pagamentos são processados via Mercado Pago. Em caso de inadimplência, o acesso poderá ser suspenso após notificação.</p>
         </section>
 

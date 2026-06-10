@@ -23,7 +23,7 @@ export default function PrivacidadePage() {
 
         <section>
           <h2>1. Quem somos</h2>
-          <p>A MarcaiFlex é uma plataforma de gestão de agendamentos. Neste documento, &quot;nós&quot; refere-se à MarcaiFlex, e &quot;você&quot; ao usuário (empresa) que utiliza nossa plataforma. Os clientes finais dos estabelecimentos são tratados como &quot;titulares de dados&quot;.</p>
+          <p>A MarcaiFlex é uma plataforma SaaS de gestão de agendamentos para negócios que trabalham com horário marcado — clínicas, consultórios, salões, barbearias, estéticas, SPAs, oficinas, pet shops e demais prestadores de serviço. Neste documento, &quot;nós&quot; refere-se à MarcaiFlex, e &quot;você&quot; ao usuário (empresa) que utiliza nossa plataforma. Os clientes finais dos estabelecimentos são tratados como &quot;titulares de dados&quot;.</p>
         </section>
 
         <section>

@@ -42,5 +42,5 @@
   <!-- Badge -->
   <rect x="80" y="545" width="220" height="40" rx="20" fill="rgba(13,148,136,0.2)"/>
   <text x="190" y="570" font-family="Arial, sans-serif" font-size="16"
-    font-weight="700" fill="#0d9488" text-anchor="middle">✓ 14 dias grátis, sem cartão</text>
+    font-weight="700" fill="#0d9488" text-anchor="middle">✓ 7 dias grátis, sem cartão</text>
 </svg>

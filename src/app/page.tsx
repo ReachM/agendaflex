@@ -4,20 +4,22 @@ import { Landing } from "@/components/landing/landing";
 const SITE_URL = "https://marcaiflex.com.br";
 
 export const metadata: Metadata = {
-  title: "MarcaiFlex — Agenda online com Bot WhatsApp para Salões e Barbearias",
+  title: "MarcaiFlex — Agenda online com Bot WhatsApp",
   description:
-    "Sistema de agendamento online para salões de beleza, barbearias, clínicas e estéticas. Bot WhatsApp com lembretes automáticos. Teste grátis 14 dias, sem cartão.",
+    "Sistema de agendamento online para clínicas, salões, barbearias, estéticas, oficinas e qualquer negócio com horário marcado. Bot WhatsApp automático. Teste grátis 7 dias, sem cartão.",
   keywords: [
-    "agenda online salão de beleza",
-    "sistema agendamento barbearia",
-    "bot whatsapp agendamento automático",
-    "software gestão salão beleza",
+    "agenda online",
+    "sistema agendamento online",
+    "bot whatsapp agendamento",
+    "software agendamento clínica",
+    "agenda online barbearia",
+    "sistema gestão salão",
     "agendamento online grátis",
-    "lembretes whatsapp salão",
-    "agenda clínica estética online",
-    "marcar horário online barbearia",
-    "sistema gestão financeiro salão",
-    "agendamento 24 horas salão"
+    "lembretes whatsapp automático",
+    "agenda online pet shop",
+    "agendamento online consultório",
+    "software agendamento estética",
+    "marcar horário online"
   ],
   alternates: { canonical: "/" },
   openGraph: {
@@ -25,7 +27,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     title: "MarcaiFlex — Agenda online com Bot WhatsApp",
     description:
-      "Receba agendamentos 24h pelo link público, envie lembretes automáticos no WhatsApp e gerencie todo o seu salão em um só lugar. Teste grátis 14 dias.",
+      "Receba agendamentos 24h pelo link público, envie lembretes automáticos no WhatsApp e gerencie seu negócio em um só lugar. Teste grátis por 7 dias.",
     images: [{ url: "/og-image.png", width: 1200, height: 630 }]
   }
 };
@@ -39,7 +41,7 @@ const jsonLd = {
       name: "MarcaiFlex",
       url: SITE_URL,
       description:
-        "Sistema de agendamento online para salões de beleza, barbearias, clínicas e estéticas com bot de WhatsApp integrado.",
+        "Sistema de agendamento online para qualquer negócio que trabalha com horário marcado. Bot WhatsApp automático, lembretes inteligentes, controle financeiro e link público de agendamento.",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web, iOS, Android",
       offers: [
@@ -93,10 +95,10 @@ const jsonLd = {
       mainEntity: [
         {
           "@type": "Question",
-          name: "O MarcaiFlex funciona para barbearias?",
+          name: "Para quais tipos de negócio o MarcaiFlex funciona?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Sim! O MarcaiFlex foi desenvolvido para salões de beleza, barbearias, clínicas estéticas e SPAs. Cada tipo de negócio tem uma experiência personalizada."
+            text: "O MarcaiFlex funciona para qualquer negócio que trabalha com horário marcado: clínicas, consultórios, salões de beleza, barbearias, estéticas, SPAs, oficinas mecânicas, pet shops, estúdios de tatuagem, personal trainers, psicólogos, dentistas e muito mais."
           }
         },
         {
@@ -104,7 +106,7 @@ const jsonLd = {
           name: "Precisa de cartão de crédito para testar?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Não. O teste gratuito dura 14 dias e não exige cartão de crédito. Você tem acesso a todas as funcionalidades do plano escolhido durante o período de teste."
+            text: "Não. O teste gratuito dura 7 dias e não exige cartão de crédito. Você tem acesso a todas as funcionalidades do plano escolhido durante o período de teste."
           }
         },
         {

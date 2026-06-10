@@ -89,12 +89,12 @@ export function Hero() {
         <div className="lp-hero__copy">
           <span className="lp-eyebrow">Agendamento + Bot WhatsApp</span>
           <h1>
-            A agenda do seu negócio, <span className="lp-hl">organizada e cheia</span>.
+            Sua agenda cheia, <span className="lp-hl">sem o telefone tocando</span>.
           </h1>
           <p className="lp-lede lp-hero__sub">
             Receba agendamentos online, reduza faltas com lembretes automáticos no WhatsApp e
-            acompanhe tudo em um painel feito para <strong>clínicas, salões, oficinas</strong> e
-            prestadores de serviço.
+            acompanhe tudo em um painel feito para{" "}
+            <strong>qualquer negócio que trabalha com horário marcado</strong>.
           </p>
           <div className="lp-hero__cta">
             <Link href="/register" className="lp-btn lp-btn--primary lp-btn--lg">
