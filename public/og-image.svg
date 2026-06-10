@@ -1,0 +1,46 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fundo gradiente -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#0c1b1c"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d9488"/>
+      <stop offset="100%" style="stop-color:#0f766e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Círculo decorativo direito -->
+  <circle cx="950" cy="315" r="280" fill="rgba(13,148,136,0.06)"/>
+  <circle cx="950" cy="315" r="180" fill="rgba(13,148,136,0.08)"/>
+
+  <!-- Logo mark -->
+  <rect x="80" y="80" width="64" height="64" rx="16" fill="url(#teal)"/>
+  <text x="112" y="123" font-family="Arial, sans-serif" font-size="32"
+    font-weight="900" fill="white" text-anchor="middle">M</text>
+
+  <!-- Nome -->
+  <text x="160" y="122" font-family="Arial, sans-serif" font-size="32"
+    font-weight="800" fill="white" letter-spacing="-1">Marcai</text>
+  <text x="305" y="122" font-family="Arial, sans-serif" font-size="32"
+    font-weight="800" fill="#0d9488" letter-spacing="-1">Flex</text>
+
+  <!-- Headline principal -->
+  <text x="80" y="280" font-family="Arial, sans-serif" font-size="64"
+    font-weight="900" fill="white" letter-spacing="-2">Sua agenda cheia,</text>
+  <text x="80" y="360" font-family="Arial, sans-serif" font-size="64"
+    font-weight="900" fill="white" letter-spacing="-2">sem o telefone</text>
+  <text x="80" y="440" font-family="Arial, sans-serif" font-size="64"
+    font-weight="900" fill="#0d9488" letter-spacing="-2">tocando.</text>
+
+  <!-- Subtítulo -->
+  <text x="80" y="510" font-family="Arial, sans-serif" font-size="24"
+    fill="#64748b">Agendamento online · Bot WhatsApp · Financeiro</text>
+
+  <!-- Badge -->
+  <rect x="80" y="545" width="220" height="40" rx="20" fill="rgba(13,148,136,0.2)"/>
+  <text x="190" y="570" font-family="Arial, sans-serif" font-size="16"
+    font-weight="700" fill="#0d9488" text-anchor="middle">✓ 14 dias grátis, sem cartão</text>
+</svg>
