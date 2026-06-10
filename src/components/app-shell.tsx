@@ -284,8 +284,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
               <div className="upgrade-card__desc">
                 {planSlug === "starter"
-                  ? "Agendamento online, bot WhatsApp e muito mais."
-                  : "Módulo Financeiro completo, DRE, notas fiscais e checklists ilimitados."}
+                  ? "Financeiro completo, DRE, Notas Fiscais e Relatórios avançados."
+                  : "Bot WhatsApp com lembretes automáticos e agendamento conversacional."}
               </div>
               <button className="upgrade-card__btn" type="button">
                 Fazer upgrade

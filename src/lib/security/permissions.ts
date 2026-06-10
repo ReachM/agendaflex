@@ -99,27 +99,25 @@ export type MenuItem = {
 
 export const TENANT_MENU_ITEMS: MenuItem[] = [
   // ── OPERAÇÃO ──────────────────────────────────────
-  { section: "Operação", href: "/dashboard",      label: "Dashboard",            icon: "LayoutDashboard" },
-  { section: "Operação", href: "/agenda",         label: "Agenda",               icon: "CalendarDays",       permission: "appointments:manage" },
-  { section: "Operação", href: "/clientes",       label: "Clientes",             icon: "Users",              permission: "customers:view" },
-  { section: "Operação", href: "/profissionais",  label: "Profissionais",        icon: "Briefcase",          permission: "professionals:view" },
-  { section: "Operação", href: "/servicos",       label: "Serviços",             icon: "ClipboardList",      permission: "services:view" },
-  { section: "Operação", href: "/link-agenda",    label: "Link de Agendamento",  icon: "Link2",              permission: "public_booking:manage" },
-
-  // ── CONFIGURAÇÃO (parte 1) ────────────────────────
-  { section: "Configuração", href: "/campos-personalizados", label: "Campos Personalizados", icon: "SlidersHorizontal", permission: "custom_fields:manage" },
-  { section: "Configuração", href: "/usuarios",              label: "Usuários",              icon: "UserCog",           permission: "users:manage" },
+  { section: "Operação",   href: "/dashboard",     label: "Dashboard",           icon: "LayoutDashboard" },
+  { section: "Operação",   href: "/agenda",        label: "Agenda",              icon: "CalendarDays",  permission: "appointments:manage" },
+  { section: "Operação",   href: "/clientes",      label: "Clientes",            icon: "Users",         permission: "customers:view" },
+  { section: "Operação",   href: "/profissionais", label: "Profissionais",       icon: "Briefcase",     permission: "professionals:view" },
+  { section: "Operação",   href: "/servicos",      label: "Serviços",            icon: "ClipboardList", permission: "services:view" },
+  { section: "Operação",   href: "/link-agenda",   label: "Link de Agendamento", icon: "Link2",         permission: "public_booking:manage" },
 
   // ── FINANCEIRO ────────────────────────────────────
-  { section: "Financeiro", href: "/financeiro",    label: "Financeiro",    icon: "DollarSign", permission: "financial:view",   requiredPlan: "pro" },
-  { section: "Financeiro", href: "/notas-fiscais", label: "Notas Fiscais", icon: "FileText",   permission: "invoices:manage",  requiredPlan: "pro" },
-  { section: "Financeiro", href: "/relatorios",    label: "Relatórios",    icon: "Activity",   permission: "reports:view",     requiredPlan: "pro" },
+  { section: "Financeiro", href: "/financeiro",    label: "Financeiro",   icon: "DollarSign", permission: "financial:view",  requiredPlan: "pro" },
+  { section: "Financeiro", href: "/notas-fiscais", label: "Notas Fiscais",icon: "FileText",   permission: "invoices:manage", requiredPlan: "pro" },
+  { section: "Financeiro", href: "/relatorios",    label: "Relatórios",   icon: "Activity",   permission: "reports:view",    requiredPlan: "pro" },
 
-  // ── CONFIGURAÇÃO (parte 2) ────────────────────────
-  { section: "Configuração", href: "/checklists",        label: "Checklists",    icon: "CheckSquare", permission: "checklists:view" },
-  { section: "Configuração", href: "/configuracoes",     label: "Configurações", icon: "Settings",    permission: "settings:manage" },
-  { section: "Configuração", href: "/logs",              label: "Logs",          icon: "FileClock",   permission: "logs:view" },
-  { section: "Configuração", href: "/configuracoes/bot", label: "Bot WhatsApp",  icon: "Bot",         permission: "settings:manage", requiredPlan: "max" }
+  // ── CONFIGURAÇÃO ──────────────────────────────────
+  { section: "Configuração", href: "/usuarios",      label: "Usuários",      icon: "UserCog",  permission: "users:manage" },
+  { section: "Configuração", href: "/configuracoes", label: "Configurações", icon: "Settings", permission: "settings:manage" },
+  { section: "Configuração", href: "/logs",          label: "Logs",          icon: "FileClock",permission: "logs:view" },
+
+  // ── BOT ───────────────────────────────────────────
+  { section: "Bot", href: "/configuracoes/bot", label: "Bot WhatsApp", icon: "Bot", permission: "settings:manage", requiredPlan: "max" },
 ];
 
 export const MASTER_MENU_ITEMS: MenuItem[] = [

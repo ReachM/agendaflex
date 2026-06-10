@@ -5,7 +5,6 @@ import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
-import { requirePlanFeature } from "@/lib/security/plan-guard";
 
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida (use o formato #RRGGBB).");
 
@@ -68,7 +67,6 @@ export async function PATCH(request: NextRequest) {
   try {
     assertSameOrigin(request);
     const context = await requireTenant(request, "public_booking:manage");
-    await requirePlanFeature(context, "allowClientSelfScheduling", "Agendamento online");
 
     const body = await request.json();
 
