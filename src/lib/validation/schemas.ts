@@ -20,6 +20,11 @@ export const forgotPasswordSchema = z.object({
   email: z.string().trim().email().max(255)
 });
 
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(1).max(200),
+  password: z.string().min(8).max(200)
+});
+
 export const registerSchema = z.object({
   // Admin user
   adminName: requiredString(180),

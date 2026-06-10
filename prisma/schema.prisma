@@ -387,10 +387,24 @@ model User {
   updatedAppointments Appointment[]    @relation("AppointmentUpdatedBy")
   auditLogs           AuditLog[]
   createdChecklists   Checklist[]
-  invoiceRequests     InvoiceRequest[] @relation("InvoiceRequestedBy")
+  invoiceRequests     InvoiceRequest[]     @relation("InvoiceRequestedBy")
+  passwordResetTokens PasswordResetToken[]
 
   @@index([status])
   @@index([systemRoleId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model CompanyUser {

@@ -54,15 +54,38 @@ export async function sendNotification(payload: NotificationPayload) {
 }
 
 /**
- * Email sending stub — in production this would use a service like
- * Resend, SendGrid, AWS SES, etc. For now it logs to console.
+ * Envia um e-mail via Resend (API REST, sem dependência extra). Se
+ * `RESEND_API_KEY` não estiver configurado (ambiente de dev), apenas loga uma
+ * linha discreta e retorna — assim o fluxo não quebra localmente. Lança em caso
+ * de erro da API para que o chamador registre como FAILED.
  */
-async function sendEmail(to: string, subject: string, body: string) {
-  // TODO: Integrate with real email provider
-  console.log(`\n📧 [EMAIL] To: ${to}`);
-  console.log(`   Subject: ${subject}`);
-  console.log(`   Body: ${body.substring(0, 200)}...`);
-  console.log(`   ✅ Email logged (simulated send)\n`);
+export async function sendEmail(to: string, subject: string, body: string) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL ?? "noreply@marcaiflex.com.br";
+
+  if (!apiKey) {
+    console.log(`[EMAIL stub] To: ${to} | Subject: ${subject}`);
+    return;
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [to],
+      subject,
+      html: body.includes("<") ? body : `<p>${body.replace(/\n/g, "<br>")}</p>`
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => res.status.toString());
+    throw new Error(`Resend API error: ${err}`);
+  }
 }
 
 // ─── Template helpers ────────────────────────────────
