@@ -1,7 +1,7 @@
 "use client";
 
-import { KeyRound, MoreVertical, RefreshCcw, Search, Shield, ShieldCheck, UserCog, Users, UserX } from "lucide-react";
-import { useMemo, useState } from "react";
+import { KeyRound, MoreVertical, RefreshCcw, Search, Shield, ShieldCheck, UserCog, Users, UserX, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import {
   SABiz,
   SAEmpty,
@@ -15,6 +15,7 @@ import {
   relativeTime
 } from "@/components/master/sa-bits";
 import { useSAData } from "@/components/master/use-sa-data";
+import { apiFetch } from "@/lib/client-api";
 
 type Membership = { companyId: string; companyName: string; plan: string; roleName: string };
 type UserRow = {
@@ -49,6 +50,41 @@ export default function UsuariosPage() {
   const { data, error, loading, reload } = useSAData<UsersResponse>("/api/master/users");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [menuUserId, setMenuUserId] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = () => setMenuUserId(null);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+
+  async function userAction(userId: string, action: "suspend" | "reactivate" | "reset_password") {
+    const labels = {
+      suspend: "Suspender este usuário?",
+      reactivate: "Reativar este usuário?",
+      reset_password: "Resetar senha? Uma senha temporária será gerada."
+    };
+    if (!confirm(labels[action])) return;
+
+    setActionLoading(true);
+    try {
+      const res = await apiFetch<{ message: string; temporaryPassword?: string }>(`/api/master/users/${userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action })
+      });
+      if (action === "reset_password" && res.temporaryPassword) {
+        setTempPassword(res.temporaryPassword);
+      }
+      setMenuUserId(null);
+      void reload();
+    } catch {
+      alert("Erro ao executar ação.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -155,13 +191,64 @@ export default function UsuariosPage() {
                       <SAStatusDot status={u.status} label={u.status === "ACTIVE" ? "Ativo" : "Suspenso"} />
                     </td>
                     <td>
-                      <div className="row-actions">
-                        <button type="button" className="row-btn" title="Resetar senha">
-                          <KeyRound size={15} />
-                        </button>
-                        <button type="button" className="row-btn" title="Mais">
+                      <div className="row-actions" style={{ position: "relative" }}>
+                        <button
+                          type="button"
+                          className="row-btn"
+                          title="Mais"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuUserId(menuUserId === u.id ? null : u.id);
+                          }}
+                        >
                           <MoreVertical size={15} />
                         </button>
+                        {menuUserId === u.id ? (
+                          <div
+                            className="dropdown"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: "absolute",
+                              right: 0,
+                              top: "100%",
+                              zIndex: 50,
+                              background: "var(--surface)",
+                              border: "1px solid var(--border)",
+                              borderRadius: "var(--radius)",
+                              boxShadow: "0 12px 32px rgba(0,0,0,0.4)",
+                              minWidth: 180,
+                              padding: 4
+                            }}
+                          >
+                            {u.status === "ACTIVE" ? (
+                              <button
+                                type="button"
+                                className="dropdown-item dropdown-item--danger"
+                                disabled={actionLoading}
+                                onClick={() => userAction(u.id, "suspend")}
+                              >
+                                <UserX size={14} /> Suspender conta
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="dropdown-item"
+                                disabled={actionLoading}
+                                onClick={() => userAction(u.id, "reactivate")}
+                              >
+                                <ShieldCheck size={14} /> Reativar conta
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="dropdown-item"
+                              disabled={actionLoading}
+                              onClick={() => userAction(u.id, "reset_password")}
+                            >
+                              <KeyRound size={14} /> Resetar senha
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -171,6 +258,51 @@ export default function UsuariosPage() {
           )}
         </div>
       </section>
+
+      {tempPassword ? (
+        <div className="modal-overlay" onClick={() => setTempPassword(null)}>
+          <div className="modal" style={{ maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal__head">
+              <h3>Senha temporária gerada</h3>
+              <button type="button" className="row-btn" onClick={() => setTempPassword(null)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal__body">
+              <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
+                Envie esta senha para o usuário. Ela não será exibida novamente.
+              </p>
+              <div
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  background: "var(--surface-2)",
+                  padding: "12px 16px",
+                  borderRadius: "var(--radius)",
+                  letterSpacing: "0.1em",
+                  textAlign: "center",
+                  color: "var(--violet-light)"
+                }}
+              >
+                {tempPassword}
+              </div>
+            </div>
+            <div className="modal__foot">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  void navigator.clipboard.writeText(tempPassword);
+                  setTempPassword(null);
+                }}
+              >
+                Copiar e fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

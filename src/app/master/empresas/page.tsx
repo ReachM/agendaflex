@@ -1,8 +1,8 @@
 "use client";
 
-import { Building2, ExternalLink, MoreVertical, RefreshCcw, Search } from "lucide-react";
+import { Building2, ExternalLink, MoreVertical, PauseCircle, PlayCircle, RefreshCcw, Search, Tag, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   SABiz,
   SAEmpty,
@@ -18,6 +18,7 @@ import {
   relativeTime
 } from "@/components/master/sa-bits";
 import { useSAData } from "@/components/master/use-sa-data";
+import { apiFetch } from "@/lib/client-api";
 
 type Company = {
   id: string;
@@ -76,6 +77,42 @@ export default function EmpresasPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState("recent");
   const [page, setPage] = useState(1);
+  const [menuCompanyId, setMenuCompanyId] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setMenuCompanyId(null);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+
+  async function companyAction(
+    companyId: string,
+    action: "suspend" | "reactivate" | "cancel" | "change_plan",
+    extra?: { planSlug?: string }
+  ) {
+    const labels = {
+      suspend: "Suspender esta empresa? O acesso será bloqueado imediatamente.",
+      reactivate: "Reativar esta empresa?",
+      cancel: "CANCELAR esta empresa? A assinatura será encerrada.",
+      change_plan: `Alterar plano para ${extra?.planSlug}?`
+    };
+    if (!confirm(labels[action])) return;
+
+    setActionLoading(true);
+    try {
+      await apiFetch(`/api/master/companies/${companyId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action, ...extra })
+      });
+      setMenuCompanyId(null);
+      void reload();
+    } catch {
+      alert("Erro ao executar ação.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -218,13 +255,95 @@ export default function EmpresasPage() {
                       <SAStatusDot status={c.subStatus ?? c.status} />
                     </td>
                     <td>
-                      <div className="row-actions">
+                      <div className="row-actions" style={{ position: "relative" }}>
                         <button type="button" className="row-btn imp" title="Acessar como empresa" onClick={() => impersonate(c.id)}>
                           <ExternalLink size={15} />
                         </button>
-                        <button type="button" className="row-btn" title="Mais">
+                        <button
+                          type="button"
+                          className="row-btn"
+                          title="Mais"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuCompanyId(menuCompanyId === c.id ? null : c.id);
+                          }}
+                        >
                           <MoreVertical size={15} />
                         </button>
+                        {menuCompanyId === c.id ? (
+                          <div
+                            className="dropdown"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              position: "absolute",
+                              right: 0,
+                              top: "100%",
+                              zIndex: 50,
+                              background: "var(--surface)",
+                              border: "1px solid var(--border)",
+                              borderRadius: "var(--radius)",
+                              boxShadow: "0 12px 32px rgba(0,0,0,0.4)",
+                              minWidth: 200,
+                              padding: 4
+                            }}
+                          >
+                            <div
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "var(--muted)",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.06em"
+                              }}
+                            >
+                              Alterar plano
+                            </div>
+                            {["starter", "pro", "max"]
+                              .filter((p) => p !== c.plan)
+                              .map((p) => (
+                                <button
+                                  key={p}
+                                  type="button"
+                                  className="dropdown-item"
+                                  disabled={actionLoading}
+                                  onClick={() => companyAction(c.id, "change_plan", { planSlug: p })}
+                                >
+                                  <Tag size={13} /> Mudar para {p.charAt(0).toUpperCase() + p.slice(1)}
+                                </button>
+                              ))}
+                            <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
+                            {c.status === "ACTIVE" ? (
+                              <button
+                                type="button"
+                                className="dropdown-item dropdown-item--warn"
+                                disabled={actionLoading}
+                                onClick={() => companyAction(c.id, "suspend")}
+                              >
+                                <PauseCircle size={13} /> Suspender acesso
+                              </button>
+                            ) : c.status === "SUSPENDED" ? (
+                              <button
+                                type="button"
+                                className="dropdown-item"
+                                disabled={actionLoading}
+                                onClick={() => companyAction(c.id, "reactivate")}
+                              >
+                                <PlayCircle size={13} /> Reativar empresa
+                              </button>
+                            ) : null}
+                            {c.status !== "INACTIVE" ? (
+                              <button
+                                type="button"
+                                className="dropdown-item dropdown-item--danger"
+                                disabled={actionLoading}
+                                onClick={() => companyAction(c.id, "cancel")}
+                              >
+                                <XCircle size={13} /> Cancelar empresa
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

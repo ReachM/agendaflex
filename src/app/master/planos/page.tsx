@@ -4,6 +4,7 @@ import { Check, FileText, MessageCircle, Pencil, Sparkles, Tag, Users, X } from 
 import { useState } from "react";
 import { SAError, SALoading, SAPageHeader, SASwitch, SASysBadge, brl, num } from "@/components/master/sa-bits";
 import { useSAData } from "@/components/master/use-sa-data";
+import { apiFetch } from "@/lib/client-api";
 
 type Plan = {
   id: string;
@@ -18,6 +19,7 @@ type Plan = {
   allowFinancialControl: boolean;
   allowInvoiceRequest: boolean;
   allowCustomerChecklist: boolean;
+  allowBotIntegration: boolean;
   allowCustomFields: boolean;
   _count: { subscriptions: number };
 };
@@ -50,8 +52,44 @@ const COUPONS = [
 ];
 
 export default function PlanosPage() {
-  const { data, error } = useSAData<PlansResponse>("/api/plans");
+  const { data, error, reload } = useSAData<PlansResponse>("/api/plans");
   const [addonState, setAddonState] = useState<Record<string, boolean>>({ "wa-extra": true, "nfe-pack": true, seats: false });
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Plan>>({});
+  const [saving, setSaving] = useState(false);
+
+  function openEdit(plan: Plan) {
+    setEditingPlan(plan);
+    setEditForm({
+      name: plan.name,
+      price: Number(plan.price),
+      description: plan.description ?? "",
+      maxUsers: plan.maxUsers,
+      maxProfessionals: plan.maxProfessionals,
+      allowClientSelfScheduling: plan.allowClientSelfScheduling,
+      allowAdvancedReports: plan.allowAdvancedReports,
+      allowFinancialControl: plan.allowFinancialControl,
+      allowInvoiceRequest: plan.allowInvoiceRequest,
+      allowBotIntegration: plan.allowBotIntegration
+    });
+  }
+
+  async function savePlan() {
+    if (!editingPlan) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/api/master/plans/${editingPlan.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(editForm)
+      });
+      setEditingPlan(null);
+      void reload();
+    } catch {
+      alert("Erro ao salvar plano.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (!data) {
     return (
@@ -101,7 +139,7 @@ export default function PlanosPage() {
                 </span>
                 <span>{Math.round((subs / totalSubs) * 100)}% da base</span>
               </div>
-              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 14 }}>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 14 }} onClick={() => openEdit(p)}>
                 <Pencil size={13} /> Editar
               </button>
             </div>
@@ -149,6 +187,113 @@ export default function PlanosPage() {
           </div>
         </section>
       </div>
+
+      {editingPlan && (
+        <div className="modal-overlay" onClick={() => setEditingPlan(null)}>
+          <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal__head">
+              <h3>Editar plano — {editingPlan.name}</h3>
+              <button type="button" className="row-btn" onClick={() => setEditingPlan(null)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal__body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div className="field">
+                <label>Preço mensal (R$)</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={editForm.price ?? ""}
+                  onChange={(e) => setEditForm((f) => ({ ...f, price: Number(e.target.value) }))}
+                />
+              </div>
+
+              <div className="field">
+                <label>Nome do plano</label>
+                <input
+                  className="input"
+                  value={editForm.name ?? ""}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+
+              <div className="field">
+                <label>Descrição</label>
+                <textarea
+                  className="input"
+                  rows={2}
+                  value={editForm.description ?? ""}
+                  onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="field">
+                  <label>Máx. usuários</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={editForm.maxUsers ?? ""}
+                    onChange={(e) => setEditForm((f) => ({ ...f, maxUsers: Number(e.target.value) }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>Máx. profissionais</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={editForm.maxProfessionals ?? ""}
+                    onChange={(e) => setEditForm((f) => ({ ...f, maxProfessionals: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="toggle-row" style={{ padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+                  <div><h4 style={{ fontSize: 13 }}>Link de agendamento público</h4></div>
+                  <SASwitch
+                    checked={!!editForm.allowClientSelfScheduling}
+                    onChange={(v) => setEditForm((f) => ({ ...f, allowClientSelfScheduling: v }))}
+                  />
+                </div>
+                <div className="toggle-row" style={{ padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+                  <div><h4 style={{ fontSize: 13 }}>Financeiro + Relatórios + Notas Fiscais</h4></div>
+                  <SASwitch
+                    checked={!!editForm.allowFinancialControl}
+                    onChange={(v) =>
+                      setEditForm((f) => ({
+                        ...f,
+                        allowFinancialControl: v,
+                        allowAdvancedReports: v,
+                        allowInvoiceRequest: v
+                      }))
+                    }
+                  />
+                </div>
+                <div className="toggle-row" style={{ padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+                  <div><h4 style={{ fontSize: 13 }}>Bot WhatsApp</h4></div>
+                  <SASwitch
+                    checked={!!editForm.allowBotIntegration}
+                    onChange={(v) => setEditForm((f) => ({ ...f, allowBotIntegration: v }))}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal__foot">
+              <button type="button" className="btn btn-ghost" onClick={() => setEditingPlan(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" onClick={savePlan} disabled={saving}>
+                {saving ? "Salvando…" : "Salvar alterações"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

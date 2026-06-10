@@ -171,64 +171,67 @@ async function main() {
   }
 
   // ─── Plans ──────────────────────────────────────────
+  // Starter: operacional completo, SEM financeiro e SEM bot — R$ 49/mês
+  const starterDescription = "Dashboard, Agenda, Clientes, Profissionais, Serviços e Link de Agendamento. Perfeito para começar.";
   const starterPlan = await prisma.plan.upsert({
     where: { slug: "starter" },
     update: {
-      maxUsers: 3, maxProfessionals: 3, maxCustomers: 500, maxAppointmentsPerMonth: 300,
-      allowClientSelfScheduling: false, allowAdvancedReports: false, allowFinancialControl: false,
-      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
+      name: "Starter", price: 49,
+      maxUsers: 5, maxProfessionals: 5, maxCustomers: 2000, maxAppointmentsPerMonth: 1000,
+      allowClientSelfScheduling: true, allowAdvancedReports: false, allowFinancialControl: false,
+      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
-      allowBotIntegration: false
+      allowBotIntegration: false, description: starterDescription
     },
     create: {
-      name: "Starter", slug: "starter", description: "Plano básico com dashboard, agenda, clientes, serviços, profissionais e relatórios simples.",
-      price: 0, maxUsers: 3, maxProfessionals: 3, maxCustomers: 500, maxAppointmentsPerMonth: 300,
-      allowClientSelfScheduling: false, allowAdvancedReports: false, allowFinancialControl: false,
-      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
+      name: "Starter", slug: "starter", description: starterDescription,
+      price: 49, maxUsers: 5, maxProfessionals: 5, maxCustomers: 2000, maxAppointmentsPerMonth: 1000,
+      allowClientSelfScheduling: true, allowAdvancedReports: false, allowFinancialControl: false,
+      allowInvoiceRequest: false, allowCustomerChecklist: true, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: false, sortOrder: 1
     }
   });
 
+  // Pro: tudo do Starter + financeiro completo + relatórios + notas fiscais — R$ 99/mês
+  const proDescription = "Tudo do Starter + Financeiro completo, DRE, Notas Fiscais e Relatórios avançados.";
   const proPlan = await prisma.plan.upsert({
     where: { slug: "pro" },
     update: {
-      maxUsers: 10, maxProfessionals: 10, maxCustomers: 5000, maxAppointmentsPerMonth: 2000,
+      name: "Pro", price: 99,
+      maxUsers: 15, maxProfessionals: 15, maxCustomers: 10000, maxAppointmentsPerMonth: 5000,
       allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
-      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
+      allowInvoiceRequest: true, allowCustomerChecklist: true, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
-      allowBotIntegration: true
+      allowBotIntegration: false, description: proDescription
     },
     create: {
-      name: "Pro", slug: "pro", description: "Tudo do Starter + agendamento público, relatórios intermediários, bot WhatsApp, controle financeiro, mais usuários e profissionais.",
-      price: 99.90, maxUsers: 10, maxProfessionals: 10, maxCustomers: 5000, maxAppointmentsPerMonth: 2000,
+      name: "Pro", slug: "pro", description: proDescription,
+      price: 99, maxUsers: 15, maxProfessionals: 15, maxCustomers: 10000, maxAppointmentsPerMonth: 5000,
       allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
-      allowInvoiceRequest: false, allowCustomerChecklist: false, allowAuditLogs: true,
+      allowInvoiceRequest: true, allowCustomerChecklist: true, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
-      allowBotIntegration: true, sortOrder: 2
+      allowBotIntegration: false, sortOrder: 2
     }
   });
 
+  // Max: tudo do Pro + Bot WhatsApp — R$ 179/mês
+  const maxDescription = "Tudo do Pro + Bot WhatsApp com lembretes automáticos e agendamento conversacional.";
   const maxPlan = await prisma.plan.upsert({
     where: { slug: "max" },
     update: {
-      maxUsers: 100, maxProfessionals: 100, maxCustomers: 50000, maxAppointmentsPerMonth: 50000,
-      allowClientSelfScheduling: true, allowAdvancedReports: true,
-      allowFinancialControl: true,
-      allowInvoiceRequest: true,
-      allowCustomerChecklist: true,
-      allowAuditLogs: true,
+      name: "Max", price: 179,
+      maxUsers: 999, maxProfessionals: 999, maxCustomers: 999999, maxAppointmentsPerMonth: 999999,
+      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
+      allowInvoiceRequest: true, allowCustomerChecklist: true, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
-      allowBotIntegration: true
+      allowBotIntegration: true, description: maxDescription
     },
     create: {
-      name: "Max", slug: "max", description: "Tudo do Pro + notas fiscais, checklists, limites altos, logs avançados, mais configurações de bot.",
-      price: 199.90, maxUsers: 100, maxProfessionals: 100, maxCustomers: 50000, maxAppointmentsPerMonth: 50000,
-      allowClientSelfScheduling: true, allowAdvancedReports: true,
-      allowFinancialControl: true,
-      allowInvoiceRequest: true,
-      allowCustomerChecklist: true,
-      allowAuditLogs: true,
+      name: "Max", slug: "max", description: maxDescription,
+      price: 179, maxUsers: 999, maxProfessionals: 999, maxCustomers: 999999, maxAppointmentsPerMonth: 999999,
+      allowClientSelfScheduling: true, allowAdvancedReports: true, allowFinancialControl: true,
+      allowInvoiceRequest: true, allowCustomerChecklist: true, allowAuditLogs: true,
       allowCustomFields: true, allowMultipleServicesPerAppointment: true,
       allowBotIntegration: true, sortOrder: 3
     }
