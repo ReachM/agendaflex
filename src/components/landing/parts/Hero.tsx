@@ -14,48 +14,52 @@ const AGENDA_ROWS = [
 
 function HeroMockup() {
   return (
-    <div className="lp-mockup" aria-hidden="true">
-      <div className="lp-mockup__chrome">
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="lp-mockup__app">
-        <aside className="lp-mockup__side">
-          <div className="lp-mockup__brand">MF</div>
-          <span className="lp-mockup__navitem lp-mockup__navitem--on" />
-          <span className="lp-mockup__navitem" />
-          <span className="lp-mockup__navitem" />
-          <span className="lp-mockup__navitem" />
-          <span className="lp-mockup__navitem" />
-        </aside>
-        <div className="lp-mockup__main">
-          <div className="lp-mockup__title">Agenda — Quinta, 28 mai</div>
-          <div className="lp-mockup__sub">14 agendamentos · 86% confirmados via bot</div>
-          <div className="lp-mockup__stats">
-            <div className="lp-mockup__stat">
-              <strong>14</strong>
-              <span>Hoje</span>
-            </div>
-            <div className="lp-mockup__stat">
-              <strong>12</strong>
-              <span>Confirmados</span>
-            </div>
-            <div className="lp-mockup__stat">
-              <strong>R$ 2,4k</strong>
-              <span>Receita</span>
-            </div>
-          </div>
-          <div className="lp-mockup__agenda">
-            {AGENDA_ROWS.map((row) => (
-              <div className="lp-mockup__row" key={row.t}>
-                <span className="lp-mockup__time">{row.t}</span>
-                <span className="lp-mockup__bar" style={{ width: row.w }} />
-                <span className={`lp-mockup__status lp-mockup__status--${row.status}`}>
-                  {row.status === "ok" ? "OK" : "⏱"}
-                </span>
+    // Floats são irmãos do .lp-mockup (não filhos) para não serem cortados pelo
+    // overflow:hidden do mockup; o offset parent é .lp-hero__visual (overflow:visible).
+    <>
+      <div className="lp-mockup" aria-hidden="true">
+        <div className="lp-mockup__chrome">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="lp-mockup__app">
+          <aside className="lp-mockup__side">
+            <div className="lp-mockup__brand">MF</div>
+            <span className="lp-mockup__navitem lp-mockup__navitem--on" />
+            <span className="lp-mockup__navitem" />
+            <span className="lp-mockup__navitem" />
+            <span className="lp-mockup__navitem" />
+            <span className="lp-mockup__navitem" />
+          </aside>
+          <div className="lp-mockup__main">
+            <div className="lp-mockup__title">Agenda — Quinta, 28 mai</div>
+            <div className="lp-mockup__sub">14 agendamentos · 86% confirmados via bot</div>
+            <div className="lp-mockup__stats">
+              <div className="lp-mockup__stat">
+                <strong>14</strong>
+                <span>Hoje</span>
               </div>
-            ))}
+              <div className="lp-mockup__stat">
+                <strong>12</strong>
+                <span>Confirmados</span>
+              </div>
+              <div className="lp-mockup__stat">
+                <strong>R$ 2,4k</strong>
+                <span>Receita</span>
+              </div>
+            </div>
+            <div className="lp-mockup__agenda">
+              {AGENDA_ROWS.map((row) => (
+                <div className="lp-mockup__row" key={row.t}>
+                  <span className="lp-mockup__time">{row.t}</span>
+                  <span className="lp-mockup__bar" style={{ width: row.w }} />
+                  <span className={`lp-mockup__status lp-mockup__status--${row.status}`}>
+                    {row.status === "ok" ? "OK" : "⏱"}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -78,7 +82,7 @@ function HeroMockup() {
           <span className="lp-float-card__sub">WhatsApp · 24h antes</span>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
