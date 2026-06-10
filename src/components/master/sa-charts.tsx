@@ -53,7 +53,7 @@ export function SAUptimeBars({ data }: { data: ("good" | "mid" | "down")[] }) {
 
 /* ---------- Gauge Ring ---------- */
 
-export function SAGaugeRing({ label, value }: { label: string; value: number }) {
+export function SAGaugeRing({ label, value, sub }: { label: string; value: number; sub?: string }) {
   const pct = Math.max(0, Math.min(100, value));
   const tone = pct >= 80 ? "high" : pct >= 60 ? "mid" : "good";
   const color = tone === "high" ? "var(--rose)" : tone === "mid" ? "var(--amber)" : "var(--success)";
@@ -85,6 +85,7 @@ export function SAGaugeRing({ label, value }: { label: string; value: number }) 
         </div>
       </div>
       <span className="gauge__label">{label}</span>
+      {sub ? <span className="gauge__sub">{sub}</span> : null}
     </div>
   );
 }

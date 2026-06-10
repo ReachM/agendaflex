@@ -396,6 +396,7 @@ select.chip-tab { appearance: none; padding-right: 28px; background-image: url("
 /* ---------- Gauge Ring ---------- */
 .gauge { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .gauge__label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.gauge__sub { font-size: 11px; color: var(--muted); margin-top: -4px; font-family: var(--mono); text-align: center; }
 .gauge__value { font-family: var(--mono); font-size: 18px; font-weight: 800; }
 .gauge--good .gauge__value { color: var(--success); }
 .gauge--mid  .gauge__value { color: var(--amber); }

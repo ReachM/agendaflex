@@ -15,7 +15,30 @@ type HealthResponse = {
   bot: { conversations24h: number; instancesActive: number; reminders24h: number };
   integrity: { companiesWithoutSubs: number; orphanProfessionals: number; invoiceErrors7d: number; cancelledSubs30d: number };
   audit: { events24h: number; recent: { id: string; action: string; createdAt: string; companyName: string | null; userName: string | null }[] };
-  database: { tables: { table: string; rows: number }[] };
+  database: {
+    tables: { table: string; rows: number }[];
+    activeConnections: number;
+    totalConnections: number;
+    maxConnections: number;
+    connectionPercent: number;
+  };
+  infrastructure: {
+    cpu: { usedPercent: number; cores: number; model: string; loadAvg: { l1: number; l5: number; l15: number } };
+    memory: { totalGb: number; usedGb: number; freeGb: number; usedPercent: number };
+    disk: { totalGb: number; usedGb: number; freeGb: number; usedPercent: number } | null;
+    network: { rxGb: number; txGb: number };
+    uptime: { processSec: number; processLabel: string; systemSec: number; systemLabel: string };
+    nodeVersion: string;
+    platform: string;
+  };
+  evolutionApi: {
+    total: number;
+    connected: number;
+    connecting: number;
+    disconnected: number;
+    instances: { name: string; state: string }[];
+    offline?: boolean;
+  };
 };
 
 function uptimeSeries(downs: number): ("good" | "mid" | "down")[] {
@@ -38,49 +61,54 @@ type Svc = {
 };
 
 export default function SaudePage() {
-  const { data, error, reload, loading } = useSAData<HealthResponse>("/api/master/health");
+  const { data, error, reload, loading } = useSAData<HealthResponse>("/api/master/health", { refreshInterval: 30_000 });
 
   const services = useMemo<Svc[]>(() => {
     if (!data) return [];
-    const evoWarn = data.notifications.failRate > 5;
+    const inf = data.infrastructure;
+    const db = data.database;
+    const evo = data.evolutionApi;
     const nfeWarn = data.integrity.invoiceErrors7d > 10;
+    const dbWarn = data.dbLatencyMs > 200 || db.connectionPercent > 80;
     return [
       {
         name: "API principal",
         icon: <Server size={15} />,
-        tone: "ok",
-        label: "Operacional",
-        m1: ["Latência", `${data.dbLatencyMs}ms`],
-        m2: ["Eventos 24h", num(data.audit.events24h)],
-        uptime: 99.98
+        tone: inf.cpu.usedPercent > 85 ? "warn" : "ok",
+        label: inf.cpu.usedPercent > 85 ? "CPU alta" : "Operacional",
+        m1: ["Uptime processo", inf.uptime.processLabel],
+        m2: ["CPU", `${inf.cpu.usedPercent}%`],
+        uptime: 99.98,
+        cardCls: inf.cpu.usedPercent > 85 ? "svc-card--warn" : undefined
       },
       {
         name: "Banco de dados",
         icon: <Database size={15} />,
-        tone: data.dbLatencyMs > 200 ? "warn" : "ok",
-        label: data.dbLatencyMs > 200 ? "Lento" : "Operacional",
+        tone: dbWarn ? "warn" : "ok",
+        label: dbWarn ? (db.connectionPercent > 80 ? "Conexões altas" : "Lento") : "Operacional",
         m1: ["Latência", `${data.dbLatencyMs}ms`],
-        m2: ["Tabelas", num(data.database.tables.length)],
-        uptime: 99.95
+        m2: ["Conexões", `${db.totalConnections}/${db.maxConnections}`],
+        uptime: 99.95,
+        cardCls: dbWarn ? "svc-card--warn" : undefined
       },
       {
         name: "Evolution API",
         icon: <MessageCircle size={15} />,
-        tone: evoWarn ? "warn" : "ok",
-        label: evoWarn ? "Degradado" : "Operacional",
-        m1: ["Msgs 24h", num(data.notifications.sent24h)],
-        m2: ["Falhas", num(data.notifications.failed24h)],
-        uptime: evoWarn ? 98.4 : 99.9,
-        cardCls: evoWarn ? "svc-card--warn" : undefined
+        tone: evo.offline ? "down" : evo.disconnected > 0 ? "warn" : "ok",
+        label: evo.offline ? "Offline" : evo.disconnected > 0 ? `${evo.disconnected} desconectada(s)` : "Operacional",
+        m1: ["Conectadas", `${evo.connected}/${evo.total}`],
+        m2: ["Msgs 24h", num(data.notifications.sent24h)],
+        uptime: evo.offline ? 0 : evo.disconnected > 0 ? 97.5 : 99.9,
+        cardCls: evo.offline ? "svc-card--down" : evo.disconnected > 0 ? "svc-card--warn" : undefined
       },
       {
         name: "NFE.io",
         icon: <FileText size={15} />,
         tone: nfeWarn ? "warn" : "ok",
-        label: nfeWarn ? "Erros" : "Operacional",
+        label: nfeWarn ? `${data.integrity.invoiceErrors7d} erros (7d)` : "Operacional",
         m1: ["Erros 7d", num(data.integrity.invoiceErrors7d)],
-        m2: ["Conversas", num(data.bot.conversations24h)],
-        uptime: nfeWarn ? 97.2 : 99.7,
+        m2: ["Canceladas 30d", num(data.integrity.cancelledSubs30d)],
+        uptime: nfeWarn ? 98.1 : 99.3,
         cardCls: nfeWarn ? "svc-card--warn" : undefined
       },
       {
@@ -89,17 +117,20 @@ export default function SaudePage() {
         tone: "ok",
         label: "Operacional",
         m1: ["Lembretes 24h", num(data.bot.reminders24h)],
-        m2: ["Instâncias", num(data.bot.instancesActive)],
-        uptime: 99.6
+        m2: ["Conversas 24h", num(data.bot.conversations24h)],
+        uptime: 99.1
       },
       {
-        name: "CDN/Mídia",
+        name: "Armazenamento",
         icon: <Cloud size={15} />,
-        tone: "ok",
-        label: "Operacional",
-        m1: ["Empresas", num(data.volume.totalCompanies)],
-        m2: ["Ativos hoje", num(data.volume.appointmentsToday)],
-        uptime: 99.99
+        tone: inf.disk && inf.disk.usedPercent > 85 ? "warn" : "ok",
+        label: inf.disk
+          ? inf.disk.usedPercent > 85 ? "Disco cheio" : "Operacional"
+          : "Sem dados",
+        m1: ["Disco usado", inf.disk ? `${inf.disk.usedPercent}%` : "—"],
+        m2: ["Livre", inf.disk ? `${inf.disk.freeGb} GB` : "—"],
+        uptime: 100,
+        cardCls: inf.disk && inf.disk.usedPercent > 85 ? "svc-card--warn" : undefined
       }
     ];
   }, [data]);
@@ -193,13 +224,31 @@ export default function SaudePage() {
       <section className="panel">
         <div className="panel__head">
           <div className="panel__title">Recursos da infraestrutura</div>
-          <div className="panel__sub">Representativo</div>
+          <div className="panel__sub">{data.infrastructure.platform} · Node {data.infrastructure.nodeVersion} · sistema {data.infrastructure.uptime.systemLabel}</div>
         </div>
         <div className="panel__body" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-          <SAGaugeRing label="CPU" value={Math.min(95, 40 + Math.round(data.dbLatencyMs / 8))} />
-          <SAGaugeRing label="Memória" value={74} />
-          <SAGaugeRing label="Disco" value={68} />
-          <SAGaugeRing label="Rede" value={Math.min(95, 20 + Math.round(data.notifications.failRate * 2))} />
+          <SAGaugeRing
+            label="CPU"
+            value={data.infrastructure.cpu.usedPercent}
+            sub={`${data.infrastructure.cpu.cores} vCPU`}
+          />
+          <SAGaugeRing
+            label="Memória"
+            value={data.infrastructure.memory.usedPercent}
+            sub={`${data.infrastructure.memory.usedGb} / ${data.infrastructure.memory.totalGb} GB`}
+          />
+          <SAGaugeRing
+            label="Disco"
+            value={data.infrastructure.disk?.usedPercent ?? 0}
+            sub={data.infrastructure.disk
+              ? `${data.infrastructure.disk.usedGb} / ${data.infrastructure.disk.totalGb} GB`
+              : "—"}
+          />
+          <SAGaugeRing
+            label="Banco"
+            value={data.database.connectionPercent}
+            sub={`${data.database.totalConnections} / ${data.database.maxConnections} conn`}
+          />
         </div>
       </section>
 
