@@ -647,14 +647,15 @@ function BillingAndUsersSection({ plan }: { plan: string }) {
   const isMax = planUpper === "MAX";
 
   const features = [
-    { label: "Agendamentos ilimitados", included: true },
+    { label: "Agenda, clientes e profissionais", included: true },
     { label: "Link público de agendamento", included: true },
-    { label: "Bot WhatsApp (Evolution)", included: isPro || isMax },
-    { label: "Emissão automática de NFS-e", included: isPro || isMax },
-    { label: "Relatórios avançados e exportação", included: isMax }
+    { label: "Financeiro completo + DRE", included: isPro || isMax },
+    { label: "Notas fiscais automáticas", included: isPro || isMax },
+    { label: "Relatórios avançados", included: isPro || isMax },
+    { label: "Bot WhatsApp (Evolution)", included: isMax }
   ];
 
-  const planPrice = isMax ? "297" : isPro ? "147" : "47";
+  const planPrice = isMax ? "179" : isPro ? "99" : "49";
   const planName = isMax ? "Max" : isPro ? "Pro" : "Starter";
 
   return (
@@ -676,7 +677,23 @@ function BillingAndUsersSection({ plan }: { plan: string }) {
         <div className="cfg-plan-card__cta">
           <button type="button" className="btn cfg-btn-dark">Histórico</button>
           {!isMax && (
-            <button type="button" className="btn btn-amber">Upgrade Max</button>
+            <button
+              type="button"
+              className="btn btn-amber"
+              onClick={async () => {
+                try {
+                  const res = await apiFetch<{ checkoutUrl?: string }>("/api/subscription/checkout", {
+                    method: "POST",
+                    body: JSON.stringify({ planSlug: isPro ? "max" : "pro" })
+                  });
+                  if (res.checkoutUrl) window.location.href = res.checkoutUrl;
+                } catch {
+                  alert("Erro ao iniciar upgrade. Tente novamente.");
+                }
+              }}
+            >
+              {isPro ? "Upgrade para Max" : "Upgrade para Pro"}
+            </button>
           )}
         </div>
       </div>
