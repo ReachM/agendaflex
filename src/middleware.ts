@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/register", "/cadastro", "/forgot-password", "/redefinir-senha", "/agendar", "/termos", "/privacidade"];
-
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/cadastro",
+  "/forgot-password",
+  "/redefinir-senha",
+  "/agendar",
+  "/termos",
+  "/privacidade",
+  "/sitemap.xml",
+  "/robots.txt"
+];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("marcaiflex_token")?.value;
@@ -39,5 +49,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"]
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)"
+  ]
 };
