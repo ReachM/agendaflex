@@ -195,3 +195,106 @@ export async function validateInstance(companyId: string): Promise<boolean> {
   const { connected } = await testConnection(companyId);
   return connected;
 }
+
+/** Lê o nome da instância sem lançar (null quando ainda não configurada). */
+async function findInstance(companyId: string): Promise<string | null> {
+  const config = await prisma.companyBotConfig.findUnique({
+    where: { companyId },
+    select: { whatsappInstance: true }
+  });
+  return config?.whatsappInstance ?? null;
+}
+
+/**
+ * Cria (ou reaproveita) uma instância na Evolution API para a empresa e grava o
+ * nome no CompanyBotConfig. Idempotente: se a instância já existir na Evolution,
+ * o erro de "já existe" é tolerado — o importante é o nome ficar persistido.
+ */
+export async function createInstance(companyId: string): Promise<{ instance: string }> {
+  const { url, apiKey } = evolutionConfig();
+  const instanceName = `company-${companyId}`;
+
+  const response = await evolutionFetch("/instance/create", {
+    method: "POST",
+    baseUrl: url,
+    apiKey,
+    body: {
+      instanceName,
+      integration: "WHATSAPP-BAILEYS",
+      qrcode: true
+    }
+  });
+
+  // 403/409 = instância já existe na Evolution; seguimos para persistir o nome.
+  if (!response.ok && response.status !== 403 && response.status !== 409) {
+    const detail = await response.text().catch(() => "");
+    throw new ApiError(
+      502,
+      `Falha ao criar a instância na Evolution API (HTTP ${response.status}).`,
+      detail.slice(0, 500)
+    );
+  }
+
+  await prisma.companyBotConfig.upsert({
+    where: { companyId },
+    update: { whatsappInstance: instanceName },
+    create: { companyId, whatsappInstance: instanceName }
+  });
+
+  return { instance: instanceName };
+}
+
+export type QrCodeResult = {
+  /** data URL (data:image/png;base64,...) do QR Code, ou null. */
+  qrcode: string | null;
+  status: "qr" | "connected" | "disconnected";
+};
+
+/**
+ * Busca o QR Code da instância via GET /instance/connect/{instance}.
+ * Evolution v2 responde { base64, code, pairingCode } enquanto aguarda o scan,
+ * ou { instance: { state: "open" } } quando já conectada.
+ */
+export async function getQrCode(companyId: string): Promise<QrCodeResult> {
+  const instance = await findInstance(companyId);
+  if (!instance) return { qrcode: null, status: "disconnected" };
+
+  const { url, apiKey } = evolutionConfig();
+  const response = await evolutionFetch(`/instance/connect/${encodeURIComponent(instance)}`, {
+    baseUrl: url,
+    apiKey
+  });
+
+  if (!response.ok) return { qrcode: null, status: "disconnected" };
+
+  const data = (await response.json().catch(() => ({}))) as {
+    base64?: string;
+    qrcode?: { base64?: string };
+    instance?: { state?: string };
+    state?: string;
+  };
+
+  const qrcode = data.base64 ?? data.qrcode?.base64 ?? null;
+  const state = data.instance?.state ?? data.state ?? "unknown";
+
+  return {
+    qrcode,
+    status: state === "open" ? "connected" : qrcode ? "qr" : "disconnected"
+  };
+}
+
+/**
+ * Desconecta (logout) a instância da empresa.
+ * DELETE /instance/logout/{instance}.
+ */
+export async function disconnectInstance(companyId: string): Promise<void> {
+  const instance = await findInstance(companyId);
+  if (!instance) return;
+
+  const { url, apiKey } = evolutionConfig();
+  await evolutionFetch(`/instance/logout/${encodeURIComponent(instance)}`, {
+    method: "DELETE",
+    baseUrl: url,
+    apiKey
+  });
+}

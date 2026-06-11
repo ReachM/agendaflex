@@ -131,6 +131,7 @@ export const MASTER_MENU_ITEMS: MenuItem[] = [
   { href: "/master/filas", label: "Filas & jobs", icon: "Clock" },
   { href: "/master/planos", label: "Planos & preços", icon: "DollarSign" },
   { href: "/master/feature-flags", label: "Feature flags", icon: "ToggleLeft" },
+  { href: "/master/configuracoes", label: "Configurações", icon: "Settings" },
   { href: "/master/campos", label: "Campos personalizados", icon: "SlidersHorizontal" },
   { href: "/logs", label: "Logs & auditoria", icon: "FileClock" }
 ];

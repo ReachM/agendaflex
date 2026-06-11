@@ -4831,3 +4831,72 @@ tbody tr:hover {
   border-color: var(--border);
   color: var(--text);
 }
+
+/* ───────────────── WhatsApp de Suporte (botão flutuante) ───────────────── */
+.support-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 50;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #25d366;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+}
+.support-fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 28px rgba(37, 211, 102, 0.55);
+}
+@media (max-width: 768px) {
+  .support-fab {
+    bottom: 16px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ───────────────── Aviso global (banner no topo do painel) ───────────────── */
+.announcement-banner {
+  padding: 10px 20px;
+  font-size: 13.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.announcement-banner button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.6;
+}
+.announcement-banner button:hover {
+  opacity: 1;
+}
+.announcement-banner--info {
+  background: var(--info-light);
+  color: var(--info);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+}
+.announcement-banner--warning {
+  background: var(--accent-light);
+  color: var(--accent-hover);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.3);
+}
+.announcement-banner--success {
+  background: var(--success-light);
+  color: var(--success);
+  border-bottom: 1px solid rgba(34, 197, 94, 0.3);
+}

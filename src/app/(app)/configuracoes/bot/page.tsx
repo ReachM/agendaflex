@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -13,9 +13,11 @@ import {
   Loader2,
   MessageCircle,
   Plus,
+  QrCode,
   Save,
   Send,
-  Trash2
+  Trash2,
+  Unplug
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 
@@ -355,6 +357,9 @@ export default function BotSettingsPage() {
             </div>
           </section>
 
+          {/* Conexão via QR Code */}
+          <WhatsAppConnect />
+
           {/* Conexão + Toggles */}
           <div className="grid cols-3">
             <section className="panel">
@@ -663,6 +668,146 @@ function StatusChip({ label, value }: { label: string; value: number }) {
         {label}
       </span>
     </div>
+  );
+}
+
+type QrStatus = "loading" | "disconnected" | "qr" | "connected";
+type QrResponse = { qrcode: string | null; status: "qr" | "connected" | "disconnected" };
+
+/**
+ * Conexão do WhatsApp da empresa via QR Code (Evolution API). Clicar em
+ * "Conectar" cria a instância e mostra o QR; enquanto o status for "qr",
+ * faz polling a cada 5s até conectar.
+ */
+function WhatsAppConnect() {
+  const [status, setStatus] = useState<QrStatus>("loading");
+  const [qrcode, setQrcode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  function applyResult(data: QrResponse) {
+    setQrcode(data.qrcode);
+    setStatus(data.status);
+    stopPolling();
+    if (data.status === "qr") {
+      pollRef.current = setTimeout(poll, 5000);
+    }
+  }
+
+  async function poll() {
+    try {
+      const data = await apiFetch<QrResponse>("/api/bot-whatsapp/qrcode");
+      applyResult(data);
+    } catch {
+      stopPolling();
+    }
+  }
+
+  useEffect(() => {
+    // Estado inicial ao abrir a página.
+    apiFetch<QrResponse>("/api/bot-whatsapp/qrcode")
+      .then((data) => setStatus(data.status))
+      .catch(() => setStatus("disconnected"));
+    return () => stopPolling();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function connect() {
+    setError("");
+    setLoading(true);
+    try {
+      const data = await apiFetch<QrResponse>("/api/bot-whatsapp/qrcode", { method: "POST" });
+      applyResult(data);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function disconnect() {
+    if (!window.confirm("Desconectar o WhatsApp desta empresa? O bot deixará de atender até reconectar.")) return;
+    setError("");
+    setLoading(true);
+    try {
+      await apiFetch("/api/bot-whatsapp/disconnect", { method: "POST" });
+      stopPolling();
+      setQrcode(null);
+      setStatus("disconnected");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel__head">
+        <div>
+          <div className="panel__title">
+            <QrCode size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--primary)" }} />
+            Conexão do WhatsApp
+          </div>
+          <div className="panel__sub">Escaneie o QR Code com o WhatsApp do número da empresa</div>
+        </div>
+        {status === "connected" && (
+          <span className="pill pill--success">
+            <span className="dot-s" /> WhatsApp conectado
+          </span>
+        )}
+      </div>
+      <div className="panel__body">
+        {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
+
+        {status === "connected" ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--success)", fontWeight: 600, fontSize: 14 }}>
+              <CheckCircle size={18} /> WhatsApp conectado e pronto para atender.
+            </div>
+            <button className="btn btn-danger-ghost" type="button" onClick={disconnect} disabled={loading}>
+              {loading ? <Loader2 size={14} className="spin" /> : <Unplug size={14} />} Desconectar
+            </button>
+          </div>
+        ) : status === "qr" && qrcode ? (
+          <div style={{ textAlign: "center", padding: "8px 0" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrcode}
+              alt="QR Code para conectar o WhatsApp"
+              width={220}
+              height={220}
+              style={{ borderRadius: 12, border: "1px solid var(--border)", background: "#fff" }}
+            />
+            <p style={{ color: "var(--muted)", marginTop: 12, fontSize: 13 }}>
+              Abra o WhatsApp &gt; Aparelhos conectados &gt; Conectar um aparelho e escaneie o código.
+            </p>
+            <p style={{ color: "var(--muted)", marginTop: 4, fontSize: 12 }}>
+              <Loader2 size={12} className="spin" style={{ verticalAlign: "-2px", marginRight: 4 }} />
+              Aguardando leitura…
+            </p>
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 13.5 }}>
+              Conecte um número de WhatsApp para ativar o bot de lembretes e agendamentos.
+            </p>
+            <button className="btn btn-primary" type="button" onClick={connect} disabled={loading || status === "loading"}>
+              {loading ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
+              {loading ? "Gerando QR Code…" : "Conectar WhatsApp"}
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

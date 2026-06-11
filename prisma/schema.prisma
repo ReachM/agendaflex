@@ -1245,6 +1245,16 @@ model SystemFlag {
   updatedBy   String?
 }
 
+// Configurações globais de string da plataforma (WhatsApp de suporte, mensagem de
+// manutenção, aviso global, etc). Complementa o SystemFlag (que só guarda Boolean).
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
 // ═══════════════════════════════════════════════════
 // COMPANY INTEGRATIONS (NFE.io, Stripe, Asaas, etc.)
 // Apenas metadados não-sensíveis. API keys completas NUNCA são persistidas —
