@@ -886,7 +886,6 @@ model CompanyInvoiceConfig {
   issRate               Decimal? @db.Decimal(5, 2)
   serviceCode           String?
   taxRegime             String?
-  nfeioApiKey           String?
   nfeioCompanyId        String?
   autoEmit              Boolean  @default(false)
   notes                 String?

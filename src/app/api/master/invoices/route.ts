@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
         _sum: { amount: true }
       }),
       prisma.companyInvoiceConfig.count(),
-      prisma.companyInvoiceConfig.count({ where: { autoEmit: true, nfeioApiKey: { not: null } } }),
-      prisma.companyInvoiceConfig.count({ where: { nfeioApiKey: { not: null } } }),
+      prisma.companyInvoiceConfig.count({ where: { autoEmit: true, nfeioCompanyId: { not: null } } }),
+      prisma.companyInvoiceConfig.count({ where: { nfeioCompanyId: { not: null } } }),
       prisma.invoiceRequest.groupBy({
         by: ["companyId"],
         _count: { id: true },

@@ -80,8 +80,8 @@ export async function GET(request: NextRequest) {
       invoices: invoices.map(i => ({ ...i, amount: Number(i.amount), issAmount: i.issAmount !== null ? Number(i.issAmount) : null })),
       statusCounts: statusCounts.map(s => ({ status: s.status, count: s._count.id })),
       hasEmitterConfig: Boolean(config),
-      hasNfeioKey: Boolean(config?.nfeioApiKey),
-      autoEmit: Boolean(config?.autoEmit && config?.nfeioApiKey)
+      hasNfeioIntegration: Boolean(process.env.NFE_IO_API_KEY),
+      autoEmit: Boolean(config?.autoEmit && config?.nfeioCompanyId && process.env.NFE_IO_API_KEY)
     });
   } catch (error) {
     return handleApiError(error);
@@ -128,9 +128,10 @@ export async function POST(request: NextRequest) {
       newValues: { id: invoice.id, legalName: invoice.legalName, amount: invoice.amount.toString() }
     });
 
-    // Auto-emit via NFE.io (stub) — currently always returns mocked failure
+    // Auto-emit via NFE.io: só tenta quando a empresa está cadastrada no NFE.io
+    // e a chave global está configurada — caso contrário, segue para emissão manual.
     const config = await prisma.companyInvoiceConfig.findUnique({ where: { companyId: context.companyId } });
-    if (config?.autoEmit && config.nfeioApiKey) {
+    if (config?.autoEmit && config.nfeioCompanyId && process.env.NFE_IO_API_KEY) {
       const result = await issueInvoice({ config, request: invoice });
       if (result.ok && result.nfeioInvoiceId) {
         await prisma.invoiceRequest.update({

@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     // Resolve integration connection status (no secrets exposed)
     const [hasInvoiceConfig, botConfig] = await Promise.all([
-      prisma.companyInvoiceConfig.findUnique({ where: { companyId: context.companyId }, select: { autoEmit: true, nfeioApiKey: true } }),
+      prisma.companyInvoiceConfig.findUnique({ where: { companyId: context.companyId }, select: { autoEmit: true, nfeioCompanyId: true } }),
       prisma.companyBotConfig.findUnique({ where: { companyId: context.companyId }, select: { whatsappInstance: true } })
     ]);
 
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
         invoice: {
           configured: Boolean(hasInvoiceConfig),
           autoEmit: hasInvoiceConfig?.autoEmit ?? false,
-          hasNfeioKey: Boolean(hasInvoiceConfig?.nfeioApiKey)
+          hasNfeioKey: Boolean(process.env.NFE_IO_API_KEY) && Boolean(hasInvoiceConfig?.nfeioCompanyId)
         },
         bot: {
           enabled: company.botEnabled,

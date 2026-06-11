@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Download,
   FileText,
+  Info,
   Loader2,
   Plus,
   Settings2,
@@ -39,7 +40,7 @@ type ListResponse = {
   invoices: Invoice[];
   statusCounts: { status: InvoiceStatus; count: number }[];
   hasEmitterConfig: boolean;
-  hasNfeioKey: boolean;
+  hasNfeioIntegration: boolean;
   autoEmit: boolean;
 };
 
@@ -52,7 +53,6 @@ type Config = {
   issRate: number | null;
   serviceCode: string | null;
   taxRegime: string | null;
-  nfeioApiKey: string | null;
   nfeioCompanyId: string | null;
   autoEmit: boolean;
   notes: string | null;
@@ -170,9 +170,34 @@ export default function NotasFiscaisPage() {
           <div className="upgrade-banner__icon"><AlertTriangle size={28} /></div>
           <div className="upgrade-banner__text">
             <strong>Configure o emissor antes de emitir notas</strong>
-            <span>Cadastre CNPJ, inscrição municipal e (opcional) credenciais NFE.io em &ldquo;Configurar emissor&rdquo;.</span>
+            <span>Cadastre CNPJ, inscrição municipal e dados fiscais em &ldquo;Configurar emissor&rdquo;.</span>
           </div>
           <button type="button" className="btn btn-amber" onClick={() => setConfigOpen(true)}>Configurar agora</button>
+        </div>
+      ) : null}
+
+      {data && data.hasEmitterConfig && !data.hasNfeioIntegration ? (
+        <div
+          className="info-banner"
+          style={{
+            background: "var(--info-light)",
+            border: "1px solid var(--info)",
+            borderRadius: "var(--radius-lg)",
+            padding: "14px 18px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 20
+          }}
+        >
+          <Info size={18} style={{ color: "var(--info)", flexShrink: 0 }} />
+          <div>
+            <strong>Emissão automática não configurada</strong>
+            <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)" }}>
+              As notas podem ser emitidas manualmente e o status atualizado aqui.
+              A emissão automática via NFE.io estará disponível em breve.
+            </p>
+          </div>
         </div>
       ) : null}
 
@@ -424,7 +449,7 @@ function ConfigModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     apiFetch<{ config: Config | null }>("/api/invoice-config")
       .then(r => setConfig(r.config ?? {
         id: "", cnpj: "", legalName: "", municipalRegistration: null, stateRegistration: null,
-        issRate: null, serviceCode: null, taxRegime: null, nfeioApiKey: null, nfeioCompanyId: null,
+        issRate: null, serviceCode: null, taxRegime: null, nfeioCompanyId: null,
         autoEmit: false, notes: null
       }))
       .catch(err => setError(err.message))
@@ -446,7 +471,6 @@ function ConfigModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
           issRate: config.issRate,
           serviceCode: config.serviceCode,
           taxRegime: config.taxRegime,
-          nfeioApiKey: config.nfeioApiKey,
           nfeioCompanyId: config.nfeioCompanyId,
           autoEmit: config.autoEmit,
           notes: config.notes
@@ -507,20 +531,10 @@ function ConfigModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                   <option value="NORMAL">Normal</option>
                 </select>
               </div>
-              <div className="field">
-                <label>NFE.io company ID</label>
-                <input className="input" value={config.nfeioCompanyId ?? ""} onChange={e => setConfig({ ...config, nfeioCompanyId: e.target.value || null })} />
-              </div>
               <div className="field full">
-                <label>NFE.io API key</label>
-                <input
-                  className="input"
-                  type="text"
-                  value={config.nfeioApiKey ?? ""}
-                  onChange={e => setConfig({ ...config, nfeioApiKey: e.target.value || null })}
-                  placeholder="Cole sua chave NFE.io. Deixe em branco para emissão manual."
-                />
-                <small className="hint">A chave fica armazenada apenas no servidor e nunca aparece em texto pleno depois de salva.</small>
+                <label>NFE.io company ID</label>
+                <input className="input" value={config.nfeioCompanyId ?? ""} readOnly placeholder="Gerado automaticamente ao salvar os dados fiscais" />
+                <small className="hint">Cadastro feito automaticamente na NFE.io quando você salva os dados fiscais. Nenhuma chave é necessária aqui.</small>
               </div>
               <div className="field full">
                 <label className="checkbox-line">
