@@ -6,6 +6,7 @@ import { assertSameOrigin } from "@/lib/security/csrf";
 import { signAuthToken } from "@/lib/security/jwt";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getRequestIp } from "@/lib/security/request";
+import { sendWelcomeEmail } from "@/lib/services/notifications";
 import { provisionTenant } from "@/lib/services/provision-tenant";
 import { registerSchema } from "@/lib/validation/schemas";
 
@@ -74,6 +75,16 @@ export async function POST(request: NextRequest) {
         subscriptionStatus: result.subscription.status
       }
     });
+
+    // Fire-and-forget — o e-mail de boas-vindas nunca bloqueia nem quebra o cadastro.
+    sendWelcomeEmail({
+      adminName: result.user.name,
+      adminEmail: result.user.email,
+      companyName: result.company.name,
+      companySlug: result.company.slug ?? result.company.id,
+      planName: "Starter",
+      trialDays: 7
+    }).catch((err) => console.error("[Welcome Email] failed:", err));
 
     return response;
   } catch (error) {
