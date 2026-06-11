@@ -6,14 +6,15 @@ import { exchangeCodeForTokens, getGoogleUserInfo } from "@/lib/services/google-
 import { sendWelcomeEmail } from "@/lib/services/notifications";
 import { provisionTenant } from "@/lib/services/provision-tenant";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://marcaiflex.com.br";
-
 /** Cookie de sessão (mesmo formato de /api/auth/login e /register). */
 function setSessionCookie(response: NextResponse, token: string) {
   response.cookies.set("marcaiflex_token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    // "lax" (e não "strict"): após o redirect vindo do Google (contexto
+    // cross-site), "strict" faria o browser omitir o cookie na primeira
+    // navegação para /dashboard, derrubando o usuário de volta ao /login.
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 8 // 8h
   });
@@ -28,13 +29,13 @@ export async function GET(request: NextRequest) {
 
   // Usuário cancelou no Google.
   if (errorParam === "access_denied") {
-    return NextResponse.redirect(`${APP_URL}/login?error=cancelled`);
+    return NextResponse.redirect(new URL("/login?error=cancelled", request.url));
   }
 
   // Valida o state (CSRF) contra o cookie salvo na rota de início.
   const savedState = request.cookies.get("google_oauth_state")?.value;
   if (!code || !state || state !== savedState) {
-    return NextResponse.redirect(`${APP_URL}/login?error=invalid_state`);
+    return NextResponse.redirect(new URL("/login?error=invalid_state", request.url));
   }
 
   try {
@@ -101,14 +102,14 @@ export async function GET(request: NextRequest) {
         trialDays: 7
       }).catch((err) => console.error("[Welcome Email Google]", err));
 
-      const response = NextResponse.redirect(`${APP_URL}/dashboard`);
+      const response = NextResponse.redirect(new URL("/dashboard", request.url));
       setSessionCookie(response, token);
       return response;
     }
 
     // ── 3b. Usuário existente → login (e vínculo do googleId, se faltar) ─────────
     if (user.status !== "ACTIVE") {
-      return NextResponse.redirect(`${APP_URL}/login?error=account_suspended`);
+      return NextResponse.redirect(new URL("/login?error=account_suspended", request.url));
     }
 
     if (!user.googleId) {
@@ -135,11 +136,11 @@ export async function GET(request: NextRequest) {
     });
 
     const redirectTo = isSuperAdmin ? "/master" : "/dashboard";
-    const response = NextResponse.redirect(`${APP_URL}${redirectTo}`);
+    const response = NextResponse.redirect(new URL(redirectTo, request.url));
     setSessionCookie(response, token);
     return response;
   } catch (error) {
     console.error("[Google OAuth callback error]", error);
-    return NextResponse.redirect(`${APP_URL}/login?error=oauth_failed`);
+    return NextResponse.redirect(new URL("/login?error=oauth_failed", request.url));
   }
 }

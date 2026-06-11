@@ -246,10 +246,10 @@ button:disabled {
   display: flex;
   flex-direction: column;
   border-right: 1px solid #1e293b;
-  overflow-y: auto;
-  /* Scrollbar fino (Firefox) */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  /* overflow: hidden (e NÃO overflow-y: auto): a sidebar é um container flex de
+     altura fixa (100vh). Quem rola é só o .nav-list (flex:1; min-height:0). Sem
+     isto haveria dois containers de scroll aninhados e o footer poderia sumir. */
+  overflow: hidden;
 }
 
 /* Scrollbar customizado da sidebar (WebKit) */

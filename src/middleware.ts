@@ -12,6 +12,11 @@ const PUBLIC_PATHS = [
   "/sitemap.xml",
   "/robots.txt"
 ];
+
+// Observação de segurança: o modelo é "deny-by-default" — qualquer rota não
+// listada acima exige autenticação (ver redirect abaixo). É a única barreira
+// server-side do grupo (app), cujo layout só renderiza o AppShell (client).
+// Rotas públicas nascem aqui; `startsWith` cobre subcaminhos (ex.: /agendar/slug).
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("marcaiflex_token")?.value;
