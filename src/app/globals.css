@@ -247,6 +247,24 @@ button:disabled {
   flex-direction: column;
   border-right: 1px solid #1e293b;
   overflow-y: auto;
+  /* Scrollbar fino (Firefox) */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Scrollbar customizado da sidebar (WebKit) */
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .sidebar-header {
@@ -329,10 +347,27 @@ button:disabled {
 .nav-list {
   padding: 18px 10px;
   flex: 1;
+  /* min-height: 0 permite que o item flex encolha abaixo do seu conteúdo e
+     role internamente — sem isso o nav-list transborda e empurra o footer
+     para fora da viewport (footer "some" quando há muitos itens). */
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Scrollbar fino (Firefox) */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.nav-list::-webkit-scrollbar {
+  width: 3px;
+}
+.nav-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.nav-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
 }
 
 .nav-section-label {
@@ -428,7 +463,8 @@ button:disabled {
 
 /* ─── Sidebar Footer ─── */
 .sidebar-footer {
-  margin-top: auto;
+  margin-top: auto;   /* empurra para o final quando há espaço */
+  flex-shrink: 0;     /* nunca encolhe — sempre visível */
   padding: 12px 14px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   display: grid;

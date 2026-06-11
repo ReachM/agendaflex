@@ -23,11 +23,12 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Star,
+  Upload,
   Users,
   UserPlus,
   X
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { DynamicFields, type CustomValues } from "@/components/dynamic-fields";
 import { PageHeader, StatCard } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";
@@ -234,6 +235,18 @@ export function CustomerManager() {
   const [saving, setSaving] = useState(false);
   const [editTab, setEditTab] = useState<"basic" | "address" | "health" | "notes">("basic");
 
+  // Import/Export CSV
+  const [showImport, setShowImport] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    skipped: number;
+    errors: number;
+    message: string;
+    errorDetails: string[];
+  } | null>(null);
+
   const isHealthSegment = ["CLINICA_MEDICA", "CONSULTORIO"].includes(segment);
 
   function calculateAge(birthDate: string): string {
@@ -333,8 +346,64 @@ export function CustomerManager() {
     window.open(`https://wa.me/${num}`, "_blank", "noopener");
   }
 
-  function handleImportCSV() {
-    alert("Importação de CSV em breve.");
+  async function exportCustomers() {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/customers/export");
+      if (!res.ok) {
+        alert("Erro ao exportar.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Erro ao exportar.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function openImport() {
+    setImportResult(null);
+    setShowImport(true);
+  }
+
+  async function handleImport(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      alert("Apenas arquivos .csv são aceitos.");
+      e.target.value = "";
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/customers/import", { method: "POST", body: formData });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.error ?? "Erro ao importar.");
+        return;
+      }
+
+      setImportResult(data);
+      await load(); // recarrega a lista de clientes
+    } catch {
+      alert("Erro ao processar arquivo.");
+    } finally {
+      setImporting(false);
+      e.target.value = ""; // permite reenviar o mesmo arquivo
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -544,8 +613,12 @@ export function CustomerManager() {
         }
         actions={
           <>
-            <button type="button" className="btn btn-ghost" onClick={handleImportCSV}>
+            <button type="button" className="btn btn-ghost" onClick={exportCustomers} disabled={exporting}>
               <Download size={15} />
+              {exporting ? "Exportando..." : "Exportar CSV"}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={openImport}>
+              <Upload size={15} />
               Importar CSV
             </button>
             <button type="button" className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
@@ -832,6 +905,97 @@ export function CustomerManager() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {showImport ? (
+        <div className="modal-overlay" onClick={() => setShowImport(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="toolbar" style={{ marginBottom: 16 }}>
+              <h2 className="section-title">Importar {entityLabelPlural}</h2>
+              <button className="icon-button secondary" type="button" onClick={() => setShowImport(false)} title="Fechar">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Instrução + download do template */}
+              <div
+                style={{
+                  background: "var(--info-light)",
+                  border: "1px solid var(--info)",
+                  borderRadius: "var(--radius)",
+                  padding: "12px 14px",
+                  fontSize: 13.5,
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.5
+                }}
+              >
+                <strong>Antes de importar:</strong> baixe o template CSV para garantir que seus dados estão no formato correto.
+                <br />
+                <a
+                  href="/templates/importar-clientes.csv"
+                  download
+                  style={{ color: "var(--primary)", fontWeight: 600, marginTop: 6, display: "inline-block" }}
+                >
+                  ↓ Baixar template CSV
+                </a>
+              </div>
+
+              {/* Regras */}
+              <ul style={{ fontSize: 13, color: "var(--muted)", paddingLeft: 18, lineHeight: 1.8, margin: 0 }}>
+                <li><strong>Nome</strong> é obrigatório — linhas sem nome são ignoradas</li>
+                <li>{isHealthSegment ? "Pacientes" : "Clientes"} com telefone já cadastrado são ignorados (evita duplicata)</li>
+                <li>Data de nascimento: DD/MM/AAAA</li>
+                <li>Máximo de 2.000 cadastros por importação</li>
+              </ul>
+
+              {/* Upload */}
+              <label
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "24px 16px",
+                  border: "2px dashed var(--border)",
+                  borderRadius: "var(--radius-lg)",
+                  cursor: importing ? "default" : "pointer",
+                  background: "var(--surface-muted)"
+                }}
+              >
+                <Upload size={24} style={{ color: "var(--muted)" }} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>
+                  {importing ? "Importando..." : "Clique para selecionar o arquivo .csv"}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>Apenas .csv</span>
+                <input
+                  type="file"
+                  accept=".csv"
+                  style={{ display: "none" }}
+                  disabled={importing}
+                  onChange={handleImport}
+                />
+              </label>
+
+              {/* Resultado */}
+              {importResult ? (
+                <div
+                  style={{
+                    background: importResult.errors > 0 ? "var(--accent-light)" : "var(--success-light)",
+                    border: `1px solid ${importResult.errors > 0 ? "var(--accent)" : "var(--success)"}`,
+                    borderRadius: "var(--radius)",
+                    padding: "12px 14px"
+                  }}
+                >
+                  <p style={{ fontWeight: 700, fontSize: 14, margin: "0 0 4px" }}>{importResult.message}</p>
+                  {importResult.errorDetails.map((detail, i) => (
+                    <p key={i} style={{ fontSize: 12, color: "var(--muted)", margin: "2px 0" }}>{detail}</p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
