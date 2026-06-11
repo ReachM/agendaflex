@@ -393,6 +393,25 @@
   transition: opacity var(--transition);
 }
 .tx-table tbody tr:hover .row-actions { opacity: 1; }
+
+/* ── Responsivo: compacta a tabela e oculta colunas secundárias no mobile,
+   evitando scroll horizontal da página (a tabela fica direto em .panel). ── */
+@media (max-width: 720px) {
+  .tx-table thead th,
+  .tx-table td { padding-left: 12px; padding-right: 12px; }
+  /* Oculta "Pagamento" */
+  .tx-table thead th:nth-child(3),
+  .tx-table tbody td:nth-child(3) { display: none; }
+}
+@media (max-width: 480px) {
+  .tx-table { font-size: 12.5px; }
+  .tx-table thead th,
+  .tx-table td { padding-left: 10px; padding-right: 10px; }
+  /* Oculta também "Categoria" (mantém Descrição · Data · Valor · ações) */
+  .tx-table thead th:nth-child(2),
+  .tx-table tbody td:nth-child(2) { display: none; }
+}
+
 .row-btn {
   width: 26px; height: 26px; border-radius: 6px;
   color: var(--muted);

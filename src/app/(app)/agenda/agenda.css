@@ -842,4 +842,10 @@
   .ag-page-head { flex-direction: column; align-items: flex-start; }
   .ag-title { font-size: 22px; }
   .range-pill { display: none; }
+  /* Calendário semanal: rola horizontalmente para manter os 7 dias legíveis
+     (em vez de comprimir as colunas a ~47px). O scroll fica contido dentro de
+     .ag-cal porque .ag-main tem min-width: 0, sem gerar scroll na página. */
+  .ag-cal { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .ag-cal__head,
+  .ag-cal__body { min-width: 600px; }
 }
