@@ -283,7 +283,7 @@ export async function sendWelcomeEmail(data: {
 
     <!-- Footer -->
     <div style="text-align:center;font-size:12px;color:#94a3b8;line-height:1.6;">
-      <p style="margin:0 0 6px;">Dúvidas? Fale com a gente: <a href="mailto:suporte@marcaiflex.com.br" style="color:#0d9488;">suporte@marcaiflex.com.br</a></p>
+      <p style="margin:0 0 6px;">Dúvidas? Fale com a gente: <a href="mailto:contato@marcaiflex.com.br" style="color:#0d9488;">contato@marcaiflex.com.br</a></p>
       <p style="margin:0;">
         <a href="${appUrl}/termos" style="color:#94a3b8;margin:0 8px;">Termos de Uso</a> ·
         <a href="${appUrl}/privacidade" style="color:#94a3b8;margin:0 8px;">Privacidade</a>
