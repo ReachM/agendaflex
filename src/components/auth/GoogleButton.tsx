@@ -26,8 +26,11 @@ function GoogleIcon() {
 }
 
 export function GoogleButton({ label = "Continuar com Google", onClick }: { label?: string; onClick?: () => void }) {
+  // Sem onClick explícito, inicia o fluxo OAuth indo para a rota de início.
+  const handleClick = onClick ?? (() => { window.location.href = "/api/auth/google"; });
+
   return (
-    <AuthButton variant="ghost" block leftIcon={<GoogleIcon />} type="button" onClick={onClick}>
+    <AuthButton variant="ghost" block leftIcon={<GoogleIcon />} type="button" onClick={handleClick}>
       {label}
     </AuthButton>
   );

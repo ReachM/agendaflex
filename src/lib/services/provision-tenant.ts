@@ -18,6 +18,8 @@ export type ProvisionTenantInput = {
     name: string;
     email: string;
     password: string;
+    /** Vincula a conta Google já no provisionamento (login social). */
+    googleId?: string;
   };
   planSlug?: string;
   trialDays?: number;
@@ -112,6 +114,7 @@ export async function provisionTenant(
       name: input.admin.name,
       email,
       passwordHash: await hashPassword(input.admin.password),
+      googleId: input.admin.googleId,
       status: "ACTIVE"
     }
   });

@@ -2,16 +2,27 @@
 
 import { AlertCircle, ArrowRight, Lock, Mail } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 import { AuthButton } from "@/components/auth/AuthButton";
 import { AuthInput } from "@/components/auth/AuthInput";
 import { BrandPanel } from "@/components/auth/BrandPanel";
 import { GoogleButton } from "@/components/auth/GoogleButton";
 import "./login.css";
 
-export default function LoginPage() {
+/** Mensagens dos erros de OAuth devolvidos via ?error= pelas rotas /api/auth/google*. */
+const OAUTH_ERRORS: Record<string, string> = {
+  oauth_failed: "Erro ao conectar com o Google. Tente novamente.",
+  invalid_state: "Sessão expirada. Tente novamente.",
+  cancelled: "Login cancelado.",
+  account_suspended: "Conta suspensa. Entre em contato com o suporte.",
+  oauth_unavailable: "Login com Google indisponível no momento."
+};
+
+function LoginContent() {
   const router = useRouter();
+  const oauthErrorKey = useSearchParams().get("error");
+  const oauthError = oauthErrorKey ? OAUTH_ERRORS[oauthErrorKey] : undefined;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -67,6 +78,13 @@ export default function LoginPage() {
             <div className="auth-error" role="alert">
               <AlertCircle size={16} className="auth-error__icon" />
               <span>{error}</span>
+            </div>
+          ) : null}
+
+          {!error && oauthError ? (
+            <div className="auth-error" role="alert">
+              <AlertCircle size={16} className="auth-error__icon" />
+              <span>{oauthError}</span>
             </div>
           ) : null}
 
@@ -135,5 +153,14 @@ export default function LoginPage() {
         </form>
       </section>
     </main>
+  );
+}
+
+// useSearchParams() exige um boundary de Suspense para o build do Next (CSR bailout).
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }

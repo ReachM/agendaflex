@@ -376,6 +376,7 @@ model User {
   name         String
   email        String     @unique
   passwordHash String
+  googleId     String?    @unique
   status       UserStatus @default(ACTIVE)
   systemRoleId String?
   createdAt    DateTime   @default(now())
