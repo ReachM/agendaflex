@@ -18,6 +18,7 @@ import { hasPermission } from "@/lib/security/permissions";
 import { resolvePlanFeatures } from "@/lib/security/plan-guard";
 import { ensureNoConflict } from "@/lib/services/availability";
 import { attachCustomValues, saveCustomFieldValues } from "@/lib/services/custom-field-values";
+import { buildAppointmentInfo, notifyCustomerAboutAppointment } from "@/lib/services/notifications";
 import { appointmentCreateSchema, listQuerySchema } from "@/lib/validation/schemas";
 
 async function assertRelatedRecords(companyId: string, customerId: string, serviceId: string | null, professionalId: string) {
@@ -375,6 +376,35 @@ export async function POST(request: NextRequest) {
 
     // Create AppointmentService records with price snapshots
     await createAppointmentServices(context.companyId, appointment.id, serviceIds);
+
+    // Notificar cliente por e-mail (fire-and-forget). Só envia se houver e-mail
+    // cadastrado e o opt-out (sendNotification: false) não tiver sido enviado.
+    if (appointment.customer?.email && body.sendNotification !== false) {
+      const statusLabels: Record<string, string> = {
+        SCHEDULED: "Agendado",
+        CONFIRMED: "Confirmado",
+        IN_PROGRESS: "Em andamento",
+        COMPLETED: "Concluído",
+        CANCELLED: "Cancelado",
+        NO_SHOW: "Não compareceu"
+      };
+      const info = buildAppointmentInfo({
+        companyName: context.company.tradeName ?? context.company.name,
+        customerName: appointment.customer.name,
+        serviceName: appointment.service?.name ?? "Serviço",
+        professionalName: appointment.professional?.name ?? "",
+        startAt: appointment.startAt,
+        status: statusLabels[appointment.status] ?? appointment.status
+      });
+      notifyCustomerAboutAppointment({
+        companyId: context.companyId,
+        appointmentId: appointment.id,
+        customerId: appointment.customerId,
+        customerEmail: appointment.customer.email,
+        type: "APPOINTMENT_CREATED",
+        info
+      });
+    }
 
     // Save custom field values (filter out internal pricing keys)
     const reservedKeys = new Set(["_serviceIds", "_servicesTotal", "_grandTotal", "_totalPrice", "_partsValue", "_laborValue", "_discountPercent"]);

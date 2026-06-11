@@ -3,6 +3,8 @@ import { ApiError, handleApiError, ok } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { getRequestIp } from "@/lib/security/request";
 
 // Parser de CSV simples (suporta campos entre aspas com vírgula e aspas escapadas).
 function parseCsvLine(line: string): string[] {
@@ -48,6 +50,8 @@ function parseBrazilDate(value: string): Date | null {
 
 export async function POST(request: NextRequest) {
   try {
+    // 5 importações por hora por IP — operação cara, evita abuso.
+    rateLimit(`customers-import:${getRequestIp(request)}`, 5, 60 * 60 * 1000);
     assertSameOrigin(request);
     // Importar cria clientes → exige permissão de gerenciar (não só visualizar).
     const context = await requireTenant(request, "customers:manage");
@@ -59,7 +63,30 @@ export async function POST(request: NextRequest) {
       throw new ApiError(422, "Nenhum arquivo enviado.");
     }
 
+    // Validar tamanho (máx 5MB).
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if ((file as Blob).size > MAX_FILE_SIZE) {
+      throw new ApiError(422, "Arquivo muito grande. Máximo permitido: 5MB.");
+    }
+
+    // Validar tipo MIME (ou extensão .csv como fallback).
+    const fileType = (file as File).type ?? "";
+    const fileName = (file as File).name ?? "";
+    const isValidType =
+      fileType === "text/csv" ||
+      fileType === "application/vnd.ms-excel" ||
+      fileType === "text/plain" ||
+      fileName.toLowerCase().endsWith(".csv");
+    if (!isValidType) {
+      throw new ApiError(422, "Tipo de arquivo inválido. Apenas arquivos .csv são aceitos.");
+    }
+
     const text = await (file as Blob).text();
+
+    // Rejeitar conteúdo binário (null byte indica arquivo não-CSV).
+    if (text.includes("\x00")) {
+      throw new ApiError(422, "Arquivo parece estar em formato binário. Use um arquivo .csv de texto.");
+    }
     const lines = text
       .split(/\r?\n/)
       .map((l) => l.trim())
@@ -88,57 +115,91 @@ export async function POST(request: NextRequest) {
       throw new ApiError(422, `Limite de ${MAX_IMPORT} clientes por importação.`);
     }
 
+    // Parsear todas as linhas primeiro (descartar as sem nome).
+    const parsed = dataLines
+      .map((line, i) => {
+        const cols = parseCsvLine(line);
+        return {
+          lineNum: i + 2,
+          name: nameIdx >= 0 ? (cols[nameIdx]?.trim() ?? "") : "",
+          phone: phoneIdx >= 0 ? (cols[phoneIdx]?.trim() ?? "") : "",
+          email: emailIdx >= 0 ? (cols[emailIdx]?.trim() ?? "") : "",
+          birth: birthIdx >= 0 ? (cols[birthIdx]?.trim() ?? "") : "",
+          notes: notesIdx >= 0 ? (cols[notesIdx]?.trim() ?? "") : ""
+        };
+      })
+      .filter((r) => r.name.length > 0);
+
+    // Verificar duplicatas em 1 query — buscar todos os telefones existentes de uma vez.
+    const phonesToCheck = [...new Set(parsed.map((r) => r.phone).filter(Boolean))];
+    const existingPhones = new Set<string>();
+    if (phonesToCheck.length > 0) {
+      const existing = await prisma.customer.findMany({
+        where: {
+          companyId: context.companyId,
+          phone: { in: phonesToCheck },
+          deletedAt: null
+        },
+        select: { phone: true }
+      });
+      existing.forEach((c) => {
+        if (c.phone) existingPhones.add(c.phone);
+      });
+    }
+
+    // Separar registros que serão importados dos que serão ignorados.
+    const toCreate = parsed.filter((r) => !r.phone || !existingPhones.has(r.phone));
+    const skippedDups = parsed.length - toCreate.length;
+    const skippedNoName = dataLines.length - parsed.length; // linhas sem nome
+
+    // createMany em batch único.
     let imported = 0;
-    let skipped = 0;
     let errors = 0;
     const errorDetails: string[] = [];
 
-    for (let i = 0; i < dataLines.length; i++) {
-      const cols = parseCsvLine(dataLines[i]);
-      const name = nameIdx >= 0 ? cols[nameIdx]?.trim() : "";
-      const phone = phoneIdx >= 0 ? cols[phoneIdx]?.trim() : "";
-      const email = emailIdx >= 0 ? cols[emailIdx]?.trim() : "";
-      const birth = birthIdx >= 0 ? cols[birthIdx]?.trim() : "";
-      const notes = notesIdx >= 0 ? cols[notesIdx]?.trim() : "";
-
-      // Nome é obrigatório
-      if (!name) {
-        skipped++;
-        continue;
-      }
-
+    if (toCreate.length > 0) {
       try {
-        // Evitar duplicata: cliente ativo com o mesmo telefone já cadastrado.
-        if (phone) {
-          const existing = await prisma.customer.findFirst({
-            where: { companyId: context.companyId, phone, deletedAt: null },
-            select: { id: true }
-          });
-          if (existing) {
-            skipped++;
-            continue;
-          }
-        }
-
-        await prisma.customer.create({
-          data: {
+        const result = await prisma.customer.createMany({
+          data: toCreate.map((r) => ({
             companyId: context.companyId,
-            name,
-            phone: phone || null,
-            email: email || null,
-            birthDate: parseBrazilDate(birth),
-            notes: notes || null,
-            status: "active"
-          }
+            name: r.name,
+            phone: r.phone || null,
+            email: r.email || null,
+            birthDate: parseBrazilDate(r.birth),
+            notes: r.notes || null,
+            status: "active" as const
+          })),
+          skipDuplicates: true // segurança extra contra race conditions
         });
-        imported++;
+        imported = result.count;
+        errors = toCreate.length - result.count;
       } catch {
-        errors++;
-        if (errorDetails.length < 5) {
-          errorDetails.push(`Linha ${i + 2}: "${name}" — erro ao salvar`);
+        // Se createMany falhar, tentar individualmente para identificar o problema.
+        for (const r of toCreate) {
+          try {
+            await prisma.customer.create({
+              data: {
+                companyId: context.companyId,
+                name: r.name,
+                phone: r.phone || null,
+                email: r.email || null,
+                birthDate: parseBrazilDate(r.birth),
+                notes: r.notes || null,
+                status: "active" as const
+              }
+            });
+            imported++;
+          } catch {
+            errors++;
+            if (errorDetails.length < 5) {
+              errorDetails.push(`Linha ${r.lineNum}: "${r.name}" — erro ao salvar`);
+            }
+          }
         }
       }
     }
+
+    const skipped = skippedDups + skippedNoName;
 
     return ok({
       imported,

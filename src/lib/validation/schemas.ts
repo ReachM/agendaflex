@@ -184,6 +184,7 @@ const appointmentBaseSchema = z.object({
   status: z.enum(["SCHEDULED", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "NO_SHOW"]).default("SCHEDULED"),
   notes: optionalString(5000),
   internalNotes: optionalString(5000),
+  sendNotification: z.coerce.boolean().optional(),
   customValues
 });
 
