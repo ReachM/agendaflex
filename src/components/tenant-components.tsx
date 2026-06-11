@@ -1891,8 +1891,6 @@ export function BookingSettingsManager() {
 
   useEffect(() => { load(); }, []);
 
-  const planSlug = session?.company?.plan ?? company?.plan ?? "starter";
-  const isStarter = planSlug === "starter";
   const publicLink = settings?.publicSlug
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/agendar/${settings.publicSlug}`
     : "";
@@ -1923,26 +1921,6 @@ export function BookingSettingsManager() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
-  }
-
-  if (isStarter) {
-    return (
-      <>
-        <PageHeader title="Link de Agenda" subtitle="Agendamento online para clientes" />
-        <section className="panel" style={{ textAlign: "center", padding: "60px 32px" }}>
-          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg, #818cf8, #6366f1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-            <CalendarPlus size={28} color="#fff" />
-          </div>
-          <h2 style={{ marginBottom: 8 }}>Agendamento online</h2>
-          <p style={{ color: "var(--muted)", marginBottom: 24, maxWidth: 440, margin: "0 auto 24px" }}>
-            Crie um link público para seus clientes agendarem online. Disponível nos planos Pro e Max.
-          </p>
-          <div style={{ padding: "12px 20px", background: "var(--surface-muted)", borderRadius: "var(--radius)", display: "inline-block", fontSize: 14, color: "var(--warning)" }}>
-            ⚡ Faça upgrade para o plano Pro ou Max para liberar essa funcionalidade.
-          </div>
-        </section>
-      </>
-    );
   }
 
   return (
