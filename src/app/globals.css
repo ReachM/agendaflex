@@ -233,13 +233,21 @@ button:disabled {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell > :last-child {
+  margin-left: var(--sidebar-w);
+  min-width: 0;
 }
 
 /* ─── Sidebar ─── */
 .sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  z-index: 40;
+  width: var(--sidebar-w);
   height: 100vh;
   background: linear-gradient(180deg, #0f172a 0%, #0c1424 100%);
   color: #cbd5e1;
