@@ -95,21 +95,24 @@ export type MenuItem = {
   permission?: PermissionKey;
   /** Minimum plan required to access (item stays visible but locked when not met) */
   requiredPlan?: "pro" | "max";
+  /** Feature flag key (sem o prefixo `feature.`). Quando a flag estiver
+   *  desativada pelo super admin, o item some do menu. */
+  featureFlag?: string;
 };
 
 export const TENANT_MENU_ITEMS: MenuItem[] = [
   // ── OPERAÇÃO ──────────────────────────────────────
   { section: "Operação",   href: "/dashboard",     label: "Dashboard",           icon: "LayoutDashboard" },
   { section: "Operação",   href: "/agenda",        label: "Agenda",              icon: "CalendarDays",  permission: "appointments:manage" },
-  { section: "Operação",   href: "/clientes",      label: "Clientes",            icon: "Users",         permission: "customers:view" },
+  { section: "Operação",   href: "/clientes",      label: "Clientes",            icon: "Users",         permission: "customers:view", featureFlag: "clientes" },
   { section: "Operação",   href: "/profissionais", label: "Profissionais",       icon: "Briefcase",     permission: "professionals:view" },
   { section: "Operação",   href: "/servicos",      label: "Serviços",            icon: "ClipboardList", permission: "services:view" },
-  { section: "Operação",   href: "/link-agenda",   label: "Link de Agendamento", icon: "Link2",         permission: "public_booking:manage" },
+  { section: "Operação",   href: "/link-agenda",   label: "Link de Agendamento", icon: "Link2",         permission: "public_booking:manage", featureFlag: "link_agendamento" },
 
   // ── FINANCEIRO ────────────────────────────────────
-  { section: "Financeiro", href: "/financeiro",    label: "Financeiro",   icon: "DollarSign", permission: "financial:view",  requiredPlan: "pro" },
-  { section: "Financeiro", href: "/notas-fiscais", label: "Notas Fiscais",icon: "FileText",   permission: "invoices:manage", requiredPlan: "pro" },
-  { section: "Financeiro", href: "/relatorios",    label: "Relatórios",   icon: "Activity",   permission: "reports:view",    requiredPlan: "pro" },
+  { section: "Financeiro", href: "/financeiro",    label: "Financeiro",   icon: "DollarSign", permission: "financial:view",  requiredPlan: "pro", featureFlag: "financeiro" },
+  { section: "Financeiro", href: "/notas-fiscais", label: "Notas Fiscais",icon: "FileText",   permission: "invoices:manage", requiredPlan: "pro", featureFlag: "notas_fiscais" },
+  { section: "Financeiro", href: "/relatorios",    label: "Relatórios",   icon: "Activity",   permission: "reports:view",    requiredPlan: "pro", featureFlag: "relatorios" },
 
   // ── CONFIGURAÇÃO ──────────────────────────────────
   { section: "Configuração", href: "/usuarios",      label: "Usuários",      icon: "UserCog",  permission: "users:manage" },

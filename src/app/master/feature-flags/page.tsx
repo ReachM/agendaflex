@@ -57,8 +57,10 @@ export default function FeatureFlagsPage() {
     );
   }
 
-  const on = flags.filter((f) => f.value);
-  const off = flags.filter((f) => !f.value);
+  const featureFlags = flags.filter((f) => f.key.startsWith("feature."));
+  const systemFlags = flags.filter((f) => !f.key.startsWith("feature."));
+  const on = systemFlags.filter((f) => f.value);
+  const off = systemFlags.filter((f) => !f.value);
 
   const renderFlag = (f: Flag & { value: boolean }) => (
     <div className="flag-row" key={f.key}>
@@ -114,6 +116,10 @@ export default function FeatureFlagsPage() {
             <SAEmpty icon={<ToggleLeft size={24} />} title="Nenhuma flag" message="Cadastre flags via systemFlag ou ajuste a busca." />
           ) : (
             <>
+              {featureFlags.length > 0 ? (
+                <div className="section-label">🔧 Funcionalidades do painel empresa — desative para manutenção</div>
+              ) : null}
+              {featureFlags.map(renderFlag)}
               {on.length > 0 ? <div className="section-label">Em produção (100%)</div> : null}
               {on.map(renderFlag)}
               {off.length > 0 ? <div className="section-label">Desativadas / experimentais</div> : null}

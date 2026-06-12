@@ -46,7 +46,7 @@ type Session = {
   role: string;
   company: null | { id: string; name: string; segment: string; status: string; plan: string; slug?: string; publicBookingEnabled?: boolean };
   planFeatures?: Record<string, boolean>;
-  menuItems?: { href: string; label: string; icon: string; section?: string; requiredPlan?: "pro" | "max" }[];
+  menuItems?: { href: string; label: string; icon: string; section?: string; requiredPlan?: "pro" | "max"; featureFlag?: string }[];
   subscription?: SubscriptionState | null;
 };
 
@@ -146,6 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [support, setSupport] = useState<{ whatsapp: string | null; message: string } | null>(null);
   const [maintenance, setMaintenance] = useState<{ enabled: boolean; message: string } | null>(null);
+  const [features, setFeatures] = useState<Record<string, boolean>>({});
   const [announcement, setAnnouncement] = useState<{
     message: string;
     type: "info" | "warning" | "success";
@@ -187,6 +188,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, [session?.kind]);
 
+  // Feature flags do painel empresa — itens do menu somem quando a feature
+  // estiver desativada pelo super admin. Fail-open: erro mantém tudo visível.
+  useEffect(() => {
+    if (session?.kind !== "tenant") return;
+    fetch("/api/feature-flags")
+      .then((r) => r.json())
+      .then((d) => setFeatures(d.features ?? {}))
+      .catch(() => {});
+  }, [session?.kind]);
+
   // Esc fecha o drawer da sidebar no mobile
   useEffect(() => {
     if (!mobileOpen) return;
@@ -198,14 +209,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [mobileOpen]);
 
   const planSlug = session?.company?.plan ?? "starter";
+  // Default: ativa, a menos que explicitamente desativada (false).
+  const isFeatureEnabled = (key?: string) => !key || features[key] !== false;
   const links = useMemo(() => {
     if (!session) return [];
-    return (session.menuItems ?? []).map((item) => ({
-      ...item,
-      icon: iconMap[item.icon] ?? LayoutDashboard,
-      locked: !canAccess(item.requiredPlan, planSlug)
-    }));
-  }, [session, planSlug]);
+    return (session.menuItems ?? [])
+      .filter((item) => isFeatureEnabled(item.featureFlag))
+      .map((item) => ({
+        ...item,
+        icon: iconMap[item.icon] ?? LayoutDashboard,
+        locked: !canAccess(item.requiredPlan, planSlug)
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, planSlug, features]);
 
   const menuGroups = useMemo(() => groupMenuItems(links), [links]);
   const pageTitle = useMemo(() => getPageTitle(pathname, links), [pathname, links]);
