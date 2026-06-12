@@ -1956,26 +1956,30 @@ export function BookingSettingsManager() {
 
       {/* Configuration Grid */}
       <div className="grid cols-2" style={{ gap: 16 }}>
-        {/* Slug Configuration */}
+        {/* Link de agendamento (somente leitura) */}
         <section className="panel">
           <h2 className="section-title">Link personalizado</h2>
           <div className="form-grid">
             <div className="field full">
-              <label>Slug da empresa</label>
-              <input
-                type="text"
-                value={settings?.publicSlug ?? ""}
-                onChange={(e) => setSettings({ ...settings, publicSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
-                placeholder="sua-empresa"
-              />
+              <label>Seu link de agendamento</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="text"
+                  value={`marcaiflex.com.br/agendar/${settings?.publicSlug ?? "sua-empresa"}`}
+                  readOnly
+                  disabled
+                />
+                <button
+                  type="button"
+                  className="button ghost"
+                  onClick={() => navigator.clipboard.writeText(`https://marcaiflex.com.br/agendar/${settings?.publicSlug ?? "sua-empresa"}`)}
+                >
+                  Copiar
+                </button>
+              </div>
               <small style={{ color: "var(--muted)", marginTop: 4, display: "block" }}>
-                URL: /agendar/{settings?.publicSlug ?? "sua-empresa"}
+                Para alterar o link, entre em contato: <a href="mailto:contato@marcaiflex.com.br">contato@marcaiflex.com.br</a>
               </small>
-            </div>
-            <div className="field full">
-              <button className="button" type="button" onClick={() => save({ publicSlug: settings?.publicSlug })} disabled={saving}>
-                <Save size={16} /> Salvar slug
-              </button>
             </div>
           </div>
         </section>

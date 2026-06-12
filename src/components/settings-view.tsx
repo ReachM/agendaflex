@@ -220,7 +220,6 @@ export function SettingsView() {
   const [document, setDocument] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [slug, setSlug] = useState("");
   const [hours, setHours] = useState<Partial<Record<Weekday, DayHours>>>({});
 
   // Local-only state
@@ -241,7 +240,6 @@ export function SettingsView() {
       setDocument(c.document ?? "");
       setEmail(c.email);
       setPhone(c.phone ?? "");
-      setSlug(c.slug ?? "");
       setHours(c.businessHours ?? {});
       setError("");
     } catch (err) {
@@ -266,10 +264,9 @@ export function SettingsView() {
     if ((document || null) !== (c.document ?? null)) return true;
     if (email !== c.email) return true;
     if ((phone || null) !== (c.phone ?? null)) return true;
-    if ((slug || null) !== (c.slug ?? null)) return true;
     if (JSON.stringify(hours) !== JSON.stringify(c.businessHours ?? {})) return true;
     return false;
-  }, [data, name, tradeName, document, email, phone, slug, hours]);
+  }, [data, name, tradeName, document, email, phone, hours]);
 
   async function handleSave() {
     if (!dirty) return;
@@ -283,7 +280,6 @@ export function SettingsView() {
           document: document || null,
           email,
           phone: phone || null,
-          slug: slug || null,
           businessHours: hours
         })
       });
@@ -304,7 +300,6 @@ export function SettingsView() {
     setDocument(c.document ?? "");
     setEmail(c.email);
     setPhone(c.phone ?? "");
-    setSlug(c.slug ?? "");
     setHours(c.businessHours ?? {});
   }
 
@@ -395,7 +390,6 @@ export function SettingsView() {
               docNumber={document}
               email={email}
               phone={phone} setPhone={setPhone}
-              slug={slug} setSlug={setSlug}
               currentSlug={c.slug ?? ""}
             />
           )}
@@ -523,7 +517,6 @@ function ProfileSection({
   docNumber,
   email,
   phone, setPhone,
-  slug, setSlug,
   currentSlug
 }: {
   name: string;
@@ -531,28 +524,9 @@ function ProfileSection({
   docNumber: string;
   email: string;
   phone: string; setPhone: (v: string) => void;
-  slug: string; setSlug: (v: string) => void;
   currentSlug: string;
 }) {
-  const [slugError, setSlugError] = useState("");
-  const [slugChecking, setSlugChecking] = useState(false);
-
-  async function checkSlug(value: string) {
-    if (!value || value === currentSlug) { setSlugError(""); return; }
-    if (!/^[a-z0-9-]+$/.test(value)) {
-      setSlugError("Use apenas letras minúsculas, números e hífens.");
-      return;
-    }
-    setSlugChecking(true);
-    try {
-      const res = await apiFetch<{ available: boolean }>(`/api/company/check-slug?slug=${encodeURIComponent(value)}`);
-      setSlugError(res.available ? "" : "Este slug já está em uso. Escolha outro.");
-    } catch {
-      setSlugError("");
-    } finally {
-      setSlugChecking(false);
-    }
-  }
+  const bookingLink = `marcaiflex.com.br/agendar/${currentSlug || "sua-empresa"}`;
 
   return (
     <SectionCard
@@ -604,21 +578,20 @@ function ProfileSection({
           />
         </div>
         <div className="cfg-field">
-          <label htmlFor="cfg-slug">Slug do link público</label>
-          <input
-            id="cfg-slug"
-            value={slug}
-            onChange={e => { setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")); setSlugError(""); }}
-            onBlur={() => checkSlug(slug)}
-            placeholder="minha-empresa"
-          />
-          {slugError ? (
-            <small style={{ color: "var(--danger)" }}>{slugError}</small>
-          ) : slugChecking ? (
-            <small>Verificando...</small>
-          ) : (
-            <small>URL: /agendar/{slug || "sua-empresa"}</small>
-          )}
+          <label htmlFor="cfg-slug">Seu link de agendamento</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input id="cfg-slug" value={bookingLink} readOnly disabled className="is-readonly" />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => void navigator.clipboard.writeText(`https://${bookingLink}`)}
+            >
+              Copiar
+            </button>
+          </div>
+          <small>
+            Para alterar o link: <a href="mailto:contato@marcaiflex.com.br">contato@marcaiflex.com.br</a>
+          </small>
         </div>
       </div>
     </SectionCard>
