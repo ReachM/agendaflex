@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, RefreshCcw, Search, Wifi } from "lucide-react";
+import { Clock, MessageCircle, RefreshCcw, Search, Wifi } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   SABiz,
@@ -15,6 +15,7 @@ import {
 } from "@/components/master/sa-bits";
 import { SASignal } from "@/components/master/sa-charts";
 import { useSAData } from "@/components/master/use-sa-data";
+import { apiFetch } from "@/lib/client-api";
 
 type Instance = {
   id: string;
@@ -32,6 +33,18 @@ type InstancesResponse = {
   metrics: { totalConfigured: number; activeBots: number; instancesWithKey: number; totalConversations24h: number; totalReminders24h: number };
   instances: Instance[];
 };
+
+type BotRequest = {
+  companyId: string;
+  companyName: string;
+  adminName: string;
+  adminEmail: string;
+  phone: string;
+  notes: string | null;
+  requestedAt: string;
+  status: string;
+};
+type BotRequestsResponse = { requests: BotRequest[]; total: number };
 
 type Filter = "all" | "connected" | "disconnected" | "noqr";
 const FILTERS: { key: Filter; label: string }[] = [
@@ -51,8 +64,25 @@ function connState(i: Instance): { status: string; label: string; level: number 
 
 export default function WhatsappPage() {
   const { data, error, reload, loading } = useSAData<InstancesResponse>("/api/master/instances");
+  const { data: requestsData, reload: reloadRequests } = useSAData<BotRequestsResponse>("/api/master/bot-requests");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [busy, setBusy] = useState(false);
+
+  async function updateRequest(companyId: string, status: "in_progress" | "done") {
+    setBusy(true);
+    try {
+      await apiFetch("/api/master/bot-requests", {
+        method: "PATCH",
+        body: JSON.stringify({ companyId, status })
+      });
+      await reloadRequests();
+    } catch {
+      // erro silencioso — a lista permanece como está
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -102,6 +132,73 @@ export default function WhatsappPage() {
         <SAMiniKpi value={num(disconnected)} label="desconectadas" icon={<MessageCircle size={18} />} variant="rose" />
         <SAMiniKpi value={num(m.totalReminders24h)} label="msgs / 24h" icon={<MessageCircle size={18} />} />
       </div>
+
+      {requestsData && requestsData.requests.length > 0 ? (
+        <section className="panel" style={{ marginBottom: 16, borderColor: "var(--primary)" }}>
+          <div className="panel__head">
+            <div>
+              <div className="panel__title">
+                <Clock size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px", color: "var(--primary)" }} />
+                Solicitações pendentes ({requestsData.requests.length})
+              </div>
+              <div className="panel__sub">Empresas aguardando configuração do Bot WhatsApp</div>
+            </div>
+          </div>
+          <div className="panel__body panel__body--flush">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Responsável</th>
+                  <th>Número</th>
+                  <th>Solicitado</th>
+                  <th>Status</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {requestsData.requests.map((r) => (
+                  <tr key={r.companyId}>
+                    <td>
+                      <strong>{r.companyName}</strong>
+                    </td>
+                    <td>
+                      <div>{r.adminName || "—"}</div>
+                      <div style={{ fontSize: 12, color: "var(--muted)" }}>{r.adminEmail}</div>
+                    </td>
+                    <td>
+                      <code style={{ fontSize: 13 }}>{r.phone}</code>
+                      {r.notes ? <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{r.notes}</div> : null}
+                    </td>
+                    <td style={{ color: "var(--muted)", fontSize: 12 }}>{relativeTime(r.requestedAt)}</td>
+                    <td>
+                      <SAStatusDot
+                        status={r.status === "pending" ? "TRIALING" : r.status === "done" ? "ACTIVE" : "SUSPENDED"}
+                        label={r.status === "pending" ? "Pendente" : r.status === "in_progress" ? "Em andamento" : "Concluído"}
+                      />
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        <a href={`https://wa.me/${r.phone}`} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                          WhatsApp
+                        </a>
+                        {r.status === "pending" ? (
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => updateRequest(r.companyId, "in_progress")} disabled={busy}>
+                            Em andamento
+                          </button>
+                        ) : null}
+                        <button type="button" className="btn btn-primary btn-sm" onClick={() => updateRequest(r.companyId, "done")} disabled={busy}>
+                          Concluir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="panel">
         <div className="tbl-filter">

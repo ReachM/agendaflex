@@ -1197,6 +1197,12 @@ model CompanyBotConfig {
   qrCodeBase64       String? // data URL do QR; limpo após conectar/expirar
   qrCodeExpiresAt    DateTime? // expira ~60s após receber o QR
   connectionStatus   String    @default("disconnected") // disconnected | connecting | qr | open
+  // Solicitação de configuração manual do bot (a equipe configura o número).
+  botRequestPhone    String? // número informado pelo cliente
+  botRequestNotes    String? // observações do cliente
+  botRequestStatus   String? // pending | in_progress | done | null
+  botRequestedAt     DateTime? // quando o cliente solicitou
+  botConfiguredAt    DateTime? // quando a equipe configurou
   allowBooking       Boolean   @default(false)
   faqConfig          Json      @default("[]") // [{pergunta, resposta}]
   reminderConfig     Json      @default("{}") // {enabled, send24h, send2h}
