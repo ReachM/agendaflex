@@ -206,26 +206,21 @@ async function findInstance(companyId: string): Promise<string | null> {
 }
 
 /**
- * Recria a instância na Evolution API e configura o webhook que entrega o QR Code.
+ * Recria a instância na Evolution API para a empresa.
  *
- * Na Evolution v2.2.3 o GET /instance/connect retorna {"count":0} (bug conhecido):
- * o QR só chega pelo evento webhook QRCODE_UPDATED. Por isso aqui:
- *  1) apagamos a instância antiga (estado sujo não emite QR novo),
- *  2) aguardamos a liberação do nome,
- *  3) criamos já apontando o webhook para /api/webhooks/whatsapp/{companyId},
- *  4) marcamos connectionStatus="connecting" — o QR chega em ~2-5s via webhook.
- *
- * O webhook é configurado com byEvents=false (todos os eventos na mesma URL,
- * distinguidos pelo campo `event` do corpo) e o header x-webhook-token, casando
- * com a validação em src/app/api/webhooks/whatsapp/[companyId]/route.ts.
+ * Na Evolution v2.2.3 o GET /instance/connect retorna {"count":0} (bug conhecido)
+ * e o webhook POR INSTÂNCIA não dispara QRCODE_UPDATED de forma confiável. A
+ * captura do QR fica a cargo do **webhook GLOBAL** (WEBHOOK_GLOBAL_URL no Docker
+ * da Evolution -> /api/webhooks/whatsapp/global), por isso NÃO configuramos
+ * webhook por instância aqui. Fluxo:
+ *  1) apaga a instância antiga (estado sujo não emite QR novo),
+ *  2) aguarda a liberação do nome,
+ *  3) recria a instância,
+ *  4) marca connectionStatus="connecting" — o QR chega em ~2-5s via webhook global.
  */
 export async function createInstance(companyId: string): Promise<{ instance: string }> {
   const { url, apiKey } = evolutionConfig();
   const instanceName = `company-${companyId}`;
-
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://marcaiflex.com.br").replace(/\/+$/, "");
-  const webhookUrl = `${appUrl}/api/webhooks/whatsapp/${companyId}`;
-  const webhookToken = process.env.WHATSAPP_WEBHOOK_TOKEN ?? "";
 
   // Apaga a instância existente (se houver) para recriar limpa — ignora erro se
   // ela não existir.
@@ -245,15 +240,8 @@ export async function createInstance(companyId: string): Promise<{ instance: str
     body: {
       instanceName,
       integration: "WHATSAPP-BAILEYS",
-      qrcode: true,
-      webhook: {
-        enabled: true,
-        url: webhookUrl,
-        byEvents: false,
-        base64: true,
-        headers: { "x-webhook-token": webhookToken },
-        events: ["QRCODE_UPDATED", "CONNECTION_UPDATE", "MESSAGES_UPSERT"]
-      }
+      qrcode: true
+      // Sem bloco `webhook` — o webhook global da Evolution captura os eventos.
     }
   });
 
@@ -270,7 +258,12 @@ export async function createInstance(companyId: string): Promise<{ instance: str
   await prisma.companyBotConfig.upsert({
     where: { companyId },
     update: { whatsappInstance: instanceName, connectionStatus: "connecting", qrCodeBase64: null, qrCodeExpiresAt: null },
-    create: { companyId, whatsappInstance: instanceName, connectionStatus: "connecting" }
+    create: {
+      companyId,
+      whatsappInstance: instanceName,
+      connectionStatus: "connecting",
+      reminderConfig: { enabled: true, send24h: true, send2h: true }
+    }
   });
 
   return { instance: instanceName };
