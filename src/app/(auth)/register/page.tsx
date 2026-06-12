@@ -108,6 +108,34 @@ export default function RegisterPage() {
     }
   }
 
+  // Step 2 → valida o código contra a API antes de avançar (sem consumi-lo).
+  async function handleVerifyCode() {
+    if (verificationCode.length !== 6) return;
+    setStepError("");
+    setSubmitError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/verify-email-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: state.adminEmail.trim().toLowerCase(),
+          code: verificationCode
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStepError(data.error ?? "Código inválido ou expirado.");
+        return;
+      }
+      setStep(3);
+    } catch {
+      setStepError("Falha de conexão. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function goBack() {
     setStepError("");
     setSubmitError("");
@@ -292,14 +320,10 @@ export default function RegisterPage() {
                 <AuthButton
                   type="button"
                   block
+                  loading={loading}
                   disabled={verificationCode.length < 6}
-                  onClick={() => {
-                    if (verificationCode.length === 6) {
-                      setStepError("");
-                      setStep(3);
-                    }
-                  }}
-                  rightIcon={<ArrowRight size={18} />}
+                  onClick={handleVerifyCode}
+                  rightIcon={loading ? null : <ArrowRight size={18} />}
                 >
                   Verificar e avançar
                 </AuthButton>
