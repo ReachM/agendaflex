@@ -90,9 +90,13 @@ export type RegisterBody = {
   document?: string;
   companyPhone?: string;
   segment: BusinessSegment;
+  emailVerificationCode?: string;
 };
 
-export function buildRegisterBody(state: RegisterFormState): RegisterBody {
+export function buildRegisterBody(
+  state: RegisterFormState,
+  emailVerificationCode?: string
+): RegisterBody {
   if (!state.segment) {
     throw new Error("Segmento é obrigatório para montar o cadastro.");
   }
@@ -112,7 +116,8 @@ export function buildRegisterBody(state: RegisterFormState): RegisterBody {
     companyName: state.companyName.trim(),
     document: optional(digitsOnly(state.document)),
     companyPhone: optional(digitsOnly(state.companyPhone)),
-    segment: state.segment
+    segment: state.segment,
+    emailVerificationCode: emailVerificationCode || undefined
   };
 }
 

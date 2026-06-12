@@ -56,7 +56,9 @@ export const registerSchema = z.object({
       },
       { message: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido." }
     ),
-  companyPhone: optionalString(30)
+  companyPhone: optionalString(30),
+  // Código de 6 dígitos enviado por POST /api/auth/send-verification.
+  emailVerificationCode: z.string().trim().length(6).optional()
 });
 
 export const subscriptionCheckoutSchema = z.object({

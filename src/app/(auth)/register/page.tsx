@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, ArrowRight, Check, FileText, Lock, Mail, MessageCircle, Store, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Check, FileText, KeyRound, Lock, Mail, MessageCircle, Store, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, KeyboardEvent, useState } from "react";
@@ -23,7 +23,7 @@ import {
 import type { BusinessSegment } from "@prisma/client";
 import "./register.css";
 
-const STEPS = [{ label: "Sua conta" }, { label: "Seu negócio" }];
+const STEPS = [{ label: "Sua conta" }, { label: "Verificar e-mail" }, { label: "Seu negócio" }];
 type TeamSize = "solo" | "2-5" | "6-15" | "16+";
 
 const TEAM_OPTIONS: { value: TeamSize; label: string }[] = [
@@ -44,6 +44,9 @@ export default function RegisterPage() {
   const [stepError, setStepError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Verificação de e-mail (step 2)
+  const [verificationCode, setVerificationCode] = useState("");
 
   function update<K extends keyof RegisterFormState>(key: K, value: RegisterFormState[K]) {
     setState((prev) => ({ ...prev, [key]: value }));
@@ -74,20 +77,41 @@ export default function RegisterPage() {
     return null;
   }
 
-  function goNext() {
+  // Step 1 → envia o código de verificação e avança para o step de confirmação.
+  // Também usado como "Reenviar código" dentro do step 2.
+  async function handleStep1Next() {
     const error = validateStep1();
     if (error) {
       setStepError(error);
       return;
     }
     setStepError("");
-    setStep(2);
+    setSubmitError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/send-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: state.adminEmail.trim().toLowerCase() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStepError(data.error ?? "Erro ao enviar código.");
+        return;
+      }
+      setVerificationCode("");
+      setStep(2);
+    } catch {
+      setStepError("Falha de conexão. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function goBack() {
     setStepError("");
     setSubmitError("");
-    setStep(1);
+    setStep((prev) => Math.max(1, prev - 1));
   }
 
   function onSegmentKeyDown(event: KeyboardEvent, value: BusinessSegment) {
@@ -115,7 +139,7 @@ export default function RegisterPage() {
       response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildRegisterBody(state))
+        body: JSON.stringify(buildRegisterBody(state, verificationCode))
       });
     } catch {
       setLoading(false);
@@ -173,7 +197,7 @@ export default function RegisterPage() {
             </div>
           ) : null}
 
-          {step === 1 ? (
+          {step === 1 && (
             <div className="register-pane">
               <h1 className="auth-form-panel__title">Crie sua conta</h1>
               <p className="auth-form-panel__sub">Comece o teste grátis de 7 dias. Sem cartão.</p>
@@ -221,7 +245,13 @@ export default function RegisterPage() {
               <PasswordStrength password={state.adminPassword} />
 
               <div style={{ marginTop: 20 }}>
-                <AuthButton type="button" block onClick={goNext} rightIcon={<ArrowRight size={18} />}>
+                <AuthButton
+                  type="button"
+                  block
+                  loading={loading}
+                  onClick={handleStep1Next}
+                  rightIcon={loading ? null : <ArrowRight size={18} />}
+                >
                   Continuar
                 </AuthButton>
               </div>
@@ -234,7 +264,63 @@ export default function RegisterPage() {
                 <Lock size={12} /> Seus dados estão protegidos · LGPD
               </div>
             </div>
-          ) : (
+          )}
+
+          {step === 2 && (
+            <div className="register-pane">
+              <h1 className="auth-form-panel__title">Verifique seu e-mail</h1>
+              <p className="auth-form-panel__sub">
+                Enviamos um código para <strong>{state.adminEmail}</strong>. Válido por 10 minutos.
+              </p>
+
+              <AuthInput
+                label="Código de verificação"
+                type="text"
+                name="verificationCode"
+                icon={<KeyRound size={18} />}
+                placeholder="000000"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                autoFocus
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                style={{ fontSize: 24, letterSpacing: 8, textAlign: "center" }}
+              />
+
+              <div style={{ marginTop: 20 }}>
+                <AuthButton
+                  type="button"
+                  block
+                  disabled={verificationCode.length < 6}
+                  onClick={() => {
+                    if (verificationCode.length === 6) {
+                      setStepError("");
+                      setStep(3);
+                    }
+                  }}
+                  rightIcon={<ArrowRight size={18} />}
+                >
+                  Verificar e avançar
+                </AuthButton>
+              </div>
+
+              <div className="auth-btn-row" style={{ marginTop: 12 }}>
+                <AuthButton type="button" variant="ghost" onClick={goBack} leftIcon={<ArrowLeft size={18} />} disabled={loading}>
+                  Voltar
+                </AuthButton>
+                <AuthButton type="button" variant="ghost" onClick={handleStep1Next} loading={loading}>
+                  Reenviar código
+                </AuthButton>
+              </div>
+
+              <div className="register-foot-note">
+                <Lock size={12} /> Seus dados estão protegidos · LGPD
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
             <div className="register-pane">
               <h1 className="auth-form-panel__title">Sobre o seu negócio</h1>
               <p className="auth-form-panel__sub">Usamos isso para montar sua página de agendamento.</p>

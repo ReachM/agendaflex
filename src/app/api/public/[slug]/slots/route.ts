@@ -17,11 +17,12 @@ export async function GET(
     const { slug } = await params;
     const url = request.nextUrl;
     const dateStr = url.searchParams.get("date");
-    const serviceId = url.searchParams.get("serviceId");
+    const serviceIdsParam = url.searchParams.get("serviceIds") ?? url.searchParams.get("serviceId") ?? "";
+    const serviceIds = serviceIdsParam.split(",").map((s) => s.trim()).filter(Boolean);
     const professionalId = url.searchParams.get("professionalId");
 
-    if (!dateStr || !serviceId || !professionalId) {
-      throw new ApiError(422, "Parâmetros obrigatórios: date, serviceId, professionalId.");
+    if (!dateStr || serviceIds.length === 0 || !professionalId) {
+      throw new ApiError(422, "Parâmetros obrigatórios: date, serviceIds, professionalId.");
     }
 
     // Find company
@@ -37,7 +38,7 @@ export async function GET(
     // Disponibilidade calculada pela lógica única (reutilizada pelo bot também).
     const result = await getAvailableSlots({
       companyId: company.id,
-      serviceId,
+      serviceIds,
       professionalId,
       date: dateStr,
       requireServicePublic: true

@@ -16,6 +16,7 @@ import {
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useCookieConsent } from "@/components/cookie-banner";
+import { maskDocument, maskPhone, isValidPhone } from "@/lib/utils/masks";
 import "./public-booking.css";
 
 type CompanyInfo = {
@@ -139,7 +140,7 @@ export default function PublicBookingClient() {
     email: "",
     notes: "",
     cpf: "",
-    serviceId: "",
+    serviceIds: [] as string[],
     professionalId: "",
     date: "",
     time: "",
@@ -168,20 +169,33 @@ export default function PublicBookingClient() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  const selectedService = useMemo(() => services.find((s) => s.id === form.serviceId), [form.serviceId, services]);
+  const selectedServices = useMemo(
+    () => services.filter((s) => form.serviceIds.includes(s.id)),
+    [form.serviceIds, services]
+  );
+  const totalDuration = useMemo(
+    () => selectedServices.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0),
+    [selectedServices]
+  );
+  const totalPrice = useMemo(
+    () => selectedServices.reduce((sum, s) => sum + Number(s.basePrice ?? 0), 0),
+    [selectedServices]
+  );
   const selectedProfessional = useMemo(
     () => professionals.find((p) => p.id === form.professionalId),
     [form.professionalId, professionals]
   );
 
+  const serviceIdsKey = form.serviceIds.join(",");
+
   useEffect(() => {
-    if (!form.date || !form.serviceId || !form.professionalId) {
+    if (!form.date || !serviceIdsKey || !form.professionalId) {
       setSlots([]);
       return;
     }
     setLoadingSlots(true);
     setError("");
-    fetch(`/api/public/${slug}/slots?date=${form.date}&serviceId=${form.serviceId}&professionalId=${form.professionalId}`)
+    fetch(`/api/public/${slug}/slots?date=${form.date}&serviceIds=${serviceIdsKey}&professionalId=${form.professionalId}`)
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json()).error ?? "Erro ao carregar horários.");
         return r.json();
@@ -189,7 +203,7 @@ export default function PublicBookingClient() {
       .then((data) => setSlots(data.slots ?? []))
       .catch((err) => setError(err.message))
       .finally(() => setLoadingSlots(false));
-  }, [form.date, form.serviceId, form.professionalId, slug]);
+  }, [form.date, serviceIdsKey, form.professionalId, slug]);
 
   function selectSlot(slot: Slot) {
     if (!slot.available) return;
@@ -218,9 +232,16 @@ export default function PublicBookingClient() {
 
   function canAdvance(): boolean {
     switch (step) {
-      case 1: return !!form.serviceId;
+      case 1: return form.serviceIds.length > 0;
       case 2: return !!form.professionalId && !!form.date && !!form.startAt;
-      case 3: return !!form.name && !!form.phone && form.lgpdAccepted;
+      case 3:
+        return (
+          !!form.name.trim() &&
+          isValidPhone(form.phone) &&
+          !!form.email &&
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) &&
+          form.lgpdAccepted
+        );
       case 4: return true; // health step ou confirmação
       default: return true;
     }
@@ -301,13 +322,16 @@ export default function PublicBookingClient() {
               <div className="pb-success__icon"><Check size={36} /></div>
               <h2>Agendamento realizado!</h2>
               <p>{success}</p>
-              {selectedService && (
+              {selectedServices.length > 0 && (
                 <div className="pb-success__details">
-                  <div><strong>Serviço:</strong> {selectedService.name}</div>
+                  <div>
+                    <strong>{selectedServices.length > 1 ? "Serviços:" : "Serviço:"}</strong>{" "}
+                    {selectedServices.map((s) => s.name).join(", ")}
+                  </div>
                   {selectedProfessional && <div><strong>Profissional:</strong> {selectedProfessional.name}</div>}
                   <div><strong>Data:</strong> {form.date ? formatDateLong(form.date) : "—"}</div>
                   <div><strong>Horário:</strong> {form.time}</div>
-                  <div><strong>Valor:</strong> {formatMoney(selectedService.basePrice)}</div>
+                  <div><strong>Valor:</strong> {formatMoney(totalPrice)}</div>
                 </div>
               )}
             </div>
@@ -353,29 +377,54 @@ export default function PublicBookingClient() {
                     Nenhum serviço disponível no momento.
                   </div>
                 )}
-                {services.map((s) => (
-                  <button
-                    type="button"
-                    key={s.id}
-                    className={`pb-svc ${form.serviceId === s.id ? "is-on" : ""}`}
-                    onClick={() => setForm({ ...form, serviceId: s.id })}
-                  >
-                    <div className="pb-svc__top">
-                      <span className="pb-svc__ico"><Scissors size={18} /></span>
-                      <div>
-                        <div className="pb-svc__nm">{s.name}</div>
+                {services.map((s) => {
+                  const checked = form.serviceIds.includes(s.id);
+                  return (
+                    <button
+                      type="button"
+                      key={s.id}
+                      className={`pb-svc ${checked ? "is-on" : ""}`}
+                      aria-pressed={checked}
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          serviceIds: checked
+                            ? form.serviceIds.filter((id) => id !== s.id)
+                            : [...form.serviceIds, s.id],
+                          // Mudar os serviços muda a duração total → resetar horário escolhido.
+                          time: "",
+                          startAt: "",
+                          endAt: ""
+                        })
+                      }
+                    >
+                      <div className="pb-svc__top">
+                        <span className="pb-svc__ico"><Scissors size={18} /></span>
+                        <div>
+                          <div className="pb-svc__nm">{s.name}</div>
+                        </div>
                       </div>
-                    </div>
-                    {s.description && <div className="pb-svc__desc">{s.description}</div>}
-                    <div className="pb-svc__foot">
-                      <span className="pb-svc__price">{formatMoney(s.basePrice)}</span>
-                      <span className="pb-svc__dur">
-                        <Clock size={11} /> {s.durationMinutes} min
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                      {s.description && <div className="pb-svc__desc">{s.description}</div>}
+                      <div className="pb-svc__foot">
+                        <span className="pb-svc__price">{formatMoney(s.basePrice)}</span>
+                        <span className="pb-svc__dur">
+                          <Clock size={11} /> {s.durationMinutes} min
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+
+              {form.serviceIds.length > 0 && (
+                <div className="pb-svc-summary">
+                  <span>
+                    {form.serviceIds.length} serviço{form.serviceIds.length > 1 ? "s" : ""} selecionado
+                    {form.serviceIds.length > 1 ? "s" : ""}
+                  </span>
+                  <span>{totalDuration} min · {formatMoney(totalPrice)}</span>
+                </div>
+              )}
             </section>
           )}
 
@@ -449,11 +498,11 @@ export default function PublicBookingClient() {
                 )}
               </section>
 
-              {form.startAt && selectedService && (
+              {form.startAt && selectedServices.length > 0 && (
                 <section className="pb-summary">
                   <div className="pb-summary__col">
                     <div className="pb-summary__lbl">Seu agendamento</div>
-                    <div className="pb-summary__svc">{selectedService.name}</div>
+                    <div className="pb-summary__svc">{selectedServices.map((s) => s.name).join(" + ")}</div>
                     <div className="pb-summary__when">
                       {selectedProfessional && <>com <strong>{selectedProfessional.name}</strong></>}
                       {form.date && <><span className="pip" /> <strong>{formatDateLong(form.date)}</strong></>}
@@ -461,7 +510,7 @@ export default function PublicBookingClient() {
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div className="pb-summary__price">{formatMoney(selectedService.basePrice)}</div>
+                    <div className="pb-summary__price">{formatMoney(totalPrice)}</div>
                     <div className="pb-summary__hint">pagamento no local</div>
                   </div>
                 </section>
@@ -493,31 +542,35 @@ export default function PublicBookingClient() {
                   <input
                     id="pb-phone"
                     required
+                    type="tel"
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    placeholder="(00) 00000-0000"
+                    onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })}
+                    placeholder="(11) 99999-9999"
                     autoComplete="tel"
-                    inputMode="tel"
+                    inputMode="numeric"
                   />
                 </div>
                 <div className="pb-field">
-                  <label htmlFor="pb-email">E-mail</label>
+                  <label htmlFor="pb-email">E-mail *</label>
                   <input
                     id="pb-email"
                     type="email"
+                    required
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="seu@email.com"
                     autoComplete="email"
+                    inputMode="email"
                   />
                 </div>
                 <div className="pb-field">
-                  <label htmlFor="pb-cpf">CPF</label>
+                  <label htmlFor="pb-cpf">CPF / CNPJ</label>
                   <input
                     id="pb-cpf"
+                    type="text"
                     value={form.cpf}
-                    onChange={(e) => setForm({ ...form, cpf: e.target.value })}
-                    placeholder="000.000.000-00"
+                    onChange={(e) => setForm({ ...form, cpf: maskDocument(e.target.value) })}
+                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
                     inputMode="numeric"
                   />
                 </div>
@@ -603,12 +656,15 @@ export default function PublicBookingClient() {
               </div>
 
               <div className="pb-success__details" style={{ margin: 0, maxWidth: "none" }}>
-                <div><strong>Serviço:</strong> {selectedService?.name ?? "—"}</div>
+                <div>
+                  <strong>{selectedServices.length > 1 ? "Serviços:" : "Serviço:"}</strong>{" "}
+                  {selectedServices.length > 0 ? selectedServices.map((s) => s.name).join(", ") : "—"}
+                </div>
                 {selectedProfessional && <div><strong>Profissional:</strong> {selectedProfessional.name}</div>}
                 <div><strong>Data:</strong> {form.date ? formatDateLong(form.date) : "—"}</div>
                 <div><strong>Horário:</strong> {form.time || "—"}</div>
-                <div><strong>Duração:</strong> {selectedService?.durationMinutes ?? "—"} min</div>
-                <div><strong>Valor:</strong> {formatMoney(selectedService?.basePrice)}</div>
+                <div><strong>Duração:</strong> {totalDuration || "—"} min</div>
+                <div><strong>Valor:</strong> {formatMoney(totalPrice)}</div>
                 <hr style={{ border: 0, borderTop: "1px solid var(--pb-border)", margin: "8px 0" }} />
                 <div><strong>Nome:</strong> {form.name}</div>
                 <div><strong>Telefone:</strong> {form.phone}</div>

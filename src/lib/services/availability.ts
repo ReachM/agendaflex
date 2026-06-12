@@ -66,34 +66,43 @@ export type AvailabilityResult = {
  */
 export async function getAvailableSlots(input: {
   companyId: string;
-  serviceId: string;
+  /** Um único serviço (compatibilidade — usado pelo bot). */
+  serviceId?: string;
+  /** Múltiplos serviços (agendamento público). A duração é a soma de todos. */
+  serviceIds?: string[];
   professionalId: string;
   date: string; // YYYY-MM-DD
   requireServicePublic?: boolean;
 }): Promise<AvailabilityResult> {
-  const { companyId, serviceId, professionalId, date } = input;
+  const { companyId, professionalId, date } = input;
+  const serviceIds = (input.serviceIds?.length ? input.serviceIds : input.serviceId ? [input.serviceId] : []).filter(
+    Boolean
+  );
+  if (serviceIds.length === 0) throw new ApiError(422, "Selecione pelo menos um serviço.");
 
   const settings = await prisma.publicBookingSettings.findUnique({ where: { companyId } });
   const slotInterval = settings?.slotIntervalMinutes ?? 30;
   const minNoticeHours = settings?.minNoticeHours ?? 1;
   const maxDaysAhead = settings?.maxDaysAhead ?? 30;
 
-  const [service, professional] = await Promise.all([
-    prisma.service.findFirst({
+  const [foundServices, professional] = await Promise.all([
+    prisma.service.findMany({
       where: {
-        id: serviceId,
+        id: { in: serviceIds },
         companyId,
         isActive: true,
         ...(input.requireServicePublic ? { isPublic: true } : {})
-      }
+      },
+      select: { id: true, durationMinutes: true }
     }),
     prisma.professional.findFirst({ where: { id: professionalId, companyId, isActive: true } })
   ]);
 
-  if (!service) throw new ApiError(422, "Serviço indisponível.");
+  if (foundServices.length !== serviceIds.length) throw new ApiError(422, "Serviço indisponível.");
   if (!professional) throw new ApiError(422, "Profissional indisponível.");
 
-  const serviceDuration = service.durationMinutes;
+  // Duração total = soma das durações dos serviços selecionados.
+  const serviceDuration = foundServices.reduce((sum, s) => sum + s.durationMinutes, 0);
   const empty = (message: string): AvailabilityResult => ({ slots: [], allSlots: [], serviceDuration, date, message });
 
   const requestedDate = new Date(`${date}T00:00:00`);

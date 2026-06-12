@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { created, handleApiError } from "@/lib/api/errors";
+import { ApiError, created, handleApiError } from "@/lib/api/errors";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { assertSameOrigin } from "@/lib/security/csrf";
@@ -16,6 +16,27 @@ export async function POST(request: NextRequest) {
     rateLimit(`register:${getRequestIp(request)}`, 5, 60 * 60 * 1000);
 
     const body = registerSchema.parse(await request.json());
+
+    // Confirmação de e-mail obrigatória antes de provisionar o tenant.
+    if (!body.emailVerificationCode) {
+      throw new ApiError(422, "Código de verificação obrigatório.");
+    }
+    const verificationEmail = body.adminEmail.toLowerCase();
+    const verification = await prisma.emailVerification.findFirst({
+      where: {
+        email: verificationEmail,
+        code: body.emailVerificationCode,
+        usedAt: null,
+        expiresAt: { gt: new Date() }
+      }
+    });
+    if (!verification) {
+      throw new ApiError(422, "Código de verificação inválido ou expirado.");
+    }
+    await prisma.emailVerification.update({
+      where: { id: verification.id },
+      data: { usedAt: new Date() }
+    });
 
     const result = await prisma.$transaction((tx) =>
       provisionTenant(tx, {

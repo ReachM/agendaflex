@@ -408,6 +408,34 @@ model PasswordResetToken {
   @@index([userId])
 }
 
+// Código de 6 dígitos enviado por e-mail para confirmar o endereço ANTES de
+// criar a conta (cadastro). Sem FK para User porque o usuário ainda não existe.
+model EmailVerification {
+  id        String    @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+}
+
+// Código de 6 dígitos para 2º fator: login (purpose="login") e confirmação de
+// ações sensíveis na zona de risco (purpose="danger"). Reaproveitado pelos dois
+// fluxos — o purpose distingue a finalidade.
+model LoginOtp {
+  id        String    @id @default(cuid())
+  email     String
+  code      String
+  purpose   String    @default("login")
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+}
+
 model CompanyUser {
   id        String     @id @default(cuid())
   companyId String

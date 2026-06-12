@@ -64,9 +64,13 @@ export async function GET(request: NextRequest) {
     const businessHours = (settings.businessHours ?? {}) as Record<string, { open: boolean; from?: string; to?: string }>;
 
     // Resolve integration connection status (no secrets exposed)
-    const [hasInvoiceConfig, botConfig] = await Promise.all([
+    const [hasInvoiceConfig, botConfig, adminMembership] = await Promise.all([
       prisma.companyInvoiceConfig.findUnique({ where: { companyId: context.companyId }, select: { autoEmit: true, nfeioCompanyId: true } }),
-      prisma.companyBotConfig.findUnique({ where: { companyId: context.companyId }, select: { whatsappInstance: true } })
+      prisma.companyBotConfig.findUnique({ where: { companyId: context.companyId }, select: { whatsappInstance: true } }),
+      prisma.companyUser.findFirst({
+        where: { companyId: context.companyId, status: "ACTIVE", role: { name: "COMPANY_ADMIN" } },
+        include: { user: { select: { email: true } } }
+      })
     ]);
 
     return ok({
@@ -85,7 +89,9 @@ export async function GET(request: NextRequest) {
         botEnabled: company.botEnabled,
         createdAt: company.createdAt,
         counts: company._count,
-        businessHours
+        businessHours,
+        // E-mail do admin — usado na zona de risco (destino do código de confirmação).
+        adminEmail: adminMembership?.user.email ?? company.email
       },
       integrations: {
         invoice: {

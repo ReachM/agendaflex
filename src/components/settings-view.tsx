@@ -8,14 +8,12 @@ import {
   Calendar,
   Check,
   CheckCircle2,
-  CheckCircle,
   Clock,
   CreditCard,
   Download,
   ExternalLink,
   FileText,
   Home,
-  Instagram,
   Lock,
   MessageCircle,
   MessageSquare,
@@ -36,6 +34,7 @@ import {
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { apiFetch } from "@/lib/client-api";
+import { maskDocument, maskPhone } from "@/lib/utils/masks";
 
 type SectionKey =
   | "profile"
@@ -80,6 +79,7 @@ type CompanyProfile = {
   createdAt: string;
   counts: Counts;
   businessHours: Partial<Record<Weekday, DayHours>>;
+  adminEmail: string;
 };
 
 type Integrations = {
@@ -142,7 +142,6 @@ const NAV_SECTIONS: { group: string; items: { key: SectionKey; label: string; ic
     group: "Conexões",
     items: [
       { key: "integrations", label: "Integrações", icon: <Share2 size={15} /> },
-      { key: "api", label: "API e webhooks", icon: <CheckCircle size={15} /> },
       { key: "logs", label: "Logs de atividade", icon: <FileText size={15} /> }
     ]
   },
@@ -391,12 +390,13 @@ export function SettingsView() {
 
           {section === "profile" && (
             <ProfileSection
-              name={name} setName={setName}
+              name={name}
               tradeName={tradeName} setTradeName={setTradeName}
-              docNumber={document} setDocNumber={setDocument}
-              email={email} setEmail={setEmail}
+              docNumber={document}
+              email={email}
               phone={phone} setPhone={setPhone}
               slug={slug} setSlug={setSlug}
+              currentSlug={c.slug ?? ""}
             />
           )}
 
@@ -424,13 +424,12 @@ export function SettingsView() {
           )}
 
           {section === "security" && (
-            <DangerZone companyName={c.name} />
+            <DangerZone companyName={c.name} adminEmail={c.adminEmail} />
           )}
 
           {(section === "permissions" ||
             section === "appearance" ||
             section === "custom-fields" ||
-            section === "api" ||
             section === "logs" ||
             section === "me") && (
             <ComingSoon sectionKey={section} />
@@ -519,20 +518,42 @@ function SectionCard({
 /* ─── Profile ─────────────────────────────────────── */
 
 function ProfileSection({
-  name, setName,
+  name,
   tradeName, setTradeName,
-  docNumber, setDocNumber,
-  email, setEmail,
+  docNumber,
+  email,
   phone, setPhone,
-  slug, setSlug
+  slug, setSlug,
+  currentSlug
 }: {
-  name: string; setName: (v: string) => void;
+  name: string;
   tradeName: string; setTradeName: (v: string) => void;
-  docNumber: string; setDocNumber: (v: string) => void;
-  email: string; setEmail: (v: string) => void;
+  docNumber: string;
+  email: string;
   phone: string; setPhone: (v: string) => void;
   slug: string; setSlug: (v: string) => void;
+  currentSlug: string;
 }) {
+  const [slugError, setSlugError] = useState("");
+  const [slugChecking, setSlugChecking] = useState(false);
+
+  async function checkSlug(value: string) {
+    if (!value || value === currentSlug) { setSlugError(""); return; }
+    if (!/^[a-z0-9-]+$/.test(value)) {
+      setSlugError("Use apenas letras minúsculas, números e hífens.");
+      return;
+    }
+    setSlugChecking(true);
+    try {
+      const res = await apiFetch<{ available: boolean }>(`/api/company/check-slug?slug=${encodeURIComponent(value)}`);
+      setSlugError(res.available ? "" : "Este slug já está em uso. Escolha outro.");
+    } catch {
+      setSlugError("");
+    } finally {
+      setSlugChecking(false);
+    }
+  }
+
   return (
     <SectionCard
       icon={<Home size={18} />}
@@ -541,8 +562,11 @@ function ProfileSection({
     >
       <div className="cfg-row-2">
         <div className="cfg-field">
-          <label htmlFor="cfg-name">Razão social *</label>
-          <input id="cfg-name" required value={name} onChange={e => setName(e.target.value)} />
+          <label htmlFor="cfg-name">Razão social</label>
+          <input id="cfg-name" value={name} readOnly disabled className="is-readonly" />
+          <small>
+            Para alterar: <a href="mailto:contato@marcaiflex.com.br">contato@marcaiflex.com.br</a>
+          </small>
         </div>
         <div className="cfg-field">
           <label htmlFor="cfg-trade">Nome fantasia</label>
@@ -552,34 +576,49 @@ function ProfileSection({
           <label htmlFor="cfg-doc">CNPJ / CPF</label>
           <input
             id="cfg-doc"
-            value={docNumber}
-            onChange={e => setDocNumber(e.target.value)}
-            placeholder="00.000.000/0001-00"
+            value={docNumber ? maskDocument(docNumber) : ""}
+            readOnly
+            disabled
+            className="is-readonly"
           />
+          <small>
+            Para alterar: <a href="mailto:contato@marcaiflex.com.br">contato@marcaiflex.com.br</a>
+          </small>
         </div>
         <div className="cfg-field">
-          <label htmlFor="cfg-email">E-mail *</label>
-          <input
-            id="cfg-email"
-            type="email"
-            required
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-          />
+          <label htmlFor="cfg-email">E-mail da empresa</label>
+          <input id="cfg-email" type="email" value={email} readOnly disabled className="is-readonly" />
+          <small>
+            Para alterar: <a href="mailto:contato@marcaiflex.com.br">contato@marcaiflex.com.br</a>
+          </small>
         </div>
         <div className="cfg-field">
           <label htmlFor="cfg-phone">Telefone</label>
-          <input id="cfg-phone" value={phone} onChange={e => setPhone(e.target.value)} />
+          <input
+            id="cfg-phone"
+            type="tel"
+            inputMode="numeric"
+            value={phone}
+            onChange={e => setPhone(maskPhone(e.target.value))}
+            placeholder="(11) 99999-9999"
+          />
         </div>
         <div className="cfg-field">
           <label htmlFor="cfg-slug">Slug do link público</label>
           <input
             id="cfg-slug"
             value={slug}
-            onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+            onChange={e => { setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")); setSlugError(""); }}
+            onBlur={() => checkSlug(slug)}
             placeholder="minha-empresa"
           />
-          <small>URL: /agendar/{slug || "sua-empresa"}</small>
+          {slugError ? (
+            <small style={{ color: "var(--danger)" }}>{slugError}</small>
+          ) : slugChecking ? (
+            <small>Verificando...</small>
+          ) : (
+            <small>URL: /agendar/{slug || "sua-empresa"}</small>
+          )}
         </div>
       </div>
     </SectionCard>
@@ -830,7 +869,6 @@ function IntegrationsSection({
 
   const nfeioActive =
     builtIn.invoice.hasNfeioKey || !!thirdParty.find(i => i.type === "nfeio" && i.isActive);
-  const mpActive = !!thirdParty.find(i => i.type === "mercadopago" && i.isActive);
 
   const items: {
     id: string;
@@ -867,27 +905,6 @@ function IntegrationsSection({
       logo: { bg: "linear-gradient(135deg, #0d9488, #0f766e)", content: <Calendar size={20} /> },
       status: publicBookingEnabled ? "active" : "configure",
       href: "/link-agenda"
-    },
-    {
-      id: "mp",
-      name: "Mercado Pago",
-      desc: mpActive ? "Pré-pagamento e PIX ativos" : "Pré-pagamento e PIX no link público",
-      logo: { bg: "linear-gradient(135deg, #009ee3, #0083b0)", content: "MP" },
-      status: mpActive ? "active" : "inactive"
-    },
-    {
-      id: "instagram",
-      name: "Instagram Direct",
-      desc: "Receba mensagens do DM no painel",
-      logo: { bg: "linear-gradient(135deg, #e1306c, #c13584)", content: <Instagram size={20} /> },
-      status: "inactive"
-    },
-    {
-      id: "api",
-      name: "API e Webhooks",
-      desc: "Integre com seu próprio sistema",
-      logo: { bg: "linear-gradient(135deg, #0f172a, #1e293b)", content: "API" },
-      status: "configure"
     }
   ];
 
@@ -942,36 +959,92 @@ function IntegrationsSection({
 
 /* ─── Zona de risco ───────────────────────────────── */
 
-function DangerZone({ companyName }: { companyName: string }) {
-  const rows = [
-    {
-      title: "Exportar todos os dados",
-      desc: "Baixe um ZIP com clientes, agendamentos, lançamentos e mídia.",
-      action: (
-        <button type="button" className="btn btn-ghost" disabled title="Em breve">
-          <Download size={14} /> Exportar
-        </button>
-      )
+type DangerAction = "export" | "pause" | "delete";
+
+function DangerZone({ companyName, adminEmail }: { companyName: string; adminEmail: string }) {
+  const [pendingAction, setPendingAction] = useState<DangerAction | null>(null);
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [sentEmail, setSentEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const ACTIONS: Record<DangerAction, { label: string; btnLabel: string; btnClass: string; icon: React.ReactNode; desc: string }> = {
+    export: {
+      label: "Exportar dados",
+      btnLabel: "Exportar",
+      btnClass: "btn-ghost",
+      icon: <Download size={14} />,
+      desc: "Baixe um arquivo com todos os seus dados."
     },
-    {
-      title: "Pausar conta",
-      desc: "O acesso fica bloqueado, mas os dados ficam preservados por 90 dias.",
-      action: (
-        <button type="button" className="btn cfg-btn-danger" disabled title="Em breve">
-          <Pause size={14} /> Pausar
-        </button>
-      )
+    pause: {
+      label: "Pausar conta",
+      btnLabel: "Pausar",
+      btnClass: "cfg-btn-danger",
+      icon: <Pause size={14} />,
+      desc: "Suspende o acesso temporariamente. Dados preservados por 90 dias."
     },
-    {
-      title: `Excluir ${companyName} permanentemente`,
-      desc: "Apaga todos os dados desta empresa. Não pode ser desfeito.",
-      action: (
-        <button type="button" className="btn cfg-btn-danger-solid" disabled title="Em breve">
-          <Trash2 size={14} /> Excluir empresa
-        </button>
-      )
+    delete: {
+      label: `Excluir ${companyName} permanentemente`,
+      btnLabel: "Excluir empresa",
+      btnClass: "cfg-btn-danger-solid",
+      icon: <Trash2 size={14} />,
+      desc: "Apaga todos os dados desta empresa. Não pode ser desfeito."
     }
-  ];
+  };
+
+  function openModal(action: DangerAction) {
+    setPendingAction(action);
+    setCode("");
+    setCodeSent(false);
+    setSentEmail("");
+    setError("");
+  }
+
+  function closeModal() {
+    setPendingAction(null);
+    setCode("");
+    setCodeSent(false);
+    setError("");
+  }
+
+  async function requestCode() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await apiFetch<{ sent: boolean; email: string }>("/api/auth/send-danger-otp", { method: "POST" });
+      setCodeSent(true);
+      setSentEmail(res.email);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao enviar código.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmAction() {
+    if (!pendingAction) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await apiFetch<{ done: boolean; redirectTo?: string; scheduled?: boolean }>(
+        "/api/company/danger-action",
+        { method: "POST", body: JSON.stringify({ action: pendingAction, code }) }
+      );
+      if (res.redirectTo) {
+        window.location.href = res.redirectTo;
+        return;
+      }
+      if (res.scheduled) {
+        alert("Exportação solicitada! Você receberá um e-mail em breve.");
+      }
+      closeModal();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Código inválido ou expirado.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="cfg-danger-zone">
@@ -979,16 +1052,77 @@ function DangerZone({ companyName }: { companyName: string }) {
         <AlertTriangle size={16} />
         Zona de risco
       </h3>
-      <p>Ações irreversíveis. Tenha certeza antes de prosseguir.</p>
-      {rows.map(row => (
-        <div key={row.title} className="cfg-danger-zone__row">
+      <p>
+        Ações irreversíveis. Um código de verificação será enviado para <strong>{adminEmail}</strong>.
+      </p>
+
+      {(Object.keys(ACTIONS) as DangerAction[]).map(action => (
+        <div key={action} className="cfg-danger-zone__row">
           <div className="info">
-            <h4>{row.title}</h4>
-            <p>{row.desc}</p>
+            <h4>{ACTIONS[action].label}</h4>
+            <p>{ACTIONS[action].desc}</p>
           </div>
-          {row.action}
+          <button type="button" className={`btn ${ACTIONS[action].btnClass}`} onClick={() => openModal(action)}>
+            {ACTIONS[action].icon} {ACTIONS[action].btnLabel}
+          </button>
         </div>
       ))}
+
+      {pendingAction && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>Confirmar: {ACTIONS[pendingAction].label}</h3>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={closeModal} aria-label="Fechar">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {!codeSent ? (
+                <>
+                  <p style={{ fontSize: 14, color: "var(--muted)", margin: 0 }}>
+                    Enviaremos um código de verificação para <strong>{adminEmail}</strong>.
+                  </p>
+                  {error ? <div className="error-box">{error}</div> : null}
+                  <button type="button" className="btn btn-primary" onClick={requestCode} disabled={loading}>
+                    {loading ? "Enviando..." : "Enviar código de verificação"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: 14, color: "var(--muted)", margin: 0 }}>
+                    Código enviado para <strong>{sentEmail}</strong>. Válido por 10 minutos.
+                  </p>
+                  <div className="cfg-field">
+                    <input
+                      value={code}
+                      onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="000000"
+                      maxLength={6}
+                      inputMode="numeric"
+                      autoFocus
+                      style={{ fontSize: 22, letterSpacing: 8, textAlign: "center" }}
+                    />
+                  </div>
+                  {error ? <div className="error-box">{error}</div> : null}
+                  <button
+                    type="button"
+                    className={`btn ${ACTIONS[pendingAction].btnClass}`}
+                    onClick={confirmAction}
+                    disabled={code.length < 6 || loading}
+                  >
+                    {loading ? "Confirmando..." : `Confirmar ${ACTIONS[pendingAction].label}`}
+                  </button>
+                  <button type="button" className="btn btn-ghost" onClick={requestCode} disabled={loading}>
+                    Reenviar código
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

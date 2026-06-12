@@ -129,25 +129,38 @@ export async function POST(
     const allergies = typeof body.allergies === "string" ? body.allergies.trim().slice(0, 1000) : "";
     const requiredCare = typeof body.requiredCare === "string" ? body.requiredCare.trim().slice(0, 1000) : "";
 
-    if (!name || !phone || !body.serviceId || !body.professionalId || !body.startAt || !body.endAt) {
-      throw new ApiError(422, "Campos obrigatórios: nome, telefone, serviço, profissional, data/horário.");
+    // Aceita serviceIds[] (multi-serviço) com fallback para serviceId (legado).
+    const serviceIds: string[] = Array.isArray(body.serviceIds)
+      ? body.serviceIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+      : typeof body.serviceId === "string" && body.serviceId
+        ? [body.serviceId]
+        : [];
+
+    if (!name || !phone || !email || serviceIds.length === 0 || !body.professionalId || !body.startAt) {
+      throw new ApiError(422, "Campos obrigatórios: nome, telefone, e-mail, serviço, profissional, data/horário.");
     }
 
     if (!lgpdAccepted) {
       throw new ApiError(422, "Você precisa aceitar a política de privacidade para continuar.");
     }
 
-    // Validate service and professional belong to this company
-    const [service, professional] = await Promise.all([
-      prisma.service.findFirst({ where: { id: body.serviceId, companyId: company.id, isActive: true, isPublic: true } }),
+    // Validate services and professional belong to this company
+    const [services, professional] = await Promise.all([
+      prisma.service.findMany({ where: { id: { in: serviceIds }, companyId: company.id, isActive: true, isPublic: true } }),
       prisma.professional.findFirst({ where: { id: body.professionalId, companyId: company.id, isActive: true, isPublic: true } })
     ]);
 
-    if (!service) throw new ApiError(422, "Serviço indisponível.");
+    if (services.length !== serviceIds.length) throw new ApiError(422, "Serviço indisponível.");
     if (!professional) throw new ApiError(422, "Profissional indisponível.");
 
+    // Serviço principal = primeiro selecionado (Appointment.serviceId aceita só um).
+    const primaryService = services[0];
+    const totalDurationMinutes = services.reduce((sum, s) => sum + s.durationMinutes, 0);
+    const serviceNames = services.map((s) => s.name).join(", ");
+
     const startAt = new Date(body.startAt);
-    const endAt = new Date(body.endAt);
+    // endAt recalculado no servidor pela duração total — não confiar no cliente.
+    const endAt = new Date(startAt.getTime() + totalDurationMinutes * 60 * 1000);
     const now = new Date();
 
     // Validate minimum notice
@@ -234,7 +247,7 @@ export async function POST(
         data: {
           companyId: company.id,
           customerId: customer.id,
-          serviceId: service.id,
+          serviceId: primaryService.id,
           professionalId: professional.id,
           startAt,
           endAt,
@@ -245,13 +258,13 @@ export async function POST(
           approvalStatus: approvalStatus as any,
           publicBookingToken,
           appointmentServices: {
-            create: {
+            create: services.map((s) => ({
               companyId: company.id,
-              serviceId: service.id,
-              serviceNameSnapshot: service.name,
-              unitPrice: service.basePrice,
-              totalPrice: service.basePrice
-            }
+              serviceId: s.id,
+              serviceNameSnapshot: s.name,
+              unitPrice: s.basePrice,
+              totalPrice: s.basePrice
+            }))
           }
         }
       });
@@ -268,7 +281,7 @@ export async function POST(
         entityId: result.appointment.id,
         newValues: {
           customerName: name,
-          service: service.name,
+          service: serviceNames,
           professional: professional.name,
           startAt: startAt.toISOString(),
           source: "PUBLIC_LINK",
@@ -284,7 +297,7 @@ export async function POST(
       const info = buildAppointmentInfo({
         companyName: company.tradeName ?? company.name,
         customerName: name,
-        serviceName: service.name,
+        serviceName: serviceNames,
         professionalName: professional.name,
         startAt,
         status: result.appointmentStatus === "CONFIRMED" ? "Confirmado" : "Pendente"
