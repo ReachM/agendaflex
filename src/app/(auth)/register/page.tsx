@@ -153,6 +153,13 @@ export default function RegisterPage() {
     event.preventDefault();
     if (loading) return;
 
+    // Step 2: verificar código de e-mail antes de avançar.
+    if (step === 2) {
+      await handleVerifyCode();
+      return;
+    }
+
+    // Step 3: validar dados da empresa.
     const error = validateStep2();
     if (error) {
       setStepError(error);
@@ -318,11 +325,10 @@ export default function RegisterPage() {
 
               <div style={{ marginTop: 20 }}>
                 <AuthButton
-                  type="button"
+                  type="submit"
                   block
                   loading={loading}
                   disabled={verificationCode.length < 6}
-                  onClick={handleVerifyCode}
                   rightIcon={loading ? null : <ArrowRight size={18} />}
                 >
                   Verificar e avançar
