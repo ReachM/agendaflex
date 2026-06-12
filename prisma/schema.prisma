@@ -1189,16 +1189,21 @@ model BotWebhookEvent {
 // ═══════════════════════════════════════════════════
 
 model CompanyBotConfig {
-  id                 String   @id @default(cuid())
-  companyId          String   @unique
+  id                 String    @id @default(cuid())
+  companyId          String    @unique
   whatsappInstance   String?
-  allowBooking       Boolean  @default(false)
-  faqConfig          Json     @default("[]") // [{pergunta, resposta}]
-  reminderConfig     Json     @default("{}") // {enabled, send24h, send2h}
+  // Conexão via QR Code (Evolution API v2.2.3). O QR só chega via webhook
+  // QRCODE_UPDATED — guardamos o base64 temporariamente para o polling do front.
+  qrCodeBase64       String? // data URL do QR; limpo após conectar/expirar
+  qrCodeExpiresAt    DateTime? // expira ~60s após receber o QR
+  connectionStatus   String    @default("disconnected") // disconnected | connecting | qr | open
+  allowBooking       Boolean   @default(false)
+  faqConfig          Json      @default("[]") // [{pergunta, resposta}]
+  reminderConfig     Json      @default("{}") // {enabled, send24h, send2h}
   businessHours      String?
   cancellationPolicy String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 

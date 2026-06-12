@@ -671,13 +671,13 @@ function StatusChip({ label, value }: { label: string; value: number }) {
   );
 }
 
-type QrStatus = "loading" | "disconnected" | "qr" | "connected";
-type QrResponse = { qrcode: string | null; status: "qr" | "connected" | "disconnected" };
+type QrStatus = "loading" | "disconnected" | "connecting" | "qr" | "connected";
+type QrResponse = { qrcode: string | null; status: "qr" | "connected" | "disconnected" | "connecting" };
 
 /**
- * Conexão do WhatsApp da empresa via QR Code (Evolution API). Clicar em
- * "Conectar" cria a instância e mostra o QR; enquanto o status for "qr",
- * faz polling a cada 5s até conectar.
+ * Conexão do WhatsApp da empresa via QR Code (Evolution API v2.2.3). Clicar em
+ * "Conectar" recria a instância; o QR chega via webhook em alguns segundos.
+ * Enquanto o status for "connecting" ou "qr", faz polling a cada 3s até conectar.
  */
 function WhatsAppConnect() {
   const [status, setStatus] = useState<QrStatus>("loading");
@@ -697,8 +697,9 @@ function WhatsAppConnect() {
     setQrcode(data.qrcode);
     setStatus(data.status);
     stopPolling();
-    if (data.status === "qr") {
-      pollRef.current = setTimeout(poll, 5000);
+    // QR chega via webhook; segue consultando enquanto preparando/aguardando scan.
+    if (data.status === "qr" || data.status === "connecting") {
+      pollRef.current = setTimeout(poll, 3000);
     }
   }
 
@@ -712,9 +713,9 @@ function WhatsAppConnect() {
   }
 
   useEffect(() => {
-    // Estado inicial ao abrir a página.
+    // Estado inicial ao abrir a página (retoma o polling se já estiver conectando).
     apiFetch<QrResponse>("/api/bot-whatsapp/qrcode")
-      .then((data) => setStatus(data.status))
+      .then((data) => applyResult(data))
       .catch(() => setStatus("disconnected"));
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -793,6 +794,14 @@ function WhatsAppConnect() {
             <p style={{ color: "var(--muted)", marginTop: 4, fontSize: 12 }}>
               <Loader2 size={12} className="spin" style={{ verticalAlign: "-2px", marginRight: 4 }} />
               Aguardando leitura…
+            </p>
+          </div>
+        ) : status === "connecting" ? (
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <Loader2 size={32} className="spin" style={{ color: "var(--primary)", marginBottom: 16 }} />
+            <p style={{ fontWeight: 600, marginBottom: 6 }}>Preparando conexão…</p>
+            <p style={{ fontSize: 13, color: "var(--muted)" }}>
+              O QR Code será exibido em alguns segundos.
             </p>
           </div>
         ) : (

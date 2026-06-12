@@ -24,7 +24,9 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/bot-whatsapp/qrcode
- * Cria a instância na Evolution API (se necessário) e retorna o primeiro QR Code.
+ * Recria a instância na Evolution API e configura o webhook. O QR Code não vem
+ * na resposta — chega em ~2-5s via webhook QRCODE_UPDATED; o front faz polling
+ * em GET até o QR aparecer. Retornamos "connecting" imediatamente.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,8 +35,7 @@ export async function POST(request: NextRequest) {
     await requirePlanFeature(context, "allowBotIntegration", "Bot WhatsApp");
 
     await createInstance(context.companyId);
-    const result = await getQrCode(context.companyId);
-    return ok(result);
+    return ok({ qrcode: null, status: "connecting" });
   } catch (error) {
     return handleApiError(error);
   }

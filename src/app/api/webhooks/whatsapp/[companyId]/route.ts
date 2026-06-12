@@ -189,8 +189,71 @@ async function routeMessage(params: {
 }
 
 /**
+ * QRCODE_UPDATED: na Evolution v2 o QR só chega por webhook. Guarda o base64
+ * (data URL) com TTL de 60s para o polling do front. Não sobrescreve instância
+ * já conectada (connectionStatus "open").
+ */
+async function handleQrCodeUpdated(companyId: string, raw: Record<string, unknown>): Promise<void> {
+  const data = (raw.data ?? {}) as Record<string, unknown>;
+  const qrcodeObj = (data.qrcode ?? {}) as Record<string, unknown>;
+  const base64 =
+    (typeof qrcodeObj.base64 === "string" ? qrcodeObj.base64 : null) ??
+    (typeof data.base64 === "string" ? data.base64 : null);
+
+  if (!base64) return;
+
+  await prisma.companyBotConfig.updateMany({
+    where: { companyId, connectionStatus: { not: "open" } },
+    data: {
+      qrCodeBase64: base64,
+      qrCodeExpiresAt: new Date(Date.now() + 60_000),
+      connectionStatus: "qr"
+    }
+  });
+  console.log(`${LOG_PREFIX} QR atualizado company=${companyId}`);
+}
+
+/**
+ * CONNECTION_UPDATE: reflete o state da Evolution no connectionStatus. Ao conectar
+ * ("open") limpa o QR pendente.
+ */
+async function handleConnectionUpdate(companyId: string, raw: Record<string, unknown>): Promise<void> {
+  const data = (raw.data ?? {}) as Record<string, unknown>;
+  const instanceObj = (data.instance ?? {}) as Record<string, unknown>;
+  const state =
+    (typeof data.state === "string" ? data.state : null) ??
+    (typeof instanceObj.state === "string" ? instanceObj.state : null) ??
+    "";
+
+  if (state === "open") {
+    await prisma.companyBotConfig.updateMany({
+      where: { companyId },
+      data: { connectionStatus: "open", qrCodeBase64: null, qrCodeExpiresAt: null }
+    });
+    console.log(`${LOG_PREFIX} conectado company=${companyId}`);
+    return;
+  }
+
+  if (state === "connecting") {
+    await prisma.companyBotConfig.updateMany({
+      where: { companyId, connectionStatus: { not: "open" } },
+      data: { connectionStatus: "connecting" }
+    });
+    return;
+  }
+
+  if (state === "close") {
+    await prisma.companyBotConfig.updateMany({
+      where: { companyId },
+      data: { connectionStatus: "disconnected", qrCodeBase64: null, qrCodeExpiresAt: null }
+    });
+    console.log(`${LOG_PREFIX} desconectado company=${companyId}`);
+  }
+}
+
+/**
  * POST /api/webhooks/whatsapp/:companyId
- * Recebe eventos da Evolution API v2 (messages.upsert).
+ * Recebe eventos da Evolution API v2 (qrcode.updated, connection.update, messages.upsert).
  */
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
@@ -214,8 +277,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return ok({ received: true, ignored: true });
     }
 
-    // Processa apenas messages.upsert.
-    if ((raw as { event?: unknown }).event !== "messages.upsert") {
+    const event = (raw as { event?: unknown }).event;
+
+    // ── QRCODE_UPDATED: salva o QR (base64) para o polling do front (TTL 60s) ──
+    if (event === "qrcode.updated") {
+      await handleQrCodeUpdated(companyId, raw as Record<string, unknown>);
+      return ok({ received: true });
+    }
+
+    // ── CONNECTION_UPDATE: atualiza o connectionStatus da instância ───────────
+    if (event === "connection.update") {
+      await handleConnectionUpdate(companyId, raw as Record<string, unknown>);
+      return ok({ received: true });
+    }
+
+    // Demais eventos: processa apenas messages.upsert.
+    if (event !== "messages.upsert") {
       return ok({ received: true, ignored: true });
     }
 

@@ -206,13 +206,37 @@ async function findInstance(companyId: string): Promise<string | null> {
 }
 
 /**
- * Cria (ou reaproveita) uma instância na Evolution API para a empresa e grava o
- * nome no CompanyBotConfig. Idempotente: se a instância já existir na Evolution,
- * o erro de "já existe" é tolerado — o importante é o nome ficar persistido.
+ * Recria a instância na Evolution API e configura o webhook que entrega o QR Code.
+ *
+ * Na Evolution v2.2.3 o GET /instance/connect retorna {"count":0} (bug conhecido):
+ * o QR só chega pelo evento webhook QRCODE_UPDATED. Por isso aqui:
+ *  1) apagamos a instância antiga (estado sujo não emite QR novo),
+ *  2) aguardamos a liberação do nome,
+ *  3) criamos já apontando o webhook para /api/webhooks/whatsapp/{companyId},
+ *  4) marcamos connectionStatus="connecting" — o QR chega em ~2-5s via webhook.
+ *
+ * O webhook é configurado com byEvents=false (todos os eventos na mesma URL,
+ * distinguidos pelo campo `event` do corpo) e o header x-webhook-token, casando
+ * com a validação em src/app/api/webhooks/whatsapp/[companyId]/route.ts.
  */
 export async function createInstance(companyId: string): Promise<{ instance: string }> {
   const { url, apiKey } = evolutionConfig();
   const instanceName = `company-${companyId}`;
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://marcaiflex.com.br").replace(/\/+$/, "");
+  const webhookUrl = `${appUrl}/api/webhooks/whatsapp/${companyId}`;
+  const webhookToken = process.env.WHATSAPP_WEBHOOK_TOKEN ?? "";
+
+  // Apaga a instância existente (se houver) para recriar limpa — ignora erro se
+  // ela não existir.
+  await evolutionFetch(`/instance/delete/${encodeURIComponent(instanceName)}`, {
+    method: "DELETE",
+    baseUrl: url,
+    apiKey
+  }).catch(() => undefined);
+
+  // Aguarda a Evolution liberar o nome antes de recriar.
+  await new Promise((resolve) => setTimeout(resolve, 3000));
 
   const response = await evolutionFetch("/instance/create", {
     method: "POST",
@@ -221,7 +245,15 @@ export async function createInstance(companyId: string): Promise<{ instance: str
     body: {
       instanceName,
       integration: "WHATSAPP-BAILEYS",
-      qrcode: true
+      qrcode: true,
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        byEvents: false,
+        base64: true,
+        headers: { "x-webhook-token": webhookToken },
+        events: ["QRCODE_UPDATED", "CONNECTION_UPDATE", "MESSAGES_UPSERT"]
+      }
     }
   });
 
@@ -237,8 +269,8 @@ export async function createInstance(companyId: string): Promise<{ instance: str
 
   await prisma.companyBotConfig.upsert({
     where: { companyId },
-    update: { whatsappInstance: instanceName },
-    create: { companyId, whatsappInstance: instanceName }
+    update: { whatsappInstance: instanceName, connectionStatus: "connecting", qrCodeBase64: null, qrCodeExpiresAt: null },
+    create: { companyId, whatsappInstance: instanceName, connectionStatus: "connecting" }
   });
 
   return { instance: instanceName };
@@ -247,40 +279,68 @@ export async function createInstance(companyId: string): Promise<{ instance: str
 export type QrCodeResult = {
   /** data URL (data:image/png;base64,...) do QR Code, ou null. */
   qrcode: string | null;
-  status: "qr" | "connected" | "disconnected";
+  status: "qr" | "connected" | "disconnected" | "connecting";
 };
 
 /**
- * Busca o QR Code da instância via GET /instance/connect/{instance}.
- * Evolution v2 responde { base64, code, pairingCode } enquanto aguarda o scan,
- * ou { instance: { state: "open" } } quando já conectada.
+ * Retorna o QR Code / estado da conexão lendo do banco (CompanyBotConfig). O QR
+ * é gravado pelo webhook QRCODE_UPDATED; aqui só servimos o valor mais recente.
+ *
+ * - QR válido (não expirado) -> { qrcode, status: "qr" }
+ * - QR expirado -> limpa e cai para "connecting" (aguardando novo QR via webhook)
+ * - connectionStatus "open" -> "connected"
+ * - "disconnected" -> reconcilia com o connectionState real da Evolution (esse
+ *   endpoint NÃO tem o bug do /connect), cobrindo instâncias conectadas antes
+ *   desta feature (sem webhook de connection registrado).
  */
 export async function getQrCode(companyId: string): Promise<QrCodeResult> {
-  const instance = await findInstance(companyId);
-  if (!instance) return { qrcode: null, status: "disconnected" };
-
-  const { url, apiKey } = evolutionConfig();
-  const response = await evolutionFetch(`/instance/connect/${encodeURIComponent(instance)}`, {
-    baseUrl: url,
-    apiKey
+  const config = await prisma.companyBotConfig.findUnique({
+    where: { companyId },
+    select: { whatsappInstance: true, qrCodeBase64: true, qrCodeExpiresAt: true, connectionStatus: true }
   });
 
-  if (!response.ok) return { qrcode: null, status: "disconnected" };
+  if (!config) return { qrcode: null, status: "disconnected" };
 
-  const data = (await response.json().catch(() => ({}))) as {
-    base64?: string;
-    qrcode?: { base64?: string };
-    instance?: { state?: string };
-    state?: string;
-  };
+  const now = new Date();
+  const qrExpired = Boolean(config.qrCodeExpiresAt && config.qrCodeExpiresAt <= now);
 
-  const qrcode = data.base64 ?? data.qrcode?.base64 ?? null;
-  const state = data.instance?.state ?? data.state ?? "unknown";
+  // QR ainda válido — serve direto.
+  if (config.qrCodeBase64 && !qrExpired) {
+    return { qrcode: config.qrCodeBase64, status: "qr" };
+  }
 
-  return {
-    qrcode,
-    status: state === "open" ? "connected" : qrcode ? "qr" : "disconnected"
-  };
+  // QR expirado — limpa para não servir um código morto.
+  if (config.qrCodeBase64 && qrExpired) {
+    await prisma.companyBotConfig.update({
+      where: { companyId },
+      data: { qrCodeBase64: null, qrCodeExpiresAt: null }
+    });
+  }
+
+  if (config.connectionStatus === "open") return { qrcode: null, status: "connected" };
+
+  // "connecting" ou "qr" sem base64 válido = aguardando o (próximo) QR do webhook.
+  if (config.connectionStatus === "connecting" || config.connectionStatus === "qr") {
+    return { qrcode: null, status: "connecting" };
+  }
+
+  // "disconnected": confirma com a Evolution se a instância já não está conectada.
+  if (config.whatsappInstance) {
+    try {
+      const { connected } = await testConnection(companyId);
+      if (connected) {
+        await prisma.companyBotConfig.update({
+          where: { companyId },
+          data: { connectionStatus: "open", qrCodeBase64: null, qrCodeExpiresAt: null }
+        });
+        return { qrcode: null, status: "connected" };
+      }
+    } catch {
+      // Evolution indisponível — trata como desconectado.
+    }
+  }
+
+  return { qrcode: null, status: "disconnected" };
 }
 
 /**
