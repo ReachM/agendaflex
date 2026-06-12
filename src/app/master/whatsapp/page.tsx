@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, MessageCircle, RefreshCcw, Search, Wifi } from "lucide-react";
+import { Clock, ExternalLink, MessageCircle, RefreshCcw, Search, Wifi } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   SABiz,
@@ -119,9 +119,14 @@ export default function WhatsappPage() {
         title="Instâncias WhatsApp"
         sub={`${num(m.totalConfigured)} instâncias configuradas`}
         actions={
-          <button type="button" className="btn btn-ghost" onClick={reload} disabled={loading}>
-            <RefreshCcw size={15} /> Atualizar
-          </button>
+          <>
+            <a href="http://2.25.129.96:8080/manager/" target="_blank" rel="noreferrer" className="btn btn-ghost">
+              <ExternalLink size={14} /> Evolution Manager
+            </a>
+            <button type="button" className="btn btn-ghost" onClick={reload} disabled={loading}>
+              <RefreshCcw size={15} /> Atualizar
+            </button>
+          </>
         }
       />
       {error ? <SAError>{error}</SAError> : null}
