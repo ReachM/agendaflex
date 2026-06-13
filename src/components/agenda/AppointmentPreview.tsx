@@ -22,6 +22,16 @@ const STATUS_PILL_CLASS: Record<string, string> = {
   NO_SHOW: "ag-pill ag-pill--noshow"
 };
 
+const PAYMENT_LABELS: Record<string, string> = {
+  PIX: "Pix",
+  CREDIT_CARD: "Cartão de crédito",
+  DEBIT_CARD: "Cartão de débito",
+  CASH: "Dinheiro",
+  BOLETO: "Boleto",
+  TRANSFER: "Transferência",
+  OTHER: "Outro"
+};
+
 type CustomField = {
   label: string;
   fieldKey: string;
@@ -203,6 +213,14 @@ export function AppointmentPreview({
               <strong style={{ display: "block", fontSize: 14, marginTop: 3 }}>{value}</strong>
             </div>
           ))}
+          {appointment.paymentMethod ? (
+            <div style={{ padding: 12, border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)" }}>
+              <span className="muted" style={{ display: "block", fontSize: 12 }}>Pagamento preferido</span>
+              <strong style={{ display: "block", fontSize: 14, marginTop: 3 }}>
+                💳 {PAYMENT_LABELS[appointment.paymentMethod] ?? appointment.paymentMethod}
+              </strong>
+            </div>
+          ) : null}
         </div>
 
         {(appointment.appointmentServices ?? []).length > 0 ? (

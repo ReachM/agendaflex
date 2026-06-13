@@ -71,6 +71,25 @@ function brandPalette(primary: string): React.CSSProperties {
 const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MONTH_SHORT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
+const PAYMENT_OPTIONS: { value: string; label: string; icon: string }[] = [
+  { value: "PIX", label: "Pix", icon: "◈" },
+  { value: "CREDIT_CARD", label: "Cartão crédito", icon: "💳" },
+  { value: "DEBIT_CARD", label: "Cartão débito", icon: "💳" },
+  { value: "CASH", label: "Dinheiro", icon: "💵" },
+  { value: "TRANSFER", label: "Transferência", icon: "🏦" },
+  { value: "OTHER", label: "Outro", icon: "•••" }
+];
+
+const PAYMENT_LABELS: Record<string, string> = {
+  PIX: "Pix",
+  CREDIT_CARD: "Cartão de crédito",
+  DEBIT_CARD: "Cartão de débito",
+  CASH: "Dinheiro",
+  BOLETO: "Boleto",
+  TRANSFER: "Transferência",
+  OTHER: "Outro"
+};
+
 function formatMoney(v?: string | number | null) {
   if (v === null || v === undefined || v === "") return "—";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v));
@@ -146,6 +165,7 @@ export default function PublicBookingClient() {
     time: "",
     startAt: "",
     endAt: "",
+    paymentMethod: "",
     lgpdAccepted: false,
     healthInsurance: "",
     healthInsuranceNumber: "",
@@ -583,6 +603,33 @@ export default function PublicBookingClient() {
                     placeholder="Informações adicionais (opcional)"
                   />
                 </div>
+                {/* Forma de pagamento */}
+                <div className="pb-field full">
+                  <label>Como prefere pagar? <span style={{ color: "var(--pb-muted)", fontWeight: 400 }}>(opcional)</span></label>
+                  <div className="pb-payment-grid">
+                    {PAYMENT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`pb-payment-opt ${form.paymentMethod === opt.value ? "is-on" : ""}`}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            paymentMethod: form.paymentMethod === opt.value ? "" : opt.value
+                          })
+                        }
+                      >
+                        <span className="pb-payment-opt__icon">{opt.icon}</span>
+                        <span className="pb-payment-opt__label">{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {!form.paymentMethod && (
+                    <p style={{ fontSize: 12, color: "var(--pb-muted)", marginTop: 6 }}>
+                      Se preferir, pode informar no local.
+                    </p>
+                  )}
+                </div>
                 <label className="pb-consent" style={{ gridColumn: "1 / -1" }}>
                   <input
                     type="checkbox"
@@ -669,6 +716,11 @@ export default function PublicBookingClient() {
                 <div><strong>Nome:</strong> {form.name}</div>
                 <div><strong>Telefone:</strong> {form.phone}</div>
                 {form.email && <div><strong>E-mail:</strong> {form.email}</div>}
+                {form.paymentMethod && (
+                  <div className="pb-summary__payment">
+                    💳 {PAYMENT_LABELS[form.paymentMethod] ?? form.paymentMethod}
+                  </div>
+                )}
               </div>
 
               {settings?.requireManualApproval && (

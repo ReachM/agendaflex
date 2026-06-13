@@ -1,4 +1,4 @@
-import { AppointmentStatus } from "@prisma/client";
+import { AppointmentStatus, PaymentMethod } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { ApiError, created, handleApiError, ok } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
@@ -122,6 +122,12 @@ export async function POST(
     const notes = typeof body.notes === "string" ? body.notes.trim().slice(0, 2000) : "";
     const cpf = typeof body.cpf === "string" ? body.cpf.trim().slice(0, 20) : "";
     const lgpdAccepted = body.lgpdAccepted === true;
+
+    // Forma de pagamento preferida (opcional) — valida contra o enum do schema.
+    const paymentMethod: PaymentMethod | null =
+      typeof body.paymentMethod === "string" && (Object.values(PaymentMethod) as string[]).includes(body.paymentMethod)
+        ? (body.paymentMethod as PaymentMethod)
+        : null;
 
     // Health-specific fields
     const healthInsurance = typeof body.healthInsurance === "string" ? body.healthInsurance.trim().slice(0, 200) : "";
@@ -253,6 +259,7 @@ export async function POST(
           endAt,
           status: appointmentStatus,
           notes: notes || null,
+          paymentMethod,
           bookedByClient: true,
           source: "PUBLIC_LINK",
           approvalStatus: approvalStatus as any,

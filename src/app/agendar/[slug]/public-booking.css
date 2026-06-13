@@ -528,6 +528,58 @@
   .pb-grid-2 { grid-template-columns: 1fr; }
 }
 
+/* ─── Forma de pagamento (step 3) ─── */
+.pb-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.pb-payment-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border: 1.5px solid var(--pb-border);
+  border-radius: var(--pb-radius);
+  background: var(--pb-surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 13px;
+  color: var(--pb-text-2);
+}
+.pb-payment-opt:hover {
+  border-color: var(--pb-brand);
+  background: var(--pb-brand-ghost);
+}
+.pb-payment-opt.is-on {
+  border-color: var(--pb-brand);
+  background: var(--pb-brand-light);
+  color: var(--pb-text);
+  font-weight: 600;
+}
+.pb-payment-opt__icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.pb-payment-opt__label {
+  font-size: 11.5px;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.pb-summary__payment {
+  font-size: 13px;
+  color: var(--pb-muted);
+  margin-top: 4px;
+}
+
+@media (max-width: 480px) {
+  .pb-payment-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* LGPD checkbox */
 .pb-consent {
   display: flex;
