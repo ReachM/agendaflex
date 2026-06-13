@@ -1,18 +1,6 @@
 "use client";
 
-import {
-  Calendar,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  MessageCircle,
-  Moon,
-  Scissors,
-  Shield,
-  Sun,
-  Sunset
-} from "lucide-react";
+import { Check } from "lucide-react";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useCookieConsent } from "@/components/cookie-banner";
@@ -50,26 +38,22 @@ function shadeHex(hex: string, amount: number): string {
   return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
-function hexToRgba(hex: string, alpha: number): string {
-  const clean = hex.replace("#", "");
-  if (clean.length !== 6) return hex;
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
+/** Aplica a cor de marca da empresa no widget via --ac / --ac-h. */
 function brandPalette(primary: string): React.CSSProperties {
   return {
-    ["--pb-brand" as never]: primary,
-    ["--pb-brand-hover" as never]: shadeHex(primary, -24),
-    ["--pb-brand-light" as never]: hexToRgba(primary, 0.18),
-    ["--pb-brand-ghost" as never]: hexToRgba(primary, 0.08)
+    ["--ac" as never]: primary,
+    ["--ac-h" as never]: shadeHex(primary, -24)
   };
 }
 
 const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MONTH_SHORT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const PERIODS = ["morning", "afternoon", "evening"] as const;
+const PERIOD_LABEL: Record<(typeof PERIODS)[number], string> = {
+  morning: "Manhã",
+  afternoon: "Tarde",
+  evening: "Noite"
+};
 
 const PAYMENT_OPTIONS: { value: string; label: string; icon: string }[] = [
   { value: "PIX", label: "Pix", icon: "◈" },
@@ -90,6 +74,25 @@ const PAYMENT_LABELS: Record<string, string> = {
   OTHER: "Outro"
 };
 
+function bizMonogram(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0] ?? "")
+      .join("")
+      .toUpperCase() || "MF"
+  );
+}
+
+/** Cor determinística para o avatar do profissional (hue derivado do id). */
+function avatarColor(id: string) {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `hsl(${h} 42% 46%)`;
+}
+
 function formatMoney(v?: string | number | null) {
   if (v === null || v === undefined || v === "") return "—";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v));
@@ -98,6 +101,11 @@ function formatMoney(v?: string | number | null) {
 function formatDateLong(dateStr: string) {
   const d = new Date(`${dateStr}T12:00:00`);
   return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(d);
+}
+
+function formatDateShort(dateStr: string) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return `${d.getDate()}/${MONTH_SHORT[d.getMonth()]}`;
 }
 
 function toLocalISODate(d: Date) {
@@ -133,6 +141,30 @@ function groupSlots(slots: Slot[]) {
   return { morning, afternoon, evening };
 }
 
+function emptyForm() {
+  return {
+    name: "",
+    phone: "",
+    email: "",
+    notes: "",
+    cpf: "",
+    serviceIds: [] as string[],
+    professionalId: "",
+    date: "",
+    time: "",
+    startAt: "",
+    endAt: "",
+    paymentMethod: "",
+    lgpdAccepted: false,
+    healthInsurance: "",
+    healthInsuranceNumber: "",
+    allergies: "",
+    requiredCare: ""
+  };
+}
+
+type BookingForm = ReturnType<typeof emptyForm>;
+
 export default function PublicBookingClient() {
   const params = useParams();
   const slug = params.slug as string;
@@ -153,25 +185,7 @@ export default function PublicBookingClient() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    notes: "",
-    cpf: "",
-    serviceIds: [] as string[],
-    professionalId: "",
-    date: "",
-    time: "",
-    startAt: "",
-    endAt: "",
-    paymentMethod: "",
-    lgpdAccepted: false,
-    healthInsurance: "",
-    healthInsuranceNumber: "",
-    allergies: "",
-    requiredCare: ""
-  });
+  const [form, setForm] = useState<BookingForm>(emptyForm);
 
   useEffect(() => {
     fetch(`/api/public/${slug}/book`)
@@ -227,7 +241,7 @@ export default function PublicBookingClient() {
 
   function selectSlot(slot: Slot) {
     if (!slot.available) return;
-    setForm({ ...form, time: slot.time, startAt: slot.startAt, endAt: slot.endAt });
+    setForm((f) => ({ ...f, time: slot.time, startAt: slot.startAt, endAt: slot.endAt }));
   }
 
   const minDate = useMemo(() => {
@@ -252,8 +266,10 @@ export default function PublicBookingClient() {
 
   function canAdvance(): boolean {
     switch (step) {
-      case 1: return form.serviceIds.length > 0;
-      case 2: return !!form.professionalId && !!form.date && !!form.startAt;
+      case 1:
+        return form.serviceIds.length > 0;
+      case 2:
+        return !!form.professionalId && !!form.date && !!form.startAt;
       case 3:
         return (
           !!form.name.trim() &&
@@ -262,8 +278,10 @@ export default function PublicBookingClient() {
           /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) &&
           form.lgpdAccepted
         );
-      case 4: return true; // health step ou confirmação
-      default: return true;
+      case 4:
+        return true; // health step ou confirmação
+      default:
+        return true;
     }
   }
 
@@ -274,8 +292,22 @@ export default function PublicBookingClient() {
     setStep(step + 1);
   }
 
+  function resetForm() {
+    setSuccess(null);
+    setStep(1);
+    setSlots([]);
+    setError("");
+    setForm(emptyForm());
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
+    // Em etapas intermediárias (ex.: Enter num input), apenas avança — nunca
+    // envia o agendamento antes da etapa final.
+    if (step < totalSteps) {
+      if (canAdvance()) goNext();
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
@@ -294,638 +326,520 @@ export default function PublicBookingClient() {
     }
   }
 
-  // ─── Loading state ─────────────────────────────────────────
+  // ─── Loading ───────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="pb">
-        <div className="pb__shell">
-          <div className="pb-loading"><div className="pb-spin" /></div>
+      <Shell>
+        <div className="sr-main">
+          <div className="sr-body" style={{ paddingTop: 28 }}>
+            <div className="sr-skel" style={{ width: "55%", height: 18, marginBottom: 20 }} />
+            <div className="sr-skel" style={{ marginBottom: 12 }} />
+            <div className="sr-skel" style={{ marginBottom: 12, width: "85%" }} />
+            <div className="sr-skel" style={{ width: "45%" }} />
+          </div>
         </div>
-      </div>
+      </Shell>
     );
   }
 
-  // ─── Fatal error (company not found) ───────────────────────
+  // ─── Erro fatal (empresa não encontrada) ───────────────────
   if (error && !company) {
     return (
-      <div className="pb">
-        <div className="pb__shell">
-          <div className="pb-card" style={{ marginTop: 48 }}>
-            <div className="pb-card__head">
-              <h2>Página indisponível</h2>
-              <p>{error}</p>
-            </div>
-          </div>
+      <Shell>
+        <div className="sr-main">
+          <div className="sr-error">{error}</div>
         </div>
-      </div>
+      </Shell>
     );
   }
 
   const companyDisplay = company?.tradeName || company?.name || "Empresa";
-  const initials = companyDisplay
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
+  const monogram = bizMonogram(companyDisplay);
+  const brandStyle = settings?.primaryColor ? brandPalette(settings.primaryColor) : undefined;
 
-  const brandStyle = brandPalette(settings?.primaryColor ?? "#0d9488");
+  // Status aberto/fechado (dado real de businessHours).
+  const dayKeys = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const todayHours = company?.businessHours?.[dayKeys[new Date().getDay()]];
+  const isOpen = !!(todayHours?.open && todayHours.from && todayHours.to);
+  const statusText = isOpen ? `Aberto agora · ${todayHours!.from}–${todayHours!.to}` : "Fechado agora";
 
-  // ─── Success ──────────────────────────────────────────────
+  // ─── Sucesso ───────────────────────────────────────────────
   if (success) {
     return (
-      <div className="pb" style={brandStyle}>
-        <div className="pb__shell">
-          <Header companyDisplay={companyDisplay} initials={initials} phone={company?.phone ?? null} businessHours={company?.businessHours ?? null} />
-          <div className="pb-card">
-            <div className="pb-success">
-              <div className="pb-success__icon"><Check size={36} /></div>
-              <h2>Agendamento realizado!</h2>
-              <p>{success}</p>
-              {selectedServices.length > 0 && (
-                <div className="pb-success__details">
-                  <div>
-                    <strong>{selectedServices.length > 1 ? "Serviços:" : "Serviço:"}</strong>{" "}
-                    {selectedServices.map((s) => s.name).join(", ")}
-                  </div>
-                  {selectedProfessional && <div><strong>Profissional:</strong> {selectedProfessional.name}</div>}
-                  <div><strong>Data:</strong> {form.date ? formatDateLong(form.date) : "—"}</div>
-                  <div><strong>Horário:</strong> {form.time}</div>
-                  <div><strong>Valor:</strong> {formatMoney(totalPrice)}</div>
+      <Shell style={brandStyle}>
+        <div className="sr-main">
+          <div className="sr-done">
+            <div className="sr-check"><Check size={36} /></div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.02em", margin: 0 }}>
+              Agendamento confirmado!
+            </h2>
+            <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 10, lineHeight: 1.55, maxWidth: 320 }}>
+              {success}
+            </p>
+            {selectedServices.length > 0 && (
+              <div className="sr-sumcard" style={{ marginTop: 22, width: "100%", maxWidth: 340, textAlign: "left" }}>
+                <div className="sr-sumrow">
+                  <span className="k">{selectedServices.length > 1 ? "Serviços" : "Serviço"}</span>
+                  <span className="v">{selectedServices.map((s) => s.name).join(", ")}</span>
                 </div>
-              )}
-            </div>
+                {selectedProfessional && (
+                  <div className="sr-sumrow"><span className="k">Profissional</span><span className="v">{selectedProfessional.name}</span></div>
+                )}
+                <div className="sr-sumrow"><span className="k">Data</span><span className="v">{form.date ? formatDateLong(form.date) : "—"}</span></div>
+                <div className="sr-sumrow"><span className="k">Horário</span><span className="v">{form.time || "—"}</span></div>
+              </div>
+            )}
+            <div className="sr-wa">✓ Horário reservado com sucesso</div>
+            <button type="button" className="sr-cta" style={{ marginTop: 28, background: "var(--text)" }} onClick={resetForm}>
+              Novo agendamento
+            </button>
+            <div style={{ marginTop: 24 }}><MFBadge /></div>
           </div>
-          <Footer companyDisplay={companyDisplay} />
         </div>
-      </div>
+      </Shell>
     );
   }
 
-  // ─── Main flow ────────────────────────────────────────────
+  // ─── Fluxo principal ───────────────────────────────────────
+  const pct = Math.round((step / totalSteps) * 100);
+  const showProSelector = settings?.allowChooseProfessional !== false;
+
+  function railValue(n: number): string | null {
+    if (n === 1) return selectedServices.length ? selectedServices.map((s) => s.name).join(", ") : null;
+    if (n === 2) {
+      const parts: string[] = [];
+      if (form.date) parts.push(formatDateShort(form.date));
+      if (form.time) parts.push(form.time);
+      return parts.length ? parts.join(" · ") : null;
+    }
+    if (n === 3) return form.name ? form.name.split(" ")[0] : null;
+    return null;
+  }
+
+  function stepHint(): string {
+    if (step === 1) return "Selecione o serviço que deseja agendar.";
+    if (step === 2) return "Escolha o profissional, a data e o melhor horário.";
+    if (step === 3) return "Precisamos de alguns dados para confirmar.";
+    if (step === 4 && company?.isHealthSegment) return "Informações de saúde (opcionais) para o atendimento.";
+    return "Revise tudo antes de confirmar o agendamento.";
+  }
+
+  const ctaLabel = submitting
+    ? "Agendando…"
+    : !hasConsent
+      ? "Aceite os cookies"
+      : "Confirmar";
+
   return (
-    <div className="pb" style={brandStyle}>
-      <div className="pb__shell">
-        <Header companyDisplay={companyDisplay} initials={initials} phone={company?.phone ?? null} businessHours={company?.businessHours ?? null} />
-
-        <section className="pb-hero">
-          <h1>Agende seu horário em <em>poucos cliques</em></h1>
-          <p>Escolha o serviço e o melhor horário disponível. A confirmação chega na hora.</p>
-        </section>
-
-        <Stepper labels={stepLabels} current={step} />
-
-        {error && <div className="pb-error" role="alert">{error}</div>}
-
-        <form onSubmit={submit}>
-          {/* ─── Step 1: Serviço ─── */}
-          {step === 1 && (
-            <section className="pb-card">
-              <div className="pb-card__head">
-                <h2>Qual serviço você quer?</h2>
-                <p>Selecione abaixo o serviço desejado.</p>
+    <Shell style={brandStyle}>
+      {/* ─── RAIL (desktop) ─── */}
+      <aside className="sr-rail">
+        <div className="sr-mono sr-railmono">{monogram}</div>
+        <div className="sr-railname">{companyDisplay}</div>
+        <div className="sr-railsub">
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 99, background: isOpen ? "#16a34a" : "var(--muted-2)", display: "inline-block" }} />
+            {statusText}
+          </span>
+          {company?.phone ? <><br />{company.phone}</> : null}
+        </div>
+        <div className="sr-raildiv" />
+        <div className="sr-railsteps">
+          {stepLabels.map((label, i) => {
+            const n = i + 1;
+            const cur = n === step;
+            const past = n < step;
+            const value = past ? railValue(n) : null;
+            return (
+              <div key={label} className={`sr-railstep${cur ? " cur" : past ? " past" : ""}`}>
+                <span className="n">{past ? <Check size={12} /> : n}</span>
+                {label}
+                {value ? <span className="v">{value}</span> : null}
               </div>
-              {settings?.instructions && (
-                <div className="pb-warn" style={{ marginBottom: 16 }}>
-                  <Shield size={14} />
-                  <span>{settings.instructions}</span>
-                </div>
-              )}
-              <div className="pb-svc-list">
-                {services.length === 0 && (
-                  <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "var(--muted)", padding: 24 }}>
-                    Nenhum serviço disponível no momento.
-                  </div>
-                )}
+            );
+          })}
+        </div>
+        <div className="sr-railfoot"><MFBadge /></div>
+      </aside>
+
+      {/* ─── MAIN ─── */}
+      <form className="sr-main" onSubmit={submit}>
+        {/* Topbar (mobile) */}
+        <div className="sr-top">
+          <div className="sr-mono">{monogram}</div>
+          <div style={{ minWidth: 0 }}>
+            <div className="sr-bizname">{companyDisplay}</div>
+            <div className="sr-bizsub">
+              <span style={{ width: 6, height: 6, borderRadius: 99, background: isOpen ? "#16a34a" : "var(--muted-2)", display: "inline-block" }} />
+              {statusText}
+            </div>
+          </div>
+        </div>
+
+        {/* Progresso */}
+        <div className="sr-prog">
+          <div className="sr-progbar">
+            <div className="sr-progfill" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="sr-progmeta">
+            <span className="sr-steplabel">{stepLabels[step - 1]}</span>
+            <span className="sr-stepcount">Etapa {step} de {totalSteps}</span>
+          </div>
+        </div>
+
+        {/* Corpo */}
+        <div className="sr-body">
+          <p className="sr-hint">{stepHint()}</p>
+          {error ? <p className="sr-hint" style={{ color: "var(--danger)" }}>{error}</p> : null}
+
+          {/* Step 1 — Serviço */}
+          {step === 1 && (
+            <>
+              {settings?.instructions ? <p className="sr-hint">{settings.instructions}</p> : null}
+              <div className="sr-list">
+                {services.length === 0 && <p className="sr-hint">Nenhum serviço disponível no momento.</p>}
                 {services.map((s) => {
-                  const checked = form.serviceIds.includes(s.id);
+                  const on = form.serviceIds.includes(s.id);
                   return (
                     <button
                       type="button"
                       key={s.id}
-                      className={`pb-svc ${checked ? "is-on" : ""}`}
-                      aria-pressed={checked}
+                      className={`sr-row${on ? " on" : ""}`}
                       onClick={() =>
-                        setForm({
-                          ...form,
-                          serviceIds: checked
-                            ? form.serviceIds.filter((id) => id !== s.id)
-                            : [...form.serviceIds, s.id],
-                          // Mudar os serviços muda a duração total → resetar horário escolhido.
+                        setForm((f) => ({
+                          ...f,
+                          serviceIds: on ? f.serviceIds.filter((id) => id !== s.id) : [...f.serviceIds, s.id],
                           time: "",
                           startAt: "",
                           endAt: ""
-                        })
+                        }))
                       }
                     >
-                      <div className="pb-svc__top">
-                        <span className="pb-svc__ico"><Scissors size={18} /></span>
-                        <div>
-                          <div className="pb-svc__nm">{s.name}</div>
-                        </div>
+                      <span className="sr-radio">{on && <Check size={13} />}</span>
+                      <div className="sr-rowmain">
+                        <div className="sr-rowname">{s.name}</div>
+                        {s.description && <div className="sr-rowdesc">{s.description}</div>}
+                        <div className="sr-rowmeta">{s.durationMinutes} min</div>
                       </div>
-                      {s.description && <div className="pb-svc__desc">{s.description}</div>}
-                      <div className="pb-svc__foot">
-                        <span className="pb-svc__price">{formatMoney(s.basePrice)}</span>
-                        <span className="pb-svc__dur">
-                          <Clock size={11} /> {s.durationMinutes} min
-                        </span>
+                      <div className="sr-rowright">
+                        <div className="sr-price">{formatMoney(s.basePrice)}</div>
                       </div>
                     </button>
                   );
                 })}
               </div>
-
-              {form.serviceIds.length > 0 && (
-                <div className="pb-svc-summary">
-                  <span>
-                    {form.serviceIds.length} serviço{form.serviceIds.length > 1 ? "s" : ""} selecionado
-                    {form.serviceIds.length > 1 ? "s" : ""}
-                  </span>
-                  <span>{totalDuration} min · {formatMoney(totalPrice)}</span>
-                </div>
-              )}
-            </section>
+            </>
           )}
 
-          {/* ─── Step 2: Profissional + data + horário ─── */}
+          {/* Step 2 — Profissional + data + horário */}
           {step === 2 && (
             <>
-              {settings?.allowChooseProfessional !== false && (
-                <section className="pb-card">
-                  <div className="pb-card__head">
-                    <h2>Com quem você prefere?</h2>
-                    <p>Selecione um profissional disponível.</p>
-                  </div>
-                  <div className="pb-pros">
-                    {professionals.length === 0 && (
-                      <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "var(--muted)", padding: 16 }}>
-                        Nenhum profissional disponível.
-                      </div>
-                    )}
+              {showProSelector && (
+                <>
+                  <div className="sr-perlabel">Profissional</div>
+                  <div className="sr-list" style={{ marginBottom: 20 }}>
+                    {professionals.length === 0 && <p className="sr-hint">Nenhum profissional disponível.</p>}
                     {professionals.map((p) => {
-                      const initialsP = p.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+                      const on = form.professionalId === p.id;
+                      const initials = bizMonogram(p.name);
                       return (
                         <button
                           type="button"
                           key={p.id}
-                          className={`pb-pro ${form.professionalId === p.id ? "is-on" : ""}`}
-                          onClick={() => setForm({ ...form, professionalId: p.id, date: "", time: "", startAt: "", endAt: "" })}
+                          className={`sr-row${on ? " on" : ""}`}
+                          onClick={() => setForm((f) => ({ ...f, professionalId: p.id, date: "", time: "", startAt: "", endAt: "" }))}
                         >
-                          <div className="pb-pro__avt">{initialsP}</div>
-                          <div className="pb-pro__nm">{p.name}</div>
-                          {p.specialty && <div className="pb-pro__role">{p.specialty}</div>}
+                          <span className="sr-av" style={{ background: avatarColor(p.id) }}>{initials}</span>
+                          <div className="sr-rowmain">
+                            <div className="sr-rowname">{p.name}</div>
+                            {p.specialty && <div className="sr-rowdesc">{p.specialty}</div>}
+                          </div>
+                          <span className="sr-radio">{on && <Check size={13} />}</span>
                         </button>
                       );
                     })}
                   </div>
-                </section>
+                </>
               )}
 
-              <section className="pb-card">
-                <div className="pb-card__head">
-                  <h2>Quando você quer vir?</h2>
-                  <p>Escolha uma data nas próximas semanas.</p>
-                </div>
+              <div className="sr-perlabel">Data</div>
+              <div className="sr-datechips">
+                {dateChips.map((c) => (
+                  <button
+                    type="button"
+                    key={c.value}
+                    className={`sr-datechip${form.date === c.value ? " on" : ""}`}
+                    onClick={() => setForm((f) => ({ ...f, date: c.value, time: "", startAt: "", endAt: "" }))}
+                  >
+                    <span className="dow">{c.dow}</span>
+                    <span className="num">{c.num}</span>
+                    <span className="mon">{c.mon}</span>
+                  </button>
+                ))}
+              </div>
 
-                <div className="pb-dates" role="listbox" aria-label="Escolher data">
-                  {dateChips.map((c) => (
-                    <button
-                      type="button"
-                      key={c.value}
-                      className={`pb-date ${form.date === c.value ? "is-on" : ""}`}
-                      onClick={() => setForm({ ...form, date: c.value, time: "", startAt: "", endAt: "" })}
-                    >
-                      <div className="pb-date__dow">{c.dow}</div>
-                      <div className="pb-date__num">{c.num}</div>
-                      <div className="pb-date__mon">{c.mon}</div>
-                    </button>
-                  ))}
-                </div>
-
-                {!form.professionalId && (
-                  <div className="pb-warn">Selecione um profissional para ver os horários.</div>
-                )}
-
-                {form.date && form.professionalId && (
-                  loadingSlots ? (
-                    <div className="pb-loading"><div className="pb-spin" /></div>
-                  ) : slots.length === 0 ? (
-                    <div className="pb-warn">Não há horários disponíveis nesse dia. Escolha outra data.</div>
-                  ) : (
-                    <SlotGrid groups={groupedSlots} selectedTime={form.time} onSelect={selectSlot} />
-                  )
-                )}
-              </section>
-
-              {form.startAt && selectedServices.length > 0 && (
-                <section className="pb-summary">
-                  <div className="pb-summary__col">
-                    <div className="pb-summary__lbl">Seu agendamento</div>
-                    <div className="pb-summary__svc">{selectedServices.map((s) => s.name).join(" + ")}</div>
-                    <div className="pb-summary__when">
-                      {selectedProfessional && <>com <strong>{selectedProfessional.name}</strong></>}
-                      {form.date && <><span className="pip" /> <strong>{formatDateLong(form.date)}</strong></>}
-                      {form.time && <><span className="pip" /> <strong>{form.time}</strong></>}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div className="pb-summary__price">{formatMoney(totalPrice)}</div>
-                    <div className="pb-summary__hint">pagamento no local</div>
-                  </div>
-                </section>
-              )}
+              {!form.professionalId ? (
+                <p className="sr-hint">Selecione um profissional para ver os horários.</p>
+              ) : form.date ? (
+                loadingSlots ? (
+                  <p className="sr-hint">Carregando horários…</p>
+                ) : slots.length === 0 ? (
+                  <p className="sr-hint">Não há horários disponíveis nesse dia. Escolha outra data.</p>
+                ) : (
+                  PERIODS.map((period) => {
+                    const arr = groupedSlots[period];
+                    if (!arr.length) return null;
+                    return (
+                      <div className="sr-period" key={period}>
+                        <div className="sr-perlabel">{PERIOD_LABEL[period]}</div>
+                        <div className="sr-slots">
+                          {arr.map((s) => (
+                            <button
+                              type="button"
+                              key={s.time}
+                              className={`sr-slot${form.time === s.time ? " on" : ""}`}
+                              disabled={!s.available}
+                              onClick={() => selectSlot(s)}
+                            >
+                              {s.time}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                )
+              ) : null}
             </>
           )}
 
-          {/* ─── Step 3: Dados pessoais ─── */}
+          {/* Step 3 — Seus dados */}
           {step === 3 && (
-            <section className="pb-card">
-              <div className="pb-card__head">
-                <h2>Seus dados</h2>
-                <p>Para confirmar e te avisar sobre o atendimento.</p>
+            <>
+              <div className="sr-field">
+                <label className="sr-lab" htmlFor="sr-name">Nome completo *</label>
+                <input
+                  id="sr-name"
+                  className="sr-input"
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Seu nome completo"
+                  autoComplete="name"
+                />
               </div>
-              <div className="pb-grid-2">
-                <div className="pb-field">
-                  <label htmlFor="pb-name">Nome completo *</label>
-                  <input
-                    id="pb-name"
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Seu nome completo"
-                    autoComplete="name"
-                  />
-                </div>
-                <div className="pb-field">
-                  <label htmlFor="pb-phone">Telefone/WhatsApp *</label>
-                  <input
-                    id="pb-phone"
-                    required
-                    type="tel"
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })}
-                    placeholder="(11) 99999-9999"
-                    autoComplete="tel"
-                    inputMode="numeric"
-                  />
-                </div>
-                <div className="pb-field">
-                  <label htmlFor="pb-email">E-mail *</label>
-                  <input
-                    id="pb-email"
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="seu@email.com"
-                    autoComplete="email"
-                    inputMode="email"
-                  />
-                </div>
-                <div className="pb-field">
-                  <label htmlFor="pb-cpf">CPF / CNPJ</label>
-                  <input
-                    id="pb-cpf"
-                    type="text"
-                    value={form.cpf}
-                    onChange={(e) => setForm({ ...form, cpf: maskDocument(e.target.value) })}
-                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
-                    inputMode="numeric"
-                  />
-                </div>
-                <div className="pb-field full">
-                  <label htmlFor="pb-notes">Observações</label>
-                  <textarea
-                    id="pb-notes"
-                    value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    placeholder="Informações adicionais (opcional)"
-                  />
-                </div>
-                {/* Forma de pagamento */}
-                <div className="pb-field full">
-                  <label>Como prefere pagar? <span style={{ color: "var(--pb-muted)", fontWeight: 400 }}>(opcional)</span></label>
-                  <div className="pb-payment-grid">
-                    {PAYMENT_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        className={`pb-payment-opt ${form.paymentMethod === opt.value ? "is-on" : ""}`}
-                        onClick={() =>
-                          setForm({
-                            ...form,
-                            paymentMethod: form.paymentMethod === opt.value ? "" : opt.value
-                          })
-                        }
-                      >
-                        <span className="pb-payment-opt__icon">{opt.icon}</span>
-                        <span className="pb-payment-opt__label">{opt.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {!form.paymentMethod && (
-                    <p style={{ fontSize: 12, color: "var(--pb-muted)", marginTop: 6 }}>
-                      Se preferir, pode informar no local.
-                    </p>
-                  )}
-                </div>
-                <label className="pb-consent" style={{ gridColumn: "1 / -1" }}>
-                  <input
-                    type="checkbox"
-                    checked={form.lgpdAccepted}
-                    onChange={(e) => setForm({ ...form, lgpdAccepted: e.target.checked })}
-                  />
-                  <span>
-                    <strong><Shield size={13} style={{ verticalAlign: -2, marginRight: 4 }} />LGPD:</strong>{" "}
-                    Aceito a coleta e processamento dos meus dados pessoais conforme a política de privacidade
-                    e a Lei Geral de Proteção de Dados.
-                  </span>
-                </label>
+              <div className="sr-field">
+                <label className="sr-lab" htmlFor="sr-phone">Telefone/WhatsApp *</label>
+                <input
+                  id="sr-phone"
+                  className="sr-input"
+                  required
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: maskPhone(e.target.value) }))}
+                  placeholder="(11) 99999-9999"
+                  autoComplete="tel"
+                  inputMode="numeric"
+                />
               </div>
-            </section>
+              <div className="sr-field">
+                <label className="sr-lab" htmlFor="sr-email">E-mail *</label>
+                <input
+                  id="sr-email"
+                  className="sr-input"
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="seu@email.com"
+                  autoComplete="email"
+                  inputMode="email"
+                />
+              </div>
+              <div className="sr-field">
+                <label className="sr-lab" htmlFor="sr-cpf">CPF / CNPJ</label>
+                <input
+                  id="sr-cpf"
+                  className="sr-input"
+                  type="text"
+                  value={form.cpf}
+                  onChange={(e) => setForm((f) => ({ ...f, cpf: maskDocument(e.target.value) }))}
+                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  inputMode="numeric"
+                />
+              </div>
+              <div className="sr-field">
+                <label className="sr-lab" htmlFor="sr-notes">Observações</label>
+                <textarea
+                  id="sr-notes"
+                  className="sr-input"
+                  value={form.notes}
+                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                  placeholder="Informações adicionais (opcional)"
+                />
+              </div>
+
+              <div className="sr-field">
+                <label className="sr-lab">Como prefere pagar? <span style={{ color: "var(--muted)", fontWeight: 400 }}>(opcional)</span></label>
+                <div className="sr-chips">
+                  {PAYMENT_OPTIONS.map((opt) => (
+                    <button
+                      type="button"
+                      key={opt.value}
+                      className={`sr-chip${form.paymentMethod === opt.value ? " on" : ""}`}
+                      onClick={() => setForm((f) => ({ ...f, paymentMethod: f.paymentMethod === opt.value ? "" : opt.value }))}
+                    >
+                      {opt.icon} {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="sr-consent">
+                <input
+                  type="checkbox"
+                  checked={form.lgpdAccepted}
+                  onChange={(e) => setForm((f) => ({ ...f, lgpdAccepted: e.target.checked }))}
+                />
+                <span>
+                  <strong>LGPD:</strong> Aceito a coleta e processamento dos meus dados pessoais conforme a política
+                  de privacidade e a Lei Geral de Proteção de Dados.
+                </span>
+              </label>
+            </>
           )}
 
-          {/* ─── Step 4 (saúde) ─── */}
+          {/* Step 4 — Saúde (segmento de saúde) */}
           {step === 4 && company?.isHealthSegment && (
-            <section className="pb-card">
-              <div className="pb-card__head">
-                <h2>Informações de saúde</h2>
-                <p>Campos opcionais que ajudam o profissional a se preparar para o atendimento.</p>
+            <>
+              <div className="sr-field">
+                <label className="sr-lab" htmlFor="sr-ins">Convênio</label>
+                <input
+                  id="sr-ins"
+                  className="sr-input"
+                  value={form.healthInsurance}
+                  onChange={(e) => setForm((f) => ({ ...f, healthInsurance: e.target.value }))}
+                  placeholder="Nome do convênio"
+                />
               </div>
-              <div className="pb-grid-2">
-                <div className="pb-field">
-                  <label htmlFor="pb-insurance">Convênio</label>
-                  <input
-                    id="pb-insurance"
-                    value={form.healthInsurance}
-                    onChange={(e) => setForm({ ...form, healthInsurance: e.target.value })}
-                    placeholder="Nome do convênio"
-                  />
-                </div>
-                <div className="pb-field">
-                  <label htmlFor="pb-insurance-n">Nº da carteirinha</label>
-                  <input
-                    id="pb-insurance-n"
-                    value={form.healthInsuranceNumber}
-                    onChange={(e) => setForm({ ...form, healthInsuranceNumber: e.target.value })}
-                    placeholder="Número"
-                  />
-                </div>
-                <div className="pb-field full">
-                  <label htmlFor="pb-allergies">Alergias</label>
-                  <textarea
-                    id="pb-allergies"
-                    value={form.allergies}
-                    onChange={(e) => setForm({ ...form, allergies: e.target.value })}
-                    placeholder="Alergias conhecidas (opcional)"
-                  />
-                </div>
-                <div className="pb-field full">
-                  <label htmlFor="pb-care">Cuidados necessários</label>
-                  <textarea
-                    id="pb-care"
-                    value={form.requiredCare}
-                    onChange={(e) => setForm({ ...form, requiredCare: e.target.value })}
-                    placeholder="Cuidados especiais (opcional)"
-                  />
-                </div>
+              <div className="sr-field">
+                <label className="sr-lab" htmlFor="sr-insn">Nº da carteirinha</label>
+                <input
+                  id="sr-insn"
+                  className="sr-input"
+                  value={form.healthInsuranceNumber}
+                  onChange={(e) => setForm((f) => ({ ...f, healthInsuranceNumber: e.target.value }))}
+                  placeholder="Número"
+                />
               </div>
-            </section>
+              <div className="sr-field">
+                <label className="sr-lab" htmlFor="sr-alg">Alergias</label>
+                <textarea
+                  id="sr-alg"
+                  className="sr-input"
+                  value={form.allergies}
+                  onChange={(e) => setForm((f) => ({ ...f, allergies: e.target.value }))}
+                  placeholder="Alergias conhecidas (opcional)"
+                />
+              </div>
+              <div className="sr-field">
+                <label className="sr-lab" htmlFor="sr-care">Cuidados necessários</label>
+                <textarea
+                  id="sr-care"
+                  className="sr-input"
+                  value={form.requiredCare}
+                  onChange={(e) => setForm((f) => ({ ...f, requiredCare: e.target.value }))}
+                  placeholder="Cuidados especiais (opcional)"
+                />
+              </div>
+            </>
           )}
 
-          {/* ─── Step final: Confirmação ─── */}
+          {/* Step final — Confirmação */}
           {step === totalSteps && (
-            <section className="pb-card">
-              <div className="pb-card__head">
-                <h2>Confirmar agendamento</h2>
-                <p>Revise os dados antes de finalizar.</p>
-              </div>
-
-              <div className="pb-success__details" style={{ margin: 0, maxWidth: "none" }}>
-                <div>
-                  <strong>{selectedServices.length > 1 ? "Serviços:" : "Serviço:"}</strong>{" "}
-                  {selectedServices.length > 0 ? selectedServices.map((s) => s.name).join(", ") : "—"}
+            <>
+              <div className="sr-sumcard">
+                <div className="sr-sumrow">
+                  <span className="k">{selectedServices.length > 1 ? "Serviços" : "Serviço"}</span>
+                  <span className="v">{selectedServices.length > 0 ? selectedServices.map((s) => s.name).join(", ") : "—"}</span>
                 </div>
-                {selectedProfessional && <div><strong>Profissional:</strong> {selectedProfessional.name}</div>}
-                <div><strong>Data:</strong> {form.date ? formatDateLong(form.date) : "—"}</div>
-                <div><strong>Horário:</strong> {form.time || "—"}</div>
-                <div><strong>Duração:</strong> {totalDuration || "—"} min</div>
-                <div><strong>Valor:</strong> {formatMoney(totalPrice)}</div>
-                <hr style={{ border: 0, borderTop: "1px solid var(--pb-border)", margin: "8px 0" }} />
-                <div><strong>Nome:</strong> {form.name}</div>
-                <div><strong>Telefone:</strong> {form.phone}</div>
-                {form.email && <div><strong>E-mail:</strong> {form.email}</div>}
+                {selectedProfessional && (
+                  <div className="sr-sumrow"><span className="k">Profissional</span><span className="v">{selectedProfessional.name}</span></div>
+                )}
+                <div className="sr-sumrow"><span className="k">Data</span><span className="v">{form.date ? formatDateLong(form.date) : "—"}</span></div>
+                <div className="sr-sumrow"><span className="k">Horário</span><span className="v">{form.time || "—"}</span></div>
+                <div className="sr-sumrow"><span className="k">Duração</span><span className="v">{totalDuration || "—"} min</span></div>
+                <div className="sr-sumrow"><span className="k">Valor</span><span className="v">{formatMoney(totalPrice)}</span></div>
                 {form.paymentMethod && (
-                  <div className="pb-summary__payment">
-                    💳 {PAYMENT_LABELS[form.paymentMethod] ?? form.paymentMethod}
-                  </div>
+                  <div className="sr-sumrow"><span className="k">Pagamento</span><span className="v">💳 {PAYMENT_LABELS[form.paymentMethod] ?? form.paymentMethod}</span></div>
                 )}
               </div>
-
+              <div className="sr-sumcard">
+                <div className="sr-sumrow"><span className="k">Nome</span><span className="v">{form.name || "—"}</span></div>
+                <div className="sr-sumrow"><span className="k">Telefone</span><span className="v">{form.phone || "—"}</span></div>
+                {form.email && <div className="sr-sumrow"><span className="k">E-mail</span><span className="v">{form.email}</span></div>}
+              </div>
               {settings?.requireManualApproval && (
-                <div className="pb-warn" style={{ marginTop: 14 }}>
-                  <Clock size={14} />
-                  <span>Seu agendamento ficará pendente até ser aprovado pela empresa.</span>
-                </div>
+                <p className="sr-hint">Seu agendamento ficará pendente até ser aprovado pela empresa.</p>
               )}
-            </section>
+              {!hasConsent && (
+                <p className="sr-hint" style={{ color: "var(--danger)" }}>
+                  ⚠️ Aceite os cookies no banner abaixo para confirmar o agendamento.
+                </p>
+              )}
+            </>
           )}
+        </div>
 
-          {/* ─── Navegação ─── */}
-          <div className="pb-nav">
-            {step > 1 ? (
-              <button type="button" className="pb-cta-secondary" onClick={() => setStep(step - 1)}>
-                <ChevronLeft size={16} /> Voltar
-              </button>
-            ) : <span />}
-
-            {step < totalSteps ? (
-              <button type="button" className="pb-cta" onClick={goNext} disabled={!canAdvance()}>
-                Continuar <ChevronRight size={16} />
-              </button>
-            ) : (
-              <button type="submit" className="pb-cta" disabled={!hasConsent || submitting}>
-                {submitting
-                  ? "Agendando…"
-                  : !hasConsent
-                    ? "Aceite os cookies para continuar"
-                    : "Confirmar agendamento"}
-                {!submitting && hasConsent && <Check size={16} />}
-              </button>
-            )}
+        {/* Footer fixo */}
+        <div className="sr-foot">
+          {step > 1 ? (
+            <button type="button" className="sr-back" onClick={() => setStep(step - 1)}>← Voltar</button>
+          ) : null}
+          <div className="sr-footsum">
+            {selectedServices.length > 0 ? (
+              <>
+                <div className="a">{selectedServices.map((s) => s.name).join(" + ")}</div>
+                <div className="b">
+                  {totalPrice > 0 ? formatMoney(totalPrice) : ""}
+                  {totalDuration ? ` · ${totalDuration} min` : ""}
+                </div>
+              </>
+            ) : null}
           </div>
-
-          {step === totalSteps && !hasConsent && (
-            <p style={{ fontSize: 12, color: "var(--muted)", textAlign: "center", marginTop: 8 }}>
-              ⚠️ Aceite os cookies no banner abaixo para continuar com o agendamento.
-            </p>
+          {step < totalSteps ? (
+            <button type="button" className="sr-cta" disabled={!canAdvance()} onClick={goNext}>
+              Continuar →
+            </button>
+          ) : (
+            <button type="submit" className="sr-cta" disabled={!hasConsent || submitting}>
+              {ctaLabel} {!submitting && hasConsent ? "→" : null}
+            </button>
           )}
-        </form>
-
-        {/* ─── Info bar (estática, sem dados sensíveis) ─── */}
-        <section className="pb-info" aria-label="Informações">
-          <div className="pb-info-card">
-            <div className="pb-info-card__ico"><MessageCircle size={16} /></div>
-            <div>
-              <div className="t">Confirmação rápida</div>
-              <div className="s">Você recebe um aviso assim que o agendamento for processado.</div>
-            </div>
-          </div>
-          <div className="pb-info-card">
-            <div className="pb-info-card__ico"><Calendar size={16} /></div>
-            <div>
-              <div className="t">Reagendamento fácil</div>
-              <div className="s">Caso precise mudar, entre em contato com a empresa.</div>
-            </div>
-          </div>
-          <div className="pb-info-card">
-            <div className="pb-info-card__ico"><Shield size={16} /></div>
-            <div>
-              <div className="t">Seus dados protegidos</div>
-              <div className="s">Tratamos suas informações conforme a LGPD.</div>
-            </div>
-          </div>
-        </section>
-
-        <Footer companyDisplay={companyDisplay} />
-      </div>
-    </div>
+        </div>
+      </form>
+    </Shell>
   );
 }
 
 /* ─── Subcomponentes locais ─── */
 
-function Header({
-  companyDisplay,
-  initials,
-  phone,
-  businessHours
-}: {
-  companyDisplay: string;
-  initials: string;
-  phone: string | null;
-  businessHours?: Record<string, { open: boolean; from?: string; to?: string }> | null;
-}) {
-  const today = new Date().getDay();
-  const dayKeys = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  const todayHours = businessHours?.[dayKeys[today]];
-  const isOpen = todayHours?.open && todayHours.from && todayHours.to;
-  const waNumber = phone?.replace(/\D/g, "");
-  const waLink = waNumber ? `https://wa.me/55${waNumber.startsWith("55") ? waNumber.slice(2) : waNumber}` : null;
-
+function Shell({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <header className="pb-head">
-      <div className="pb-brand">
-        <span className="pb-brand__logo">{initials}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="pb-brand__name">{companyDisplay}</div>
-          <div className="pb-brand__slogan" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 6, height: 6, borderRadius: 999, background: isOpen ? "#16a34a" : "#94a3b8", display: "inline-block" }} />
-              {isOpen ? `Aberto agora · ${todayHours.from}–${todayHours.to}` : "Fechado agora"}
-            </span>
-            {phone ? <span style={{ color: "rgba(255,255,255,0.7)" }}>· {phone}</span> : null}
-          </div>
-        </div>
-        {waLink ? (
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Falar no WhatsApp"
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "8px 14px", borderRadius: 999,
-              background: "#25d366", color: "#fff",
-              fontSize: 13, fontWeight: 600,
-              textDecoration: "none",
-              boxShadow: "0 2px 8px rgba(37,211,102,0.3)"
-            }}
-          >
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24z"/></svg>
-            WhatsApp
-          </a>
-        ) : null}
+    <div className="sr-page">
+      <div className="sr-frame">
+        <div className="sr" style={style}>{children}</div>
       </div>
-    </header>
+    </div>
   );
 }
 
-function Footer({ companyDisplay }: { companyDisplay: string }) {
+function MFBadge() {
   return (
-    <footer className="pb-footer">
-      {companyDisplay}
-      <br />
-      <span className="pb-powered">
-        <span className="m">M</span>
-        Powered by <strong>MarcaiFlex</strong>
-      </span>
-    </footer>
-  );
-}
-
-function Stepper({ labels, current }: { labels: string[]; current: number }) {
-  return (
-    <nav className="pb-stepper" aria-label="Etapas do agendamento">
-      <div className="pb-stepper__list">
-        {labels.map((label, i) => {
-          const num = i + 1;
-          const done = num < current;
-          const on = num === current;
-          return (
-            <span key={label} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
-              {i > 0 && <span className="pb-step__sep">›</span>}
-              <span className={`pb-step ${done ? "is-done" : ""} ${on ? "is-on" : ""}`}>
-                <span className="pb-step__num">{done ? <Check size={11} /> : num}</span>
-                {label}
-              </span>
-            </span>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
-
-function SlotGrid({
-  groups,
-  selectedTime,
-  onSelect
-}: {
-  groups: { morning: Slot[]; afternoon: Slot[]; evening: Slot[] };
-  selectedTime: string;
-  onSelect: (slot: Slot) => void;
-}) {
-  const sections: { label: string; icon: React.ReactNode; slots: Slot[] }[] = [
-    { label: "Manhã", icon: <Sun size={13} />, slots: groups.morning },
-    { label: "Tarde", icon: <Sunset size={13} />, slots: groups.afternoon },
-    { label: "Noite", icon: <Moon size={13} />, slots: groups.evening }
-  ];
-
-  return (
-    <>
-      {sections.map((sec) =>
-        sec.slots.length === 0 ? null : (
-          <div className="pb-slot-group" key={sec.label}>
-            <div className="pb-slot-group__lbl">{sec.icon}{sec.label}</div>
-            <div className="pb-slots">
-              {sec.slots.map((slot) => (
-                <button
-                  type="button"
-                  key={slot.time}
-                  className={`pb-slot ${selectedTime === slot.time ? "is-on" : ""} ${!slot.available ? "is-off" : ""}`}
-                  onClick={() => onSelect(slot)}
-                  disabled={!slot.available}
-                  aria-label={`Horário ${slot.time}${slot.available ? "" : " indisponível"}`}
-                >
-                  {slot.time}
-                </button>
-              ))}
-            </div>
-          </div>
-        )
-      )}
-    </>
+    <div className="sr-mfbadge">
+      <span>Agendado com</span>
+      <span className="sr-mfbadge__icon">MF</span>
+      <span className="sr-mfbadge__name">MarcaiFlex</span>
+    </div>
   );
 }
