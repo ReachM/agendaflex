@@ -1,7 +1,7 @@
 "use client";
 
-import { Activity, Ban, Check, Clock, DollarSign, Plus, Save, Trash2, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Activity, Ban, Check, Clock, DollarSign, Plus, Save, Search, Trash2, UserPlus, X } from "lucide-react";
+import { FormEvent, MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   getAgendaPreset,
   isClinicalSensitiveFieldKey,
@@ -19,6 +19,7 @@ import { WeekToolbar } from "@/components/agenda/WeekToolbar";
 import { addDays as addDaysWeek, isSameDay as isSameDayWeek, startOfDay as startOfDayWeek, startOfWeek as startOfWeekWeek } from "@/components/agenda/week-utils";
 import { DynamicFields, type CustomValues } from "@/components/dynamic-fields";
 import { apiFetch } from "@/lib/client-api";
+import { maskPhone } from "@/lib/utils/masks";
 
 type CustomField = {
   id: string;
@@ -131,6 +132,225 @@ function Select({
           <option key={optionValue} value={optionValue}>{label}</option>
         ))}
       </select>
+    </div>
+  );
+}
+
+interface SearchSelectOption {
+  id: string;
+  name: string;
+  sub?: string; // texto secundário (ex: telefone do cliente)
+}
+
+function SearchSelect({
+  label,
+  value,
+  onChange,
+  options,
+  required,
+  placeholder,
+  onCreateNew,
+  createLabel = "Criar novo"
+}: {
+  label: string;
+  value: string;
+  onChange: (id: string, name: string) => void;
+  options: SearchSelectOption[];
+  required?: boolean;
+  placeholder?: string;
+  onCreateNew?: (query: string) => void; // se undefined, não mostra botão criar
+  createLabel?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Nome do item selecionado
+  const selectedName = options.find((o) => o.id === value)?.name ?? "";
+
+  // Fechar ao clicar fora
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  // Filtrar opções pelo query
+  const filtered = query.trim()
+    ? options.filter(
+        (o) =>
+          o.name.toLowerCase().includes(query.toLowerCase()) ||
+          (o.sub ?? "").toLowerCase().includes(query.toLowerCase())
+      )
+    : options.slice(0, 20); // mostrar primeiros 20 sem busca
+
+  function select(opt: SearchSelectOption) {
+    onChange(opt.id, opt.name);
+    setQuery("");
+    setOpen(false);
+  }
+
+  function clear(e: ReactMouseEvent) {
+    e.stopPropagation();
+    onChange("", "");
+    setQuery("");
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  return (
+    <div className="search-select" ref={wrapRef}>
+      <label>
+        {label}
+        {required && <span style={{ color: "var(--error, #ef4444)", marginLeft: 2 }}>*</span>}
+      </label>
+
+      {/* Campo de entrada */}
+      <div
+        className={`search-select__input-wrap ${open || focused ? "is-open" : ""}`}
+        onClick={() => {
+          setOpen(true);
+          inputRef.current?.focus();
+        }}
+      >
+        <Search size={14} className="search-select__icon" />
+        <input
+          ref={inputRef}
+          type="text"
+          className="search-select__input"
+          placeholder={value ? selectedName : placeholder ?? `Buscar ${label.toLowerCase()}...`}
+          value={open ? query : value ? selectedName : query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => {
+            setFocused(true);
+            setOpen(true);
+          }}
+          onBlur={() => setFocused(false)}
+          autoComplete="off"
+        />
+        {value && (
+          <button type="button" className="search-select__clear" onClick={clear} tabIndex={-1}>
+            <X size={12} />
+          </button>
+        )}
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="search-select__dropdown">
+          {filtered.length > 0 ? (
+            filtered.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`search-select__option ${opt.id === value ? "is-selected" : ""}`}
+                onMouseDown={() => select(opt)}
+              >
+                <span className="search-select__option-name">{opt.name}</span>
+                {opt.sub && <span className="search-select__option-sub">{opt.sub}</span>}
+              </button>
+            ))
+          ) : (
+            <div className="search-select__empty">
+              Nenhum resultado para &quot;<strong>{query}</strong>&quot;
+            </div>
+          )}
+
+          {/* Botão criar novo */}
+          {onCreateNew && query.trim() && (
+            <button
+              type="button"
+              className="search-select__create"
+              onMouseDown={() => {
+                onCreateNew(query.trim());
+                setOpen(false);
+              }}
+            >
+              <Plus size={13} />
+              {createLabel} &quot;{query.trim()}&quot;
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickCreateCustomer({
+  initialName,
+  onCancel,
+  saving,
+  onSave
+}: {
+  initialName: string;
+  onCancel: () => void;
+  saving: boolean;
+  onSave: (data: { name: string; phone: string; email: string }) => void;
+}) {
+  const [name, setName] = useState(initialName);
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+
+  return (
+    <div className="quick-create-customer">
+      <div className="quick-create-customer__header">
+        <UserPlus size={14} />
+        <span>Novo cliente</span>
+        <button type="button" onClick={onCancel} style={{ marginLeft: "auto", border: 0, background: "transparent", cursor: "pointer", color: "inherit", display: "flex" }}>
+          <X size={14} />
+        </button>
+      </div>
+      <div className="quick-create-customer__body">
+        <div className="field">
+          <label>Nome *</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nome do cliente"
+            autoFocus
+            required
+          />
+        </div>
+        <div className="field">
+          <label>Telefone *</label>
+          <input
+            value={phone}
+            onChange={(e) => setPhone(maskPhone(e.target.value))}
+            placeholder="(11) 99999-9999"
+            inputMode="numeric"
+            required
+          />
+        </div>
+        <div className="field">
+          <label>E-mail <span style={{ color: "var(--muted)", fontWeight: 400 }}>(opcional)</span></label>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="cliente@email.com"
+            type="email"
+          />
+        </div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancelar</button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!name.trim() || !phone.trim() || saving}
+            onClick={() => onSave({ name: name.trim(), phone, email })}
+          >
+            {saving ? "Salvando..." : "Criar e selecionar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -268,7 +488,13 @@ function AppointmentForm({
   setPricing,
   submitLabel,
   onSubmit,
-  saving
+  saving,
+  showQuickCreate,
+  setShowQuickCreate,
+  quickCreateName,
+  setQuickCreateName,
+  savingCustomer,
+  onQuickCreateCustomer
 }: {
   preset: AgendaPreset;
   access: AgendaAccess;
@@ -287,13 +513,48 @@ function AppointmentForm({
   submitLabel: string;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   saving?: boolean;
+  showQuickCreate: boolean;
+  setShowQuickCreate: (value: boolean) => void;
+  quickCreateName: string;
+  setQuickCreateName: (value: string) => void;
+  savingCustomer: boolean;
+  onQuickCreateCustomer: (data: { name: string; phone: string; email: string }) => void;
 }) {
   const visibleFields = fields.filter((field) => fieldIsVisible(field, access));
 
   return (
     <form className="form-grid" onSubmit={onSubmit}>
-      <Select label={preset.labels.customer} value={form.customerId} onChange={(customerId) => setForm({ ...form, customerId })} required options={customers.map((item) => [item.id, item.name])} />
-      <Select label={preset.labels.professional} value={form.professionalId} onChange={(professionalId) => setForm({ ...form, professionalId })} required options={professionals.map((item) => [item.id, item.name])} />
+      {/* Busca de cliente com criação rápida */}
+      {!showQuickCreate ? (
+        <SearchSelect
+          label={preset.labels.customer}
+          value={form.customerId}
+          onChange={(id) => setForm({ ...form, customerId: id })}
+          options={customers.map((c) => ({ id: c.id, name: c.name, sub: c.phone ?? undefined }))}
+          required
+          placeholder="Buscar ou criar cliente..."
+          onCreateNew={(query) => {
+            setQuickCreateName(query);
+            setShowQuickCreate(true);
+          }}
+          createLabel="Criar cliente"
+        />
+      ) : (
+        <QuickCreateCustomer
+          initialName={quickCreateName}
+          saving={savingCustomer}
+          onCancel={() => setShowQuickCreate(false)}
+          onSave={onQuickCreateCustomer}
+        />
+      )}
+      <SearchSelect
+        label={preset.labels.professional}
+        value={form.professionalId}
+        onChange={(id) => setForm({ ...form, professionalId: id })}
+        options={professionals.map((p) => ({ id: p.id, name: p.name }))}
+        required
+        placeholder="Buscar profissional..."
+      />
       <Select label="Status" value={form.status} onChange={(status) => setForm({ ...form, status })} options={Object.entries(statusLabels)} />
       <MultiServiceSelect label={preset.labels.service} services={services} selectedIds={selectedServiceIds} onChange={setSelectedServiceIds} showPrices={access.canSeeFinancial} />
       <Input label="Inicio" type="datetime-local" value={form.startAt} onChange={(startAt) => setForm({ ...form, startAt })} required />
@@ -364,6 +625,11 @@ export function AgendaPage() {
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [customValues, setCustomValues] = useState<CustomValues>({});
   const [pricing, setPricing] = useState({ partsValue: "", laborValue: "", discountPercent: "" });
+
+  // Criação rápida de cliente dentro do formulário de agendamento
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [quickCreateName, setQuickCreateName] = useState("");
+  const [savingCustomer, setSavingCustomer] = useState(false);
 
   const appointmentFields = fields.filter((field) => field.entityType === "APPOINTMENT");
 
@@ -507,6 +773,32 @@ export function AgendaPage() {
     setSelectedServiceIds([]);
     setCustomValues({});
     setPricing({ partsValue: "", laborValue: "", discountPercent: "" });
+    setShowQuickCreate(false);
+    setQuickCreateName("");
+  }
+
+  async function handleQuickCreateCustomer(data: { name: string; phone: string; email: string }) {
+    setSavingCustomer(true);
+    try {
+      const res = await apiFetch<{ customer: AnyRecord }>("/api/customers", {
+        method: "POST",
+        body: JSON.stringify({
+          name: data.name,
+          phone: data.phone,
+          email: data.email || null,
+          status: "active"
+        })
+      });
+      // Adiciona à lista local e seleciona automaticamente
+      setCustomers((prev) => [res.customer, ...prev]);
+      setForm((prev) => ({ ...prev, customerId: res.customer.id }));
+      setShowQuickCreate(false);
+      setQuickCreateName("");
+    } catch (err) {
+      setError((err as Error).message || "Erro ao criar cliente.");
+    } finally {
+      setSavingCustomer(false);
+    }
   }
 
   function payloadFromForm(state: AppointmentFormState, serviceIds: string[], values: CustomValues, price: typeof pricing) {
@@ -617,6 +909,12 @@ export function AgendaPage() {
             setPricing={setPricing}
             setSelectedServiceIds={setSelectedServiceIds}
             submitLabel={`Salvar ${preset.labels.appointment.toLowerCase()}`}
+            showQuickCreate={showQuickCreate}
+            setShowQuickCreate={setShowQuickCreate}
+            quickCreateName={quickCreateName}
+            setQuickCreateName={setQuickCreateName}
+            savingCustomer={savingCustomer}
+            onQuickCreateCustomer={handleQuickCreateCustomer}
           />
         </section>
       ) : null}
