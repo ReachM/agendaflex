@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useCookieConsent } from "@/components/cookie-banner";
-import { maskDocument, maskPhone, isValidPhone } from "@/lib/utils/masks";
+import { maskPhone, isValidPhone } from "@/lib/utils/masks";
 import "./public-booking.css";
 
 type CompanyInfo = {
@@ -654,18 +654,6 @@ export default function PublicBookingClient() {
                   placeholder="seu@email.com"
                   autoComplete="email"
                   inputMode="email"
-                />
-              </div>
-              <div className="sr-field">
-                <label className="sr-lab" htmlFor="sr-cpf">CPF / CNPJ</label>
-                <input
-                  id="sr-cpf"
-                  className="sr-input"
-                  type="text"
-                  value={form.cpf}
-                  onChange={(e) => setForm((f) => ({ ...f, cpf: maskDocument(e.target.value) }))}
-                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
-                  inputMode="numeric"
                 />
               </div>
               <div className="sr-field">
