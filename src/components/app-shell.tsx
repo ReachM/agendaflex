@@ -386,35 +386,82 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           {!isMaster && <GlobalSearch />}
           <div className="topbar-actions">
-            <button
-              type="button"
-              aria-label="Ajuda"
-              title="Ajuda"
-              onClick={() => router.push("/ajuda")}
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 9,
-                background: "transparent",
-                border: "1px solid transparent",
-                color: "var(--text-secondary)",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "all var(--transition)"
-              }}
+            <div style={{ position: "relative", display: "inline-flex" }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--surface-muted)";
-                e.currentTarget.style.borderColor = "var(--border)";
+                const tip = e.currentTarget.querySelector<HTMLElement>(".help-tip");
+                if (tip) tip.style.opacity = "1";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.borderColor = "transparent";
+                const tip = e.currentTarget.querySelector<HTMLElement>(".help-tip");
+                if (tip) tip.style.opacity = "0";
               }}
             >
-              <HelpCircle size={18} />
-            </button>
+              <button
+                type="button"
+                aria-label="Ajuda"
+                title="Dúvidas? Precisa de ajuda?"
+                onClick={() => router.push("/ajuda")}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 9,
+                  background: "transparent",
+                  border: "1px solid transparent",
+                  color: "var(--text-secondary)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all var(--transition)"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--surface-muted)";
+                  e.currentTarget.style.borderColor = "var(--border)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.borderColor = "transparent";
+                }}
+              >
+                <HelpCircle size={18} />
+              </button>
+
+              {/* Tooltip */}
+              <div
+                className="help-tip"
+                style={{
+                  position: "absolute",
+                  bottom: "calc(100% + 10px)",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  background: "var(--text)",
+                  color: "var(--bg)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  whiteSpace: "nowrap",
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  pointerEvents: "none",
+                  opacity: 0,
+                  transition: "opacity 0.15s ease",
+                  zIndex: 100,
+                }}
+              >
+                Dúvidas? Precisa de ajuda?
+                {/* Setinha apontando para baixo */}
+                <span style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 0,
+                  height: 0,
+                  borderLeft: "5px solid transparent",
+                  borderRight: "5px solid transparent",
+                  borderTop: "5px solid var(--text)",
+                }} />
+              </div>
+            </div>
             {!isMaster && <NotificationBell />}
             <div className="user-chip">
               <span className="chip-avatar">{userInitials}</span>
