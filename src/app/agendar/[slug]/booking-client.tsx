@@ -3,7 +3,6 @@
 import { Check } from "lucide-react";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useCookieConsent } from "@/components/cookie-banner";
 import { maskPhone, isValidPhone } from "@/lib/utils/masks";
 import "./public-booking.css";
 
@@ -168,9 +167,6 @@ type BookingForm = ReturnType<typeof emptyForm>;
 export default function PublicBookingClient() {
   const params = useParams();
   const slug = params.slug as string;
-
-  const { consent } = useCookieConsent();
-  const hasConsent = consent === "accepted";
 
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [services, setServices] = useState<Service[]>([]);
@@ -424,11 +420,7 @@ export default function PublicBookingClient() {
     return "Revise tudo antes de confirmar o agendamento.";
   }
 
-  const ctaLabel = submitting
-    ? "Agendando…"
-    : !hasConsent
-      ? "Aceite os cookies"
-      : "Confirmar";
+  const ctaLabel = submitting ? "Agendando…" : "Confirmar";
 
   return (
     <Shell style={brandStyle}>
@@ -770,11 +762,6 @@ export default function PublicBookingClient() {
               {settings?.requireManualApproval && (
                 <p className="sr-hint">Seu agendamento ficará pendente até ser aprovado pela empresa.</p>
               )}
-              {!hasConsent && (
-                <p className="sr-hint" style={{ color: "var(--danger)" }}>
-                  ⚠️ Aceite os cookies no banner abaixo para confirmar o agendamento.
-                </p>
-              )}
             </>
           )}
         </div>
@@ -800,8 +787,8 @@ export default function PublicBookingClient() {
               Continuar →
             </button>
           ) : (
-            <button type="submit" className="sr-cta" disabled={!hasConsent || submitting}>
-              {ctaLabel} {!submitting && hasConsent ? "→" : null}
+            <button type="submit" className="sr-cta" disabled={submitting}>
+              {ctaLabel} {!submitting ? "→" : null}
             </button>
           )}
         </div>
