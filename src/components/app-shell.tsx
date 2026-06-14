@@ -386,20 +386,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           {!isMaster && <GlobalSearch />}
           <div className="topbar-actions">
-            <div style={{ position: "relative", display: "inline-flex" }}
-              onMouseEnter={(e) => {
-                const tip = e.currentTarget.querySelector<HTMLElement>(".help-tip");
-                if (tip) tip.style.opacity = "1";
-              }}
-              onMouseLeave={(e) => {
-                const tip = e.currentTarget.querySelector<HTMLElement>(".help-tip");
-                if (tip) tip.style.opacity = "0";
-              }}
-            >
+            <div style={{ position: "relative", display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
               <button
                 type="button"
                 aria-label="Ajuda"
-                title="Dúvidas? Precisa de ajuda?"
+                title="Ajuda"
                 onClick={() => router.push("/ajuda")}
                 style={{
                   width: 38,
@@ -426,40 +417,26 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <HelpCircle size={18} />
               </button>
 
-              {/* Tooltip */}
+              {/* Etiqueta fixa saindo por baixo do ícone */}
               <div
-                className="help-tip"
                 style={{
                   position: "absolute",
-                  bottom: "calc(100% + 10px)",
+                  top: "calc(100% + 6px)",
                   left: "50%",
                   transform: "translateX(-50%)",
-                  background: "var(--text)",
-                  color: "var(--bg)",
-                  fontSize: 12,
-                  fontWeight: 500,
+                  background: "var(--primary)",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 700,
                   whiteSpace: "nowrap",
-                  padding: "6px 12px",
-                  borderRadius: 8,
+                  padding: "3px 8px",
+                  borderRadius: 99,
                   pointerEvents: "none",
-                  opacity: 0,
-                  transition: "opacity 0.15s ease",
-                  zIndex: 100,
+                  letterSpacing: "0.02em",
+                  zIndex: 50,
                 }}
               >
-                Dúvidas? Precisa de ajuda?
-                {/* Setinha apontando para baixo */}
-                <span style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  width: 0,
-                  height: 0,
-                  borderLeft: "5px solid transparent",
-                  borderRight: "5px solid transparent",
-                  borderTop: "5px solid var(--text)",
-                }} />
+                Dúvidas?
               </div>
             </div>
             {!isMaster && <NotificationBell />}
