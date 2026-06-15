@@ -4951,3 +4951,301 @@ tbody tr:hover {
   font-weight: 600;
   text-decoration: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE MOBILE — CORREÇÕES GLOBAIS
+   Cobre: topbar, QR code, logs, formulários inline, professional
+   modal, category form, financeiro charts, configurações, ajuda.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── SHARE QR WRAP — base (desktop mantém grid) ────────────────── */
+.share-qr-wrap {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ─── TOPBAR PRINCIPAL (≤768px) ─────────────────────────────────── */
+@media (max-width: 768px) {
+  .topbar-main {
+    height: auto;
+    min-height: 56px;
+    padding: 0 12px 0 60px;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .topbar-main .breadcrumb .crumb-hide,
+  .topbar-main .breadcrumb .sep {
+    display: none;
+  }
+
+  .topbar-main .breadcrumb .now {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .topbar-main .topbar-actions {
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .topbar-main .user-chip .chip-name {
+    display: none;
+  }
+
+  .topbar-main .user-chip {
+    padding: 4px;
+  }
+
+  .content > .page-wrapper {
+    padding: 16px;
+  }
+
+  .trial-banner {
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+}
+
+/* ─── QR CODE / LINK DE AGENDA (≤640px) ─────────────────────────── */
+@media (max-width: 640px) {
+  .share-qr-wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .share-qr-wrap > div:last-child {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+  }
+}
+
+/* ─── LOGS TABLE (≤640px) ────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .table-wrap table thead th:nth-child(3),
+  .table-wrap table tbody td:nth-child(3),
+  .table-wrap table thead th:nth-child(4),
+  .table-wrap table tbody td:nth-child(4),
+  .table-wrap table thead th:nth-child(5),
+  .table-wrap table tbody td:nth-child(5),
+  .table-wrap table thead th:nth-child(6),
+  .table-wrap table tbody td:nth-child(6) {
+    display: none;
+  }
+
+  .table-wrap table th,
+  .table-wrap table td {
+    padding: 10px 12px;
+    font-size: 12.5px;
+  }
+}
+
+/* ─── CONFIGURAÇÕES — business hours row (≤640px) ───────────────── */
+@media (max-width: 640px) {
+  .cfg-hours-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .cfg-hours-row__day {
+    grid-column: 1 / 2;
+    font-size: 13px;
+  }
+
+  .cfg-hours-row__closed {
+    grid-column: 1 / 3;
+  }
+
+  .cfg-member {
+    grid-template-columns: 36px 1fr auto;
+    gap: 10px;
+  }
+
+  .cfg-biz-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .cfg-plan-card__cta {
+    flex-direction: column;
+  }
+
+  .cfg-danger-zone__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+/* ─── FINANCEIRO — gráficos e tabelas (≤640px) ───────────────────── */
+@media (max-width: 640px) {
+  .fin-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .fin-bar__left,
+  .fin-bar__right {
+    flex-wrap: wrap;
+  }
+
+  .dre {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .cashflow {
+    padding: 4px 12px 16px;
+    overflow-x: auto;
+  }
+
+  .bars14 {
+    min-width: 380px;
+    height: 160px;
+    gap: 4px;
+  }
+
+  .x-axis {
+    min-width: 380px;
+  }
+
+  .row-actions {
+    opacity: 1 !important;
+  }
+
+  .tx-filter {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .pm-legend {
+    padding: 0 12px 12px;
+  }
+}
+
+/* ─── RELATÓRIOS — tabs e charts (≤640px) ───────────────────────── */
+@media (max-width: 640px) {
+  .rep-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    padding-bottom: 4px;
+    gap: 0 !important;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .rep-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+
+  .rep-tab.is-on {
+    border-bottom-color: var(--primary);
+  }
+
+  .kpi-row {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px;
+  }
+}
+
+/* ─── CENTRAL DE AJUDA (≤640px) ─────────────────────────────────── */
+@media (max-width: 640px) {
+  .help-layout {
+    padding: 0 12px;
+    gap: 16px;
+  }
+
+  .help-hero {
+    padding: 28px 16px 20px;
+  }
+
+  .help-hero h1 {
+    font-size: 22px;
+  }
+
+  .help-nav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 6px;
+    padding-bottom: 4px;
+  }
+
+  .help-nav__item {
+    white-space: nowrap;
+    flex-shrink: 0;
+    width: auto !important;
+    padding: 8px 12px;
+  }
+
+  .help-support {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .help-support .btn {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .help-card__head {
+    padding: 14px;
+  }
+
+  .help-card__body {
+    padding: 0 14px 14px;
+  }
+}
+
+/* ─── PAGE HEADER — ações em coluna no mobile ────────────────────── */
+@media (max-width: 560px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+  }
+
+  .page-header__actions,
+  .ph-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .page-header__actions .button,
+  .page-header__actions .btn,
+  .ph-actions .button,
+  .ph-actions .btn {
+    flex: 1;
+    min-width: 120px;
+    justify-content: center;
+  }
+}
+
+/* ─── PANEL HEADS — ações abaixo do título (≤480px) ─────────────── */
+@media (max-width: 480px) {
+  .panel__head {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+
+  .panel__head > .button,
+  .panel__head > .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
