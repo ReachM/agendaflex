@@ -460,19 +460,19 @@ export function ProfessionalManager() {
                   {WEEKDAYS.map(({ id, label }) => {
                     const day = form.workingHours[id] ?? { open: false };
                     return (
-                      <div key={id} style={{ display: "grid", gridTemplateColumns: "120px auto 1fr 1fr", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: day.open ? "var(--surface)" : "var(--surface-muted)" }}>
+                      <div key={id} className="pro-day-row" style={{ display: "grid", gridTemplateColumns: "120px auto 1fr 1fr", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: day.open ? "var(--surface)" : "var(--surface-muted)" }}>
                         <strong style={{ fontSize: 13 }}>{label}</strong>
                         <label className="switch">
                           <input type="checkbox" checked={day.open ?? false} onChange={e => updateDay(id, { open: e.target.checked })} />
                           <span className="switch__track" />
                         </label>
                         {day.open ? (
-                          <>
+                          <div className="pro-day-times" style={{ display: "contents" }}>
                             <input className="input" type="time" value={day.from ?? "09:00"} onChange={e => updateDay(id, { from: e.target.value })} style={{ height: 32 }} />
                             <input className="input" type="time" value={day.to ?? "18:00"} onChange={e => updateDay(id, { to: e.target.value })} style={{ height: 32 }} />
-                          </>
+                          </div>
                         ) : (
-                          <span style={{ gridColumn: "3 / span 2", fontSize: 12, color: "var(--muted)" }}>Fechado</span>
+                          <span className="pro-day-closed" style={{ gridColumn: "3 / span 2", fontSize: 12, color: "var(--muted)" }}>Fechado</span>
                         )}
                       </div>
                     );

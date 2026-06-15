@@ -2252,7 +2252,7 @@ function ShareToolkit({ publicLink, companyName, copied, onCopy }: { publicLink:
   }
 
   return (
-    <div className="share-qr-wrap" style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 16, alignItems: "start" }}>
+    <div className="share-qr-wrap">
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ background: "var(--surface-muted)", padding: "12px 14px", borderRadius: "var(--radius)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <input

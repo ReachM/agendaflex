@@ -104,6 +104,7 @@ export function GlobalSearch() {
   return (
     <div
       ref={containerRef}
+      className="global-search-wrap"
       style={{ position: "relative", width: "clamp(200px, 36vw, 420px)" }}
     >
       <Search

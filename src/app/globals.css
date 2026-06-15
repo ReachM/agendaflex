@@ -4953,9 +4953,10 @@ tbody tr:hover {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   RESPONSIVE MOBILE — CORREÇÕES GLOBAIS
-   Cobre: topbar, QR code, logs, formulários inline, professional
-   modal, category form, financeiro charts, configurações, ajuda.
+   RESPONSIVE MOBILE — CORREÇÕES GLOBAIS v2
+   Cobre: topbar, sidebar, modal, QR code, logs, formulários inline,
+   professional modal, category form, financeiro, relatórios,
+   configurações (todas as abas), ajuda.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ─── SHARE QR WRAP — base (desktop mantém grid) ────────────────── */
@@ -4971,9 +4972,16 @@ tbody tr:hover {
   .topbar-main {
     height: auto;
     min-height: 56px;
-    padding: 0 12px 0 60px;
+    padding: 0 12px 0 56px;
     flex-wrap: nowrap;
-    gap: 8px;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .topbar-main .breadcrumb {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
   }
 
   .topbar-main .breadcrumb .crumb-hide,
@@ -4982,28 +4990,41 @@ tbody tr:hover {
   }
 
   .topbar-main .breadcrumb .now {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+
+  /* GlobalSearch ocupa espaço demais no mobile — oculta a caixa */
+  .topbar-main .global-search-wrap {
+    display: none;
   }
 
   .topbar-main .topbar-actions {
-    gap: 4px;
-    margin-left: auto;
+    gap: 2px;
+    margin-left: 0;
+    flex-shrink: 0;
   }
 
+  /* Esconde o nome no user chip — fica só o avatar */
   .topbar-main .user-chip .chip-name {
     display: none;
   }
 
   .topbar-main .user-chip {
     padding: 4px;
+    min-width: 0;
   }
 
   .content > .page-wrapper {
-    padding: 16px;
+    padding: 12px;
   }
 
-  .trial-banner {
+  .trial-banner,
+  .impersonate-banner {
     flex-wrap: wrap;
     gap: 6px;
     font-size: 13px;
@@ -5024,19 +5045,28 @@ tbody tr:hover {
     flex-direction: column;
     align-items: center;
     padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  /* input estica horizontalmente */
+  .share-qr-wrap input[type="text"] {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Container do input + botão vira coluna */
+  .share-qr-wrap > div:first-child > div:first-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
   }
 }
 
 /* ─── LOGS TABLE (≤640px) ────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .table-wrap table thead th:nth-child(3),
-  .table-wrap table tbody td:nth-child(3),
-  .table-wrap table thead th:nth-child(4),
-  .table-wrap table tbody td:nth-child(4),
-  .table-wrap table thead th:nth-child(5),
-  .table-wrap table tbody td:nth-child(5),
-  .table-wrap table thead th:nth-child(6),
-  .table-wrap table tbody td:nth-child(6) {
+  /* Mantém apenas "Quando" e "Ação"; oculta colunas 3–6 */
+  .table-wrap table thead th:nth-child(n + 3),
+  .table-wrap table tbody td:nth-child(n + 3) {
     display: none;
   }
 
@@ -5047,27 +5077,38 @@ tbody tr:hover {
   }
 }
 
-/* ─── CONFIGURAÇÕES — business hours row (≤640px) ───────────────── */
+/* ─── CONFIGURAÇÕES — layout geral (≤640px) ─────────────────────── */
 @media (max-width: 640px) {
-  .cfg-hours-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+  /* Sidebar de abas vira strip horizontal com scroll */
+  .cfg-side {
+    position: static !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 4px !important;
+    padding: 10px !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
 
-  .cfg-hours-row__day {
-    grid-column: 1 / 2;
-    font-size: 13px;
+  .cfg-side::-webkit-scrollbar {
+    display: none;
   }
 
-  .cfg-hours-row__closed {
-    grid-column: 1 / 3;
+  .cfg-side__group {
+    display: none !important;
   }
 
-  .cfg-member {
-    grid-template-columns: 36px 1fr auto;
-    gap: 10px;
+  .cfg-side__item {
+    width: auto !important;
+    flex-shrink: 0 !important;
+    padding: 7px 14px !important;
+    white-space: nowrap !important;
+    font-size: 12.5px !important;
   }
 
+  /* Hero da empresa em coluna */
   .cfg-biz-head {
     flex-direction: column;
     align-items: flex-start;
@@ -5075,14 +5116,102 @@ tbody tr:hover {
     padding: 16px;
   }
 
-  .cfg-plan-card__cta {
-    flex-direction: column;
+  .cfg-biz-head__chips {
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
+  /* Grids de campos — 1 coluna */
+  .cfg-row-2,
+  .cfg-row-3,
+  .cfg-row-addr {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Horários de funcionamento */
+  .cfg-hours-row {
+    grid-template-columns: 80px auto 1fr 1fr;
+    gap: 6px;
+  }
+
+  .cfg-hours-row__day {
+    font-size: 12px;
+  }
+
+  .cfg-hours-row__closed {
+    grid-column: 3 / -1;
+  }
+
+  /* Membros da equipe */
+  .cfg-member {
+    grid-template-columns: 36px 1fr auto;
+    gap: 8px;
+  }
+
+  /* Plano — CTA em coluna */
+  .cfg-plan-card__cta {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cfg-plan-card__cta .button,
+  .cfg-plan-card__cta .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Zona de perigo */
   .cfg-danger-zone__row {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
+  }
+
+  .cfg-danger-zone__row .button,
+  .cfg-danger-zone__row .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Integrações */
+  .cfg-integ-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── PROFISSIONAL — modal (formulário de dias da semana) ────────── */
+@media (max-width: 640px) {
+  /* Grid "120px auto 1fr 1fr" → layout de 2 linhas */
+  .pro-day-row {
+    grid-template-columns: 1fr auto !important;
+    row-gap: 6px !important;
+  }
+
+  .pro-day-row .pro-day-times {
+    grid-column: 1 / -1;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .pro-day-row .pro-day-closed {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ─── SERVIÇOS — formulário inline de nova categoria (≤640px) ───── */
+@media (max-width: 640px) {
+  /* grid "1fr auto auto" com color-picker e botão */
+  .cat-inline-form {
+    grid-template-columns: 1fr auto !important;
+    row-gap: 8px !important;
+  }
+
+  /* Botão "Adicionar" ocupa linha inteira */
+  .cat-inline-form button[type="submit"] {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -5097,107 +5226,184 @@ tbody tr:hover {
   .fin-bar__left,
   .fin-bar__right {
     flex-wrap: wrap;
+    gap: 6px;
   }
 
+  /* DRE: 2 colunas suficientes */
   .dre {
     grid-template-columns: 1fr 1fr !important;
   }
 
+  /* Cashflow chart — container scrollável, eixo mínimo legível */
   .cashflow {
     padding: 4px 12px 16px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .bars14 {
-    min-width: 380px;
-    height: 160px;
-    gap: 4px;
+    min-width: 360px;
+    height: 150px;
+    gap: 3px;
   }
 
   .x-axis {
-    min-width: 380px;
+    min-width: 360px;
   }
 
+  /* Ações sempre visíveis no mobile (sem hover) */
   .row-actions {
     opacity: 1 !important;
   }
 
+  /* Filtros de transações em coluna */
   .tx-filter {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
   }
 
+  .tx-filter .input,
+  .tx-filter .select {
+    width: 100%;
+  }
+
+  /* Legenda de formas de pagamento */
   .pm-legend {
     padding: 0 12px 12px;
+  }
+
+  /* KPIs de 2 colunas */
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
   }
 }
 
 /* ─── RELATÓRIOS — tabs e charts (≤640px) ───────────────────────── */
 @media (max-width: 640px) {
+  /* Tabs com scroll horizontal suave */
   .rep-tabs {
     overflow-x: auto;
     flex-wrap: nowrap !important;
     padding-bottom: 4px;
     gap: 0 !important;
+    background: transparent;
+    border: none;
     border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .rep-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .rep-tab {
     white-space: nowrap;
     flex-shrink: 0;
+    border-radius: 0;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
+    padding: 0 12px;
+    font-size: 12px;
   }
 
   .rep-tab.is-on {
+    background: transparent;
     border-bottom-color: var(--primary);
+    color: var(--primary-hover);
   }
 
   .kpi-row {
     grid-template-columns: 1fr 1fr !important;
     gap: 10px;
   }
+
+  /* Banner de insight */
+  .insight-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .insight-banner .btn {
+    margin-left: 0;
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Ranking / templates */
+  .tpl-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* ─── CENTRAL DE AJUDA (≤640px) ─────────────────────────────────── */
 @media (max-width: 640px) {
-  .help-layout {
-    padding: 0 12px;
-    gap: 16px;
+  .help-page {
+    padding-bottom: 32px;
   }
 
   .help-hero {
-    padding: 28px 16px 20px;
+    padding: 24px 16px 18px;
   }
 
   .help-hero h1 {
     font-size: 22px;
   }
 
+  /* Botões Tutorial / Buscar artigos em coluna */
+  .help-hero > div:last-child {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .help-hero > div:last-child .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* FAQ layout */
+  .help-layout {
+    padding: 0 12px;
+    gap: 16px;
+  }
+
+  /* Navegação lateral vira strip horizontal */
   .help-nav {
-    flex-direction: row;
-    flex-wrap: nowrap;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
     overflow-x: auto;
     gap: 6px;
     padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .help-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .help-nav__item {
     white-space: nowrap;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
     width: auto !important;
-    padding: 8px 12px;
+    padding: 8px 12px !important;
+    font-size: 12.5px;
   }
 
+  /* Suporte: em coluna */
   .help-support {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
   }
 
   .help-support .btn {
     margin-left: 0;
     width: 100%;
+    justify-content: center;
   }
 
   .help-card__head {
@@ -5209,7 +5415,7 @@ tbody tr:hover {
   }
 }
 
-/* ─── PAGE HEADER — ações em coluna no mobile ────────────────────── */
+/* ─── PAGE HEADER — ações em coluna no mobile (≤560px) ───────────── */
 @media (max-width: 560px) {
   .page-header {
     flex-direction: column;

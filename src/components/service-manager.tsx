@@ -459,7 +459,7 @@ export function ServiceManager() {
                 <div className="panel__title">Nova categoria</div>
               </div>
               <div className="panel__body">
-                <form onSubmit={submitCategory} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10 }}>
+                <form onSubmit={submitCategory} className="cat-inline-form" style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10 }}>
                   <input className="input" required placeholder="Ex.: Cabelo, Unhas, Estética" value={catName} onChange={e => setCatName(e.target.value)} />
                   <input className="input" type="color" value={catColor} onChange={e => setCatColor(e.target.value)} style={{ width: 60 }} />
                   <button type="submit" className="btn btn-primary" disabled={saving}>

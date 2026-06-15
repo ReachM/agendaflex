@@ -94,3 +94,14 @@
 .help-support h4 { font-size: 14px; font-weight: 700; }
 .help-support p { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 .help-support .btn { margin-left: auto; white-space: nowrap; }
+
+/* ── Responsivo mobile ──────────────────────────── */
+@media (max-width: 640px) {
+  .help-search { max-width: 100%; }
+
+  /* Grids inline de regras 2×2 → 1 coluna */
+  .help-page [style*='grid-template-columns: "1fr 1fr"'],
+  .help-page [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}

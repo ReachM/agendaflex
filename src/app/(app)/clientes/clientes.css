@@ -109,7 +109,27 @@
 }
 .cl-chip.is-on .count { background: var(--primary); color: #fff; }
 
-@media (max-width: 480px) { .cl-filterbar { flex-wrap: wrap; } }
+@media (max-width: 640px) {
+  /* Filterbar: chips em linha com scroll horizontal */
+  .cl-filterbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 10px 12px;
+  }
+  .cl-filterbar::-webkit-scrollbar { display: none; }
+  .cl-chip { flex-shrink: 0; white-space: nowrap; }
+  /* Busca sempre full width, acima dos chips */
+  .cl-search { min-width: 0; flex: 1 1 100%; order: -1; }
+  /* Paginação compacta */
+  .cl-pagination {
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+  }
+}
 
 /* ── Tabela de clientes ──────────────────────────── */
 .cl-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }

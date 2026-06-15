@@ -190,6 +190,17 @@
   .cfg-row-2, .cfg-row-3, .cfg-row-addr { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 640px) {
+  /* Horário de funcionamento: compacta o grid de 4 colunas */
+  .cfg-hours-row {
+    grid-template-columns: 80px auto 1fr 1fr;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .cfg-hours-row__day { font-size: 12px; }
+  .cfg-hours-row__closed { grid-column: 3 / -1; }
+}
+
 /* ── Field (form) ─────────────────────────────────── */
 .cfg-field { display: grid; gap: 6px; }
 .cfg-field label {
