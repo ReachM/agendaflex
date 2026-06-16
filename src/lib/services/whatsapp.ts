@@ -116,6 +116,42 @@ async function deleteCompanyInstances(baseUrl: string, adminToken: string, compa
   }
 }
 
+/**
+ * Espera a WuzAPI ficar pronta (GET /admin/users respondendo 2xx) por até
+ * maxWaitMs, sondando a cada 1s. Necessário porque o disconnect REINICIA o
+ * container: sem esperar, um reconnect logo em seguida bate numa WuzAPI ainda
+ * subindo e o create falha — a causa mais provável de "erro ao conectar o QR".
+ */
+async function waitForWuzapiReady(baseUrl: string, adminToken: string, maxWaitMs = 15_000): Promise<boolean> {
+  const deadline = Date.now() + maxWaitMs;
+  for (;;) {
+    const res = await wuzapiFetch("/admin/users", { baseUrl, adminToken }).catch(() => null);
+    if (res?.ok) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+/**
+ * Normaliza o QR retornado pela WuzAPI para um data URL que o <img> renderiza.
+ * Versões/configs diferentes devolvem: (a) já um data URL completo
+ * ("data:image/...;base64,..."), (b) base64 cru de uma imagem (sem prefixo).
+ * Ambos viram data URL aqui. Qualquer outra coisa (ex.: a string crua do QR
+ * "2@...") NÃO é imagem: devolvemos null e logamos, pois o front não renderiza —
+ * é o sinal de que precisamos gerar a imagem no servidor.
+ */
+function normalizeQrCode(raw: string | undefined | null): string | null {
+  const value = (raw ?? "").trim();
+  if (!value) return null;
+  if (value.startsWith("data:image")) return value;
+  // base64 puro de imagem: só caracteres base64 e tamanho compatível com PNG.
+  if (value.length > 100 && /^[A-Za-z0-9+/=\s]+$/.test(value)) {
+    return `data:image/png;base64,${value.replace(/\s+/g, "")}`;
+  }
+  console.warn("[WuzAPI] /session/qr devolveu o QR em formato não-imagem; o painel não consegue renderizar como <img>.");
+  return null;
+}
+
 export type NormalizedPhone = {
   /** Apenas dígitos, com DDI (ex: "5511977778888"). null se inválido. */
   digits: string | null;
@@ -252,31 +288,40 @@ export async function validateInstance(companyId: string): Promise<boolean> {
  * whatsappInstance (lido depois por getInstanceToken).
  *
  * Fluxo:
+ *  0) espera a WuzAPI ficar pronta (pode ter acabado de reiniciar no disconnect),
  *  1) remove TODOS os usuários antigos da empresa (qualquer name com o prefixo),
- *  2) aguarda a WuzAPI liberar os recursos da sessão antiga,
- *  3) gera name + token únicos,
- *  4) cria o usuário com webhook por empresa (evento "Message"),
- *  5) inicia a sessão (POST /session/connect) — o QR fica disponível em ~1-2s
+ *  2) gera name + token únicos,
+ *  3) cria o usuário com webhook por empresa (evento "Message"),
+ *  4) inicia a sessão (POST /session/connect) — o QR fica disponível em ~1-2s
  *     via GET /session/qr,
- *  6) persiste o token e marca connectionStatus="connecting".
+ *  5) persiste o token e marca connectionStatus="connecting".
  */
 export async function createInstance(companyId: string): Promise<{ instance: string }> {
   const { url, adminToken } = wuzapiConfig();
 
+  // 0) Garante que a WuzAPI está de pé. O disconnect reinicia o container, então
+  //    um reconnect logo em seguida precisa esperar o serviço voltar.
+  const ready = await waitForWuzapiReady(url, adminToken);
+  if (!ready) {
+    throw new ApiError(503, "WuzAPI indisponível no momento (iniciando). Aguarde alguns segundos e tente de novo.");
+  }
+
   // 1) Remove todos os usuários antigos da empresa (ignora erros).
   await deleteCompanyInstances(url, adminToken, companyId);
 
-  // 2) Aguarda a WuzAPI liberar os recursos da sessão antiga antes de recriar.
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-
-  // 3) Gera name + token únicos: a sessão em memória do WuzAPI fica atrelada ao
+  // 2) Gera name + token únicos: a sessão em memória do WuzAPI fica atrelada ao
   //    token, então um token novo garante conexão limpa e QR novo.
   const stamp = Date.now();
   const name = `${instanceName(companyId)}-${stamp}`;
   const token = `${companyToken(companyId)}-${stamp}`;
 
-  // 4) Cria o usuário com webhook por empresa.
+  // 3) Cria o usuário com webhook por empresa. Só inclui o webhook se a URL
+  //    pública estiver configurada — webhook inválido faz a WuzAPI recusar o
+  //    create (e aí nunca há QR). Sem ela, cria sem webhook e avisa nos logs.
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  if (!appUrl) {
+    console.warn("[WuzAPI] NEXT_PUBLIC_APP_URL ausente: instância criada SEM webhook (o bot não receberá mensagens).");
+  }
   const createRes = await wuzapiFetch("/admin/users", {
     method: "POST",
     baseUrl: url,
@@ -284,8 +329,8 @@ export async function createInstance(companyId: string): Promise<{ instance: str
     body: {
       name,
       token,
-      webhook: `${appUrl}/api/webhooks/whatsapp/${companyId}`,
-      events: "Message"
+      events: "Message",
+      ...(appUrl ? { webhook: `${appUrl}/api/webhooks/whatsapp/${companyId}` } : {})
     }
   });
 
@@ -294,15 +339,19 @@ export async function createInstance(companyId: string): Promise<{ instance: str
     throw new ApiError(502, `Falha ao criar usuário na WuzAPI (HTTP ${createRes.status}).`, detail.slice(0, 500));
   }
 
-  // 5) Inicia a sessão com o token novo (best-effort).
-  await wuzapiFetch("/session/connect", {
+  // 4) Inicia a sessão com o token novo. Best-effort, mas logamos se não
+  //    confirmar — connect falho é o motivo de o QR "nunca aparecer".
+  const connectRes = await wuzapiFetch("/session/connect", {
     method: "POST",
     baseUrl: url,
     token,
     body: { Subscribe: ["Message"], Immediate: true }
-  }).catch(() => undefined);
+  }).catch(() => null);
+  if (!connectRes?.ok) {
+    console.warn(`[WuzAPI] /session/connect não confirmou para company=${companyId}; o QR pode demorar a aparecer.`);
+  }
 
-  // 6) Persiste o token atual (whatsappInstance) e o estado "connecting".
+  // 5) Persiste o token atual (whatsappInstance) e o estado "connecting".
   await prisma.companyBotConfig.upsert({
     where: { companyId },
     update: { whatsappInstance: token, connectionStatus: "connecting", qrCodeBase64: null, qrCodeExpiresAt: null },
@@ -344,7 +393,7 @@ export async function getQrCode(companyId: string): Promise<QrCodeResult> {
     const qrRes = await wuzapiFetch("/session/qr", { baseUrl: url, token });
     if (qrRes.ok) {
       const json = (await qrRes.json().catch(() => ({}))) as { data?: { QRCode?: string } };
-      const qrcode = json.data?.QRCode;
+      const qrcode = normalizeQrCode(json.data?.QRCode);
       if (qrcode) {
         await prisma.companyBotConfig.updateMany({
           where: { companyId },
