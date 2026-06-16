@@ -1,3 +1,4 @@
+import { exec } from "child_process";
 import { ApiError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 
@@ -381,9 +382,28 @@ export async function getQrCode(companyId: string): Promise<QrCodeResult> {
 }
 
 /**
- * Desconecta a empresa da WuzAPI por completo: logout da sessão atual E remoção de
- * TODOS os usuários da empresa (admin). Apagar os usuários garante que a próxima
- * conexão recrie a sessão do zero e sempre exija um QR Code novo. Reflete
+ * Reinicia o container do WuzAPI via script privilegiado de caminho fixo
+ * (configure um sudoers restrito a este script para o usuário do pm2). É
+ * assíncrono — não bloqueia o event loop — e best-effort: resolve mesmo em
+ * erro/timeout (apenas loga), para não travar o disconnect.
+ *
+ * ATENÇÃO: o WuzAPI é um container ÚNICO compartilhado por TODAS as empresas.
+ * Reiniciá-lo derruba a sessão de todos os tenants conectados, que precisarão
+ * reescanear o QR. Por isso só é chamado no disconnect explícito de uma empresa.
+ */
+async function restartWuzapi(): Promise<void> {
+  return new Promise((resolve) => {
+    exec("/usr/local/bin/restart-wuzapi.sh", { timeout: 20_000 }, (error) => {
+      if (error) console.warn(`[WuzAPI] restart do container falhou: ${error.message}`);
+      resolve();
+    });
+  });
+}
+
+/**
+ * Desconecta a empresa da WuzAPI por completo: logout da sessão atual, remoção de
+ * TODOS os usuários da empresa (admin) e restart do container para limpar a sessão
+ * presa em memória do whatsmeow. Garante QR novo na próxima conexão. Reflete
  * "disconnected" no banco — a WuzAPI não envia evento de conexão.
  */
 export async function disconnectInstance(companyId: string): Promise<void> {
@@ -396,7 +416,10 @@ export async function disconnectInstance(companyId: string): Promise<void> {
   // 2) Remove TODOS os usuários da empresa para forçar QR novo na reconexão.
   await deleteCompanyInstances(url, adminToken, companyId);
 
-  // 3) Reflete o estado no banco para o painel não mostrar "conectado" após reload.
+  // 3) Reinicia o WuzAPI para limpar a sessão em memória (afeta todos os tenants).
+  await restartWuzapi();
+
+  // 4) Reflete o estado no banco para o painel não mostrar "conectado" após reload.
   await prisma.companyBotConfig.updateMany({
     where: { companyId },
     data: { connectionStatus: "disconnected", qrCodeBase64: null, qrCodeExpiresAt: null }
