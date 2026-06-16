@@ -9,7 +9,7 @@ import { disconnectInstance } from "@/lib/services/whatsapp";
 
 /**
  * POST /api/bot-whatsapp/disconnect
- * Faz logout da instância na Evolution API e desliga o bot da empresa.
+ * Faz logout da sessão na WuzAPI e desliga o bot da empresa.
  */
 export async function POST(request: NextRequest) {
   try {

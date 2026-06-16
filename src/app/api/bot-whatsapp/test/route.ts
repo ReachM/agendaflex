@@ -15,7 +15,7 @@ const testSchema = z.object({
 
 /**
  * POST /api/bot-whatsapp/test
- * Envia uma mensagem de teste pela Evolution API usando a instância da empresa.
+ * Envia uma mensagem de teste pela WuzAPI usando a instância da empresa.
  */
 export async function POST(request: NextRequest) {
   try {

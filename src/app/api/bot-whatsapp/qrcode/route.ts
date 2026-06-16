@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/bot-whatsapp/qrcode
- * Recria a instância na Evolution API e configura o webhook. O QR Code não vem
- * na resposta — chega em ~2-5s via webhook QRCODE_UPDATED; o front faz polling
+ * Recria a sessão na WuzAPI e configura o webhook por empresa. O QR Code não vem
+ * na resposta — fica disponível em ~1-2s via GET /session/qr; o front faz polling
  * em GET até o QR aparecer. Retornamos "connecting" imediatamente.
  */
 export async function POST(request: NextRequest) {

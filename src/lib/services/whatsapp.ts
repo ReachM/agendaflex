@@ -2,63 +2,64 @@ import { ApiError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 
 /**
- * Integração com a Evolution API v2 (auto-hospedada).
+ * Integração com a WuzAPI (auto-hospedada, baseada em whatsmeow).
  * Funções nomeadas, sem classes — segue o padrão de src/lib/services/.
  *
+ * Diferença chave em relação à Evolution API: o QR Code é retornado
+ * DIRETAMENTE por GET /session/qr (sem webhook, sem delay). O webhook por
+ * empresa serve apenas para receber mensagens recebidas (evento "Message").
+ *
  * Variáveis de ambiente (nunca expor no frontend):
- * - EVOLUTION_API_URL: base da Evolution API (ex: https://evo.seudominio.com)
- * - EVOLUTION_API_KEY: apikey global da Evolution API
- * - WHATSAPP_WEBHOOK_TOKEN: token que valida os webhooks recebidos da Evolution
+ * - WUZAPI_URL: base da WuzAPI (ex: http://localhost:8080)
+ * - WUZAPI_ADMIN_TOKEN: token admin global da WuzAPI (header Authorization)
+ * - WHATSAPP_WEBHOOK_TOKEN: opcional — se definido, valida x-webhook-token nos
+ *   webhooks recebidos (a WuzAPI não envia esse header por padrão).
  */
 
 const REQUEST_TIMEOUT_MS = 8_000;
 
-function evolutionConfig() {
-  const url = process.env.EVOLUTION_API_URL;
-  const apiKey = process.env.EVOLUTION_API_KEY;
-
-  if (!url || !apiKey) {
-    throw new ApiError(500, "Evolution API não configurada (defina EVOLUTION_API_URL e EVOLUTION_API_KEY).");
-  }
-
-  return { url: url.replace(/\/+$/, ""), apiKey };
+function wuzapiConfig() {
+  const url = (process.env.WUZAPI_URL ?? "http://localhost:8080").replace(/\/+$/, "");
+  const adminToken = process.env.WUZAPI_ADMIN_TOKEN;
+  if (!adminToken) throw new ApiError(500, "WUZAPI_ADMIN_TOKEN não configurado.");
+  return { url, adminToken };
 }
 
-async function getInstance(companyId: string): Promise<string> {
-  const config = await prisma.companyBotConfig.findUnique({
-    where: { companyId },
-    select: { whatsappInstance: true }
-  });
-
-  if (!config?.whatsappInstance) {
-    throw new ApiError(400, "Instância do WhatsApp não configurada para esta empresa.");
-  }
-
-  return config.whatsappInstance;
+/** Token por empresa usado no header `Token` das rotas de sessão/chat. */
+function companyToken(companyId: string) {
+  return `wuzapi-${companyId}`;
 }
 
-async function evolutionFetch(
+/** Nome do usuário/instância na WuzAPI para a empresa. */
+function instanceName(companyId: string) {
+  return `company-${companyId}`;
+}
+
+async function wuzapiFetch(
   path: string,
-  options: { method?: string; apiKey: string; baseUrl: string; body?: unknown }
+  options: {
+    method?: string;
+    token?: string;
+    adminToken?: string;
+    baseUrl: string;
+    body?: unknown;
+  }
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (options.token) headers["Token"] = options.token;
+    if (options.adminToken) headers["Authorization"] = options.adminToken;
     return await fetch(`${options.baseUrl}${path}`, {
       method: options.method ?? "GET",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: options.apiKey
-      },
+      headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
       signal: controller.signal
     });
   } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
-      throw new ApiError(504, "Tempo esgotado ao conectar com a Evolution API.");
-    }
-    throw new ApiError(502, "Erro ao conectar com a Evolution API.");
+    if (err instanceof Error && err.name === "AbortError") throw new ApiError(504, "Timeout ao conectar com WuzAPI.");
+    throw new ApiError(502, "Erro ao conectar com WuzAPI.");
   } finally {
     clearTimeout(timeout);
   }
@@ -128,12 +129,12 @@ export function normalizePhone(phone: string): NormalizedPhone {
 }
 
 /**
- * Envia uma mensagem de texto via Evolution API v2.
- * POST {EVOLUTION_API_URL}/message/sendText/{instance} com header "apikey".
+ * Envia uma mensagem de texto via WuzAPI.
+ * POST {WUZAPI_URL}/chat/send/text com header "Token" da empresa.
  */
 export async function sendTextMessage(companyId: string, phone: string, message: string) {
-  const { url, apiKey } = evolutionConfig();
-  const instance = await getInstance(companyId);
+  const { url } = wuzapiConfig();
+  const token = companyToken(companyId);
 
   const normalized = normalizePhone(phone);
   const number = normalized.digits ?? phone.replace(/\D/g, "");
@@ -141,16 +142,16 @@ export async function sendTextMessage(companyId: string, phone: string, message:
     throw new ApiError(422, "Número de telefone inválido.");
   }
 
-  const response = await evolutionFetch(`/message/sendText/${encodeURIComponent(instance)}`, {
+  const response = await wuzapiFetch("/chat/send/text", {
     method: "POST",
     baseUrl: url,
-    apiKey,
-    body: { number, text: message }
+    token,
+    body: { Phone: `${number}@s.whatsapp.net`, Body: message }
   });
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new ApiError(502, `Falha ao enviar mensagem pela Evolution API (HTTP ${response.status}).`, detail.slice(0, 500));
+    throw new ApiError(502, `Falha ao enviar mensagem pela WuzAPI (HTTP ${response.status}).`, detail.slice(0, 500));
   }
 
   return response.json().catch(() => ({}));
@@ -163,110 +164,115 @@ export type ConnectionState = {
 };
 
 /**
- * Consulta o connectionState da instância na Evolution API.
- * GET {EVOLUTION_API_URL}/instance/connectionState/{instance}.
+ * Consulta o estado da sessão da empresa na WuzAPI.
+ * GET {WUZAPI_URL}/session/status -> { data: { connected: boolean } }.
  */
 export async function testConnection(companyId: string): Promise<ConnectionState> {
-  const { url, apiKey } = evolutionConfig();
-  const instance = await getInstance(companyId);
+  const { url } = wuzapiConfig();
+  const token = companyToken(companyId);
+  const instance = instanceName(companyId);
 
-  const response = await evolutionFetch(`/instance/connectionState/${encodeURIComponent(instance)}`, {
-    baseUrl: url,
-    apiKey
-  });
+  const response = await wuzapiFetch("/session/status", { baseUrl: url, token });
 
   if (!response.ok) {
-    throw new ApiError(502, `Não foi possível consultar a instância "${instance}" (HTTP ${response.status}).`);
+    throw new ApiError(502, `Não foi possível consultar a sessão "${instance}" (HTTP ${response.status}).`);
   }
 
-  const data = (await response.json().catch(() => ({}))) as {
-    instance?: { state?: string };
-    state?: string;
-  };
-  const state = data.instance?.state ?? data.state ?? "unknown";
+  const data = (await response.json().catch(() => ({}))) as { data?: { connected?: boolean } };
+  const connected = data.data?.connected === true;
 
-  return { instance, state, connected: state === "open" };
+  return { instance, state: connected ? "open" : "close", connected };
 }
 
 /**
- * Retorna true se a instância da empresa existe e está conectada na Evolution.
+ * Retorna true se a sessão da empresa existe e está conectada na WuzAPI.
  */
 export async function validateInstance(companyId: string): Promise<boolean> {
   const { connected } = await testConnection(companyId);
   return connected;
 }
 
-/** Lê o nome da instância sem lançar (null quando ainda não configurada). */
-async function findInstance(companyId: string): Promise<string | null> {
-  const config = await prisma.companyBotConfig.findUnique({
-    where: { companyId },
-    select: { whatsappInstance: true }
-  });
-  return config?.whatsappInstance ?? null;
-}
-
 /**
- * Recria a instância na Evolution API para a empresa.
+ * (Re)cria o usuário/sessão da empresa na WuzAPI e inicia a conexão.
  *
- * Na Evolution v2.2.3 o GET /instance/connect retorna {"count":0} (bug conhecido)
- * e o webhook POR INSTÂNCIA não dispara QRCODE_UPDATED de forma confiável. A
- * captura do QR fica a cargo do **webhook GLOBAL** (WEBHOOK_GLOBAL_URL no Docker
- * da Evolution -> /api/webhooks/whatsapp/global), por isso NÃO configuramos
- * webhook por instância aqui. Fluxo:
- *  1) apaga a instância antiga (estado sujo não emite QR novo),
- *  2) aguarda a liberação do nome,
- *  3) recria a instância,
- *  4) marca connectionStatus="connecting" — o QR chega em ~2-5s via webhook global.
+ * Fluxo:
+ *  1) lista usuários (admin),
+ *  2) remove o usuário antigo com o mesmo name (estado sujo não emite QR novo),
+ *  3) aguarda a liberação do token/name,
+ *  4) cria o usuário com webhook por empresa (evento "Message"),
+ *  5) inicia a sessão (POST /session/connect) — o QR fica disponível em ~1-2s
+ *     via GET /session/qr,
+ *  6) marca connectionStatus="connecting".
  */
 export async function createInstance(companyId: string): Promise<{ instance: string }> {
-  const { url, apiKey } = evolutionConfig();
-  const instanceName = `company-${companyId}`;
+  const { url, adminToken } = wuzapiConfig();
+  const name = instanceName(companyId);
+  const token = companyToken(companyId);
 
-  // Apaga a instância existente (se houver) para recriar limpa — ignora erro se
-  // ela não existir.
-  await evolutionFetch(`/instance/delete/${encodeURIComponent(instanceName)}`, {
-    method: "DELETE",
-    baseUrl: url,
-    apiKey
-  }).catch(() => undefined);
+  // 1) + 2) Remove usuário existente com o mesmo name (ignora erro se não houver).
+  try {
+    const listRes = await wuzapiFetch("/admin/users", { baseUrl: url, adminToken });
+    if (listRes.ok) {
+      const json = (await listRes.json().catch(() => ({}))) as {
+        data?: Array<{ id?: string | number; name?: string }>;
+      };
+      const users = Array.isArray(json.data) ? json.data : [];
+      const existing = users.find((u) => u.name === name);
+      if (existing?.id !== undefined && existing.id !== null) {
+        await wuzapiFetch(`/admin/users/${encodeURIComponent(String(existing.id))}`, {
+          method: "DELETE",
+          baseUrl: url,
+          adminToken
+        }).catch(() => undefined);
+      }
+    }
+  } catch {
+    // Lista indisponível — segue para tentar criar mesmo assim.
+  }
 
-  // Aguarda a Evolution liberar o nome antes de recriar.
-  await new Promise((resolve) => setTimeout(resolve, 3000));
+  // 3) Aguarda a WuzAPI liberar o token/name antes de recriar.
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  const response = await evolutionFetch("/instance/create", {
+  // 4) Cria o usuário com webhook por empresa.
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  const createRes = await wuzapiFetch("/admin/users", {
     method: "POST",
     baseUrl: url,
-    apiKey,
+    adminToken,
     body: {
-      instanceName,
-      integration: "WHATSAPP-BAILEYS",
-      qrcode: true
-      // Sem bloco `webhook` — o webhook global da Evolution captura os eventos.
+      name,
+      token,
+      webhook: `${appUrl}/api/webhooks/whatsapp/${companyId}`,
+      events: "Message"
     }
   });
 
-  // 403/409 = instância já existe na Evolution; seguimos para persistir o nome.
-  if (!response.ok && response.status !== 403 && response.status !== 409) {
-    const detail = await response.text().catch(() => "");
-    throw new ApiError(
-      502,
-      `Falha ao criar a instância na Evolution API (HTTP ${response.status}).`,
-      detail.slice(0, 500)
-    );
+  if (!createRes.ok) {
+    const detail = await createRes.text().catch(() => "");
+    throw new ApiError(502, `Falha ao criar usuário na WuzAPI (HTTP ${createRes.status}).`, detail.slice(0, 500));
   }
 
+  // 5) Inicia a sessão (best-effort: pode já estar conectando).
+  await wuzapiFetch("/session/connect", {
+    method: "POST",
+    baseUrl: url,
+    token,
+    body: { Subscribe: ["Message"], Immediate: true }
+  }).catch(() => undefined);
+
+  // 6) Persiste o estado "connecting".
   await prisma.companyBotConfig.upsert({
     where: { companyId },
-    update: { whatsappInstance: instanceName, connectionStatus: "connecting", qrCodeBase64: null, qrCodeExpiresAt: null },
+    update: { whatsappInstance: name, connectionStatus: "connecting", qrCodeBase64: null, qrCodeExpiresAt: null },
     create: {
       companyId,
-      whatsappInstance: instanceName,
+      whatsappInstance: name,
       connectionStatus: "connecting",
       reminderConfig: { enabled: true, send24h: true, send2h: true }
     }
   });
 
-  return { instance: instanceName };
+  return { instance: name };
 }
 
 export type QrCodeResult = {
@@ -276,78 +282,72 @@ export type QrCodeResult = {
 };
 
 /**
- * Retorna o QR Code / estado da conexão lendo do banco (CompanyBotConfig). O QR
- * é gravado pelo webhook QRCODE_UPDATED; aqui só servimos o valor mais recente.
+ * Retorna o QR Code / estado da conexão consultando a WuzAPI diretamente.
  *
- * - QR válido (não expirado) -> { qrcode, status: "qr" }
- * - QR expirado -> limpa e cai para "connecting" (aguardando novo QR via webhook)
- * - connectionStatus "open" -> "connected"
- * - "disconnected" -> reconcilia com o connectionState real da Evolution (esse
- *   endpoint NÃO tem o bug do /connect), cobrindo instâncias conectadas antes
- *   desta feature (sem webhook de connection registrado).
+ * - connectionStatus "open" no banco -> "connected" (sem ida à WuzAPI)
+ * - GET /session/qr com QRCode -> grava o base64 (TTL 60s) e retorna "qr"
+ * - sem QR -> GET /session/status: connected -> "connected", senão "connecting"
  */
 export async function getQrCode(companyId: string): Promise<QrCodeResult> {
   const config = await prisma.companyBotConfig.findUnique({
     where: { companyId },
-    select: { whatsappInstance: true, qrCodeBase64: true, qrCodeExpiresAt: true, connectionStatus: true }
+    select: { connectionStatus: true }
   });
 
   if (!config) return { qrcode: null, status: "disconnected" };
-
-  const now = new Date();
-  const qrExpired = Boolean(config.qrCodeExpiresAt && config.qrCodeExpiresAt <= now);
-
-  // QR ainda válido — serve direto.
-  if (config.qrCodeBase64 && !qrExpired) {
-    return { qrcode: config.qrCodeBase64, status: "qr" };
-  }
-
-  // QR expirado — limpa para não servir um código morto.
-  if (config.qrCodeBase64 && qrExpired) {
-    await prisma.companyBotConfig.update({
-      where: { companyId },
-      data: { qrCodeBase64: null, qrCodeExpiresAt: null }
-    });
-  }
-
   if (config.connectionStatus === "open") return { qrcode: null, status: "connected" };
 
-  // "connecting" ou "qr" sem base64 válido = aguardando o (próximo) QR do webhook.
-  if (config.connectionStatus === "connecting" || config.connectionStatus === "qr") {
-    return { qrcode: null, status: "connecting" };
-  }
+  const { url } = wuzapiConfig();
+  const token = companyToken(companyId);
 
-  // "disconnected": confirma com a Evolution se a instância já não está conectada.
-  if (config.whatsappInstance) {
-    try {
-      const { connected } = await testConnection(companyId);
-      if (connected) {
-        await prisma.companyBotConfig.update({
-          where: { companyId },
-          data: { connectionStatus: "open", qrCodeBase64: null, qrCodeExpiresAt: null }
-        });
-        return { qrcode: null, status: "connected" };
-      }
-    } catch {
-      // Evolution indisponível — trata como desconectado.
+  // 1) Tenta obter o QR diretamente.
+  const qrRes = await wuzapiFetch("/session/qr", { baseUrl: url, token }).catch(() => null);
+  if (qrRes?.ok) {
+    const json = (await qrRes.json().catch(() => ({}))) as { data?: { QRCode?: string } };
+    const qrcode = json.data?.QRCode;
+    if (qrcode) {
+      await prisma.companyBotConfig.update({
+        where: { companyId },
+        data: {
+          qrCodeBase64: qrcode,
+          qrCodeExpiresAt: new Date(Date.now() + 60_000),
+          connectionStatus: "qr"
+        }
+      });
+      return { qrcode, status: "qr" };
     }
   }
 
-  return { qrcode: null, status: "disconnected" };
+  // 2) Sem QR — verifica se a sessão já está conectada.
+  const statusRes = await wuzapiFetch("/session/status", { baseUrl: url, token }).catch(() => null);
+  if (statusRes?.ok) {
+    const json = (await statusRes.json().catch(() => ({}))) as { data?: { connected?: boolean } };
+    if (json.data?.connected === true) {
+      await prisma.companyBotConfig.update({
+        where: { companyId },
+        data: { connectionStatus: "open", qrCodeBase64: null, qrCodeExpiresAt: null }
+      });
+      return { qrcode: null, status: "connected" };
+    }
+  }
+
+  return { qrcode: null, status: "connecting" };
 }
 
 /**
- * Desconecta (logout) a instância da empresa.
- * DELETE /instance/logout/{instance}.
+ * Desconecta (logout) a sessão da empresa na WuzAPI e marca o banco como
+ * desconectado. POST /session/logout — ignora erro se a sessão não existir.
  */
 export async function disconnectInstance(companyId: string): Promise<void> {
-  const instance = await findInstance(companyId);
-  if (!instance) return;
+  const { url } = wuzapiConfig();
+  const token = companyToken(companyId);
 
-  const { url, apiKey } = evolutionConfig();
-  await evolutionFetch(`/instance/logout/${encodeURIComponent(instance)}`, {
-    method: "DELETE",
-    baseUrl: url,
-    apiKey
+  await wuzapiFetch("/session/logout", { method: "POST", baseUrl: url, token }).catch(() => undefined);
+
+  // A WuzAPI não envia evento de conexão; refletimos o estado no banco aqui para
+  // que o painel não mostre "conectado" após um reload.
+  await prisma.companyBotConfig.updateMany({
+    where: { companyId },
+    data: { connectionStatus: "disconnected", qrCodeBase64: null, qrCodeExpiresAt: null }
   });
 }

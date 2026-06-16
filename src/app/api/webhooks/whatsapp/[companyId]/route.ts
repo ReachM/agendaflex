@@ -1,6 +1,5 @@
 import { AppointmentStatus } from "@prisma/client";
 import { NextRequest } from "next/server";
-import { z } from "zod";
 import { ApiError, handleApiError, ok } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { resolvePlanFeatures } from "@/lib/security/plan-guard";
@@ -13,33 +12,26 @@ type RouteContext = { params: Promise<{ companyId: string }> };
 
 const LOG_PREFIX = "[Bot WhatsApp]";
 
-const payloadSchema = z.object({
-  event: z.string(),
-  instance: z.string().optional(),
-  data: z.object({
-    key: z.object({
-      remoteJid: z.string(),
-      fromMe: z.boolean().optional(),
-      id: z.string().optional()
-    }),
-    pushName: z.string().optional(),
-    message: z.record(z.unknown()).optional(),
-    instanceId: z.string().optional()
-  })
-});
-
-/** Texto: aceita data.message.conversation OU data.message.extendedTextMessage.text. */
-function extractText(message: Record<string, unknown> | undefined): string | null {
-  if (!message) return null;
-
-  if (typeof message.conversation === "string") return message.conversation;
-
-  const ext = message.extendedTextMessage;
-  if (ext && typeof ext === "object" && typeof (ext as { text?: unknown }).text === "string") {
-    return (ext as { text: string }).text;
-  }
-  return null;
-}
+/**
+ * Payload do evento "Message" da WuzAPI. Estrutura toda opcional — fazemos
+ * acesso defensivo e ignoramos o que não casar.
+ */
+type WuzapiWebhookBody = {
+  event?: string;
+  instanceId?: string | number;
+  data?: {
+    Info?: {
+      MessageSource?: {
+        Chat?: { User?: string; Server?: string };
+        IsFromMe?: boolean;
+        IsGroup?: boolean;
+      };
+      Type?: string;
+    };
+    Text?: { Body?: string };
+    Message?: { conversation?: string };
+  };
+};
 
 /**
  * Remove caracteres de controle (C0 + DEL), colapsa espaços e limita o tamanho
@@ -189,71 +181,11 @@ async function routeMessage(params: {
 }
 
 /**
- * QRCODE_UPDATED: na Evolution v2 o QR só chega por webhook. Guarda o base64
- * (data URL) com TTL de 60s para o polling do front. Não sobrescreve instância
- * já conectada (connectionStatus "open").
- */
-async function handleQrCodeUpdated(companyId: string, raw: Record<string, unknown>): Promise<void> {
-  const data = (raw.data ?? {}) as Record<string, unknown>;
-  const qrcodeObj = (data.qrcode ?? {}) as Record<string, unknown>;
-  const base64 =
-    (typeof qrcodeObj.base64 === "string" ? qrcodeObj.base64 : null) ??
-    (typeof data.base64 === "string" ? data.base64 : null);
-
-  if (!base64) return;
-
-  await prisma.companyBotConfig.updateMany({
-    where: { companyId, connectionStatus: { not: "open" } },
-    data: {
-      qrCodeBase64: base64,
-      qrCodeExpiresAt: new Date(Date.now() + 60_000),
-      connectionStatus: "qr"
-    }
-  });
-  console.log(`${LOG_PREFIX} QR atualizado company=${companyId}`);
-}
-
-/**
- * CONNECTION_UPDATE: reflete o state da Evolution no connectionStatus. Ao conectar
- * ("open") limpa o QR pendente.
- */
-async function handleConnectionUpdate(companyId: string, raw: Record<string, unknown>): Promise<void> {
-  const data = (raw.data ?? {}) as Record<string, unknown>;
-  const instanceObj = (data.instance ?? {}) as Record<string, unknown>;
-  const state =
-    (typeof data.state === "string" ? data.state : null) ??
-    (typeof instanceObj.state === "string" ? instanceObj.state : null) ??
-    "";
-
-  if (state === "open") {
-    await prisma.companyBotConfig.updateMany({
-      where: { companyId },
-      data: { connectionStatus: "open", qrCodeBase64: null, qrCodeExpiresAt: null }
-    });
-    console.log(`${LOG_PREFIX} conectado company=${companyId}`);
-    return;
-  }
-
-  if (state === "connecting") {
-    await prisma.companyBotConfig.updateMany({
-      where: { companyId, connectionStatus: { not: "open" } },
-      data: { connectionStatus: "connecting" }
-    });
-    return;
-  }
-
-  if (state === "close") {
-    await prisma.companyBotConfig.updateMany({
-      where: { companyId },
-      data: { connectionStatus: "disconnected", qrCodeBase64: null, qrCodeExpiresAt: null }
-    });
-    console.log(`${LOG_PREFIX} desconectado company=${companyId}`);
-  }
-}
-
-/**
  * POST /api/webhooks/whatsapp/:companyId
- * Recebe eventos da Evolution API v2 (qrcode.updated, connection.update, messages.upsert).
+ *
+ * Recebe o evento "Message" da WuzAPI (webhook por empresa, configurado em
+ * createInstance). A WuzAPI não envia eventos de QR/conexão — o QR é obtido
+ * sob demanda via GET /session/qr.
  */
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
@@ -262,13 +194,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // Rate limiting (helper já existente no projeto).
     rateLimit(`whatsapp-webhook:${companyId}`, 600, 60_000);
 
-    // Valida origem por header secreto (não confia só na apikey do body).
+    // Validação OPCIONAL: a WuzAPI não envia x-webhook-token. Só rejeitamos
+    // quando WHATSAPP_WEBHOOK_TOKEN está definido E veio um header divergente.
     const expected = process.env.WHATSAPP_WEBHOOK_TOKEN;
-    if (!expected) {
-      console.error(`${LOG_PREFIX} WHATSAPP_WEBHOOK_TOKEN não configurado.`);
-      throw new ApiError(500, "Webhook não configurado.");
-    }
-    if (request.headers.get("x-webhook-token") !== expected) {
+    const provided = request.headers.get("x-webhook-token");
+    if (expected && provided && provided !== expected) {
       throw new ApiError(401, "Webhook não autorizado.");
     }
 
@@ -277,57 +207,41 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return ok({ received: true, ignored: true });
     }
 
-    const event = (raw as { event?: unknown }).event;
+    const body = raw as WuzapiWebhookBody;
 
-    // ── QRCODE_UPDATED: salva o QR (base64) para o polling do front (TTL 60s) ──
-    if (event === "qrcode.updated") {
-      await handleQrCodeUpdated(companyId, raw as Record<string, unknown>);
-      return ok({ received: true });
-    }
-
-    // ── CONNECTION_UPDATE: atualiza o connectionStatus da instância ───────────
-    if (event === "connection.update") {
-      await handleConnectionUpdate(companyId, raw as Record<string, unknown>);
-      return ok({ received: true });
-    }
-
-    // Demais eventos: processa apenas messages.upsert.
-    if (event !== "messages.upsert") {
+    // A WuzAPI assina apenas o evento "Message" — demais eventos são ignorados.
+    if (body.event !== "Message") {
       return ok({ received: true, ignored: true });
     }
 
-    const parsed = payloadSchema.safeParse(raw);
-    if (!parsed.success) {
-      return ok({ received: true, ignored: true });
-    }
-    const body = parsed.data;
+    const data = body.data ?? {};
+    const source = data.Info?.MessageSource;
+    const fromMe = source?.IsFromMe ?? false;
+    const isGroup = source?.IsGroup ?? false;
+    const user = source?.Chat?.User;
+    const rawText = data.Text?.Body ?? data.Message?.conversation ?? "";
 
-    // Ignora mensagens do próprio bot (evita responder a si mesmo -> loop).
-    if (body.data.key.fromMe === true) {
-      return ok({ received: true, ignored: true });
-    }
-
-    const rawText = extractText(body.data.message);
-    if (!rawText) {
+    // Ignora: mensagens do próprio bot (loop), grupos, ou sem remetente/texto.
+    if (fromMe || isGroup || !user) {
       return ok({ received: true, ignored: true });
     }
     const text = sanitizeText(rawText);
     if (!text) {
       return ok({ received: true, ignored: true });
     }
+    const remoteJid = `${user}@s.whatsapp.net`;
 
-    // Cruza o companyId da URL com a instância — nunca confia cego no path.
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: {
         botEnabled: true,
-        botConfiguration: { select: { whatsappInstance: true, faqConfig: true } }
+        botConfiguration: { select: { faqConfig: true } }
       }
     });
 
-    const configuredInstance = company?.botConfiguration?.whatsappInstance ?? null;
-    if (!company || !configuredInstance || configuredInstance !== body.instance) {
-      throw new ApiError(403, "Empresa ou instância não autorizada.");
+    // Empresa inexistente -> 200 e ignora (não vaza existência via status).
+    if (!company) {
+      return ok({ received: true, ignored: true });
     }
 
     // Bot desligado para a empresa -> 200 e ignora.
@@ -342,14 +256,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return ok({ received: true, ignored: true });
     }
 
-    const normalized = normalizePhone(body.data.key.remoteJid);
+    const normalized = normalizePhone(remoteJid);
     const mask = maskPhone(normalized);
     console.log(`${LOG_PREFIX} mensagem recebida company=${companyId} phone=${mask} chars=${text.length}`);
 
     const reply = await routeMessage({
       companyId,
       normalized,
-      remoteJid: body.data.key.remoteJid,
+      remoteJid,
       text,
       faqConfig: company.botConfiguration?.faqConfig
     });

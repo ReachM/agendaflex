@@ -26,8 +26,6 @@ type ReminderConfig = { enabled?: boolean; send24h?: boolean; send2h?: boolean }
 type BotConfig = {
   whatsappInstance: string | null;
   connectionStatus: string;
-  botRequestStatus: string | null;
-  botRequestPhone: string | null;
   allowBooking: boolean;
   faqConfig: FaqItem[];
   reminderConfig: ReminderConfig;
@@ -154,7 +152,7 @@ export default function BotSettingsClient() {
     }
   }
 
-  // Chamado pelo QrCodeSection quando a Evolution confirma a conexão: reflete
+  // Chamado pelo QrCodeSection quando a WuzAPI confirma a conexão: reflete
   // "open" no estado pai e ativa o bot (card de STATUS passa a "Ativo").
   function handleWhatsappConnected() {
     setConnectionStatus("open");
@@ -375,7 +373,7 @@ export default function BotSettingsClient() {
             </div>
           </section>
 
-          {/* Conexão do WhatsApp via QR Code automático (Evolution API) */}
+          {/* Conexão do WhatsApp via QR Code automático (WuzAPI) */}
           <section className="panel">
             <div className="panel__head">
               <div>
@@ -413,11 +411,11 @@ export default function BotSettingsClient() {
               </div>
               <div className="panel__body">
                 <div className="field" style={{ marginBottom: 12 }}>
-                  <label htmlFor="bot-instance">Instância Evolution API</label>
+                  <label htmlFor="bot-instance">Instância WhatsApp</label>
                   <input
                     id="bot-instance"
                     type="text"
-                    placeholder="ex: minha-empresa"
+                    placeholder="ex: company-..."
                     value={whatsappInstance}
                     onChange={(e) => setWhatsappInstance(e.target.value)}
                     maxLength={100}
@@ -730,11 +728,12 @@ function Spinner({ size = 18, color = "var(--primary)" }: { size?: number; color
 }
 
 /**
- * Conexão do WhatsApp via QR Code automático (Evolution API v2).
+ * Conexão do WhatsApp via QR Code automático (WuzAPI).
  *
- * O QR não vem na resposta do POST — chega via webhook global em ~2-5s e é
- * gravado no banco (TTL 60s). O front dispara o POST e faz polling no GET a cada
- * 3s até o QR aparecer ("qr") ou a conexão ser confirmada ("connected").
+ * O POST recria a sessão na WuzAPI; o QR é retornado diretamente por GET
+ * /session/qr em ~1-2s e gravado no banco (TTL 60s). O front dispara o POST e
+ * faz polling no GET a cada 3s até o QR aparecer ("qr") ou a conexão ser
+ * confirmada ("connected").
  *
  * Estados: disconnected · connecting (aguardando QR) · qr (escaneável) ·
  * expired (QR venceu) · connected · error (timeout/falha).
