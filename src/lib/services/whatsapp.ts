@@ -282,72 +282,97 @@ export type QrCodeResult = {
 };
 
 /**
- * Retorna o QR Code / estado da conexão consultando a WuzAPI diretamente.
+ * Retorna o QR Code / estado da conexão consultando SEMPRE a WuzAPI diretamente.
  *
- * - connectionStatus "open" no banco -> "connected" (sem ida à WuzAPI)
+ * Nunca confia apenas no banco: o connectionStatus persistido fica defasado (ex.:
+ * "connecting" logo após createInstance, ou "open" de uma sessão antiga já caída),
+ * então a verdade vem do WuzAPI. Só retorna "connected" quando GET /session/status
+ * confirma connected === true.
+ *
  * - GET /session/qr com QRCode -> grava o base64 (TTL 60s) e retorna "qr"
- * - sem QR -> GET /session/status: connected -> "connected", senão "connecting"
+ * - sem QR -> GET /session/status: connected -> grava "open" e retorna "connected"
+ * - caso contrário -> "connecting"
  */
 export async function getQrCode(companyId: string): Promise<QrCodeResult> {
-  const config = await prisma.companyBotConfig.findUnique({
-    where: { companyId },
-    select: { connectionStatus: true }
-  });
-
-  if (!config) return { qrcode: null, status: "disconnected" };
-  if (config.connectionStatus === "open") return { qrcode: null, status: "connected" };
-
   const { url } = wuzapiConfig();
   const token = companyToken(companyId);
 
   // 1) Tenta obter o QR diretamente.
-  const qrRes = await wuzapiFetch("/session/qr", { baseUrl: url, token }).catch(() => null);
-  if (qrRes?.ok) {
-    const json = (await qrRes.json().catch(() => ({}))) as { data?: { QRCode?: string } };
-    const qrcode = json.data?.QRCode;
-    if (qrcode) {
-      await prisma.companyBotConfig.update({
-        where: { companyId },
-        data: {
-          qrCodeBase64: qrcode,
-          qrCodeExpiresAt: new Date(Date.now() + 60_000),
-          connectionStatus: "qr"
-        }
-      });
-      return { qrcode, status: "qr" };
+  try {
+    const qrRes = await wuzapiFetch("/session/qr", { baseUrl: url, token });
+    if (qrRes.ok) {
+      const json = (await qrRes.json().catch(() => ({}))) as { data?: { QRCode?: string } };
+      const qrcode = json.data?.QRCode;
+      if (qrcode) {
+        await prisma.companyBotConfig.updateMany({
+          where: { companyId },
+          data: {
+            qrCodeBase64: qrcode,
+            qrCodeExpiresAt: new Date(Date.now() + 60_000),
+            connectionStatus: "qr"
+          }
+        });
+        return { qrcode, status: "qr" };
+      }
     }
+  } catch {
+    // Ignora — segue para confirmar o status real.
   }
 
-  // 2) Sem QR — verifica se a sessão já está conectada.
-  const statusRes = await wuzapiFetch("/session/status", { baseUrl: url, token }).catch(() => null);
-  if (statusRes?.ok) {
-    const json = (await statusRes.json().catch(() => ({}))) as { data?: { connected?: boolean } };
-    if (json.data?.connected === true) {
-      await prisma.companyBotConfig.update({
-        where: { companyId },
-        data: { connectionStatus: "open", qrCodeBase64: null, qrCodeExpiresAt: null }
-      });
-      return { qrcode: null, status: "connected" };
+  // 2) Sem QR — confirma com a WuzAPI se a sessão está realmente conectada.
+  try {
+    const statusRes = await wuzapiFetch("/session/status", { baseUrl: url, token });
+    if (statusRes.ok) {
+      const json = (await statusRes.json().catch(() => ({}))) as { data?: { connected?: boolean } };
+      if (json.data?.connected === true) {
+        await prisma.companyBotConfig.updateMany({
+          where: { companyId },
+          data: { connectionStatus: "open", qrCodeBase64: null, qrCodeExpiresAt: null }
+        });
+        return { qrcode: null, status: "connected" };
+      }
     }
+  } catch {
+    // Ignora — devolve "connecting" por padrão.
   }
 
   return { qrcode: null, status: "connecting" };
 }
 
 /**
- * Desconecta (logout) a sessão da empresa na WuzAPI e marca o banco como
- * desconectado. POST /session/logout — ignora erro se a sessão não existir.
+ * Desconecta a empresa da WuzAPI por completo: logout da sessão E remoção do
+ * usuário (admin). Apagar o usuário garante que a próxima conexão recrie a sessão
+ * do zero e sempre exija um QR Code novo (logout sozinho pode reconectar sem QR).
+ * Reflete "disconnected" no banco — a WuzAPI não envia evento de conexão.
  */
 export async function disconnectInstance(companyId: string): Promise<void> {
-  const { url } = wuzapiConfig();
+  const { url, adminToken } = wuzapiConfig();
   const token = companyToken(companyId);
+  const name = instanceName(companyId);
 
+  // 1) Logout da sessão (ignora erro se não existir).
   await wuzapiFetch("/session/logout", { method: "POST", baseUrl: url, token }).catch(() => undefined);
 
-  // A WuzAPI não envia evento de conexão; refletimos o estado no banco aqui para
-  // que o painel não mostre "conectado" após um reload.
+  // 2) Remove o usuário na WuzAPI (admin) para forçar QR novo na reconexão.
+  const usersRes = await wuzapiFetch("/admin/users", { baseUrl: url, adminToken }).catch(() => null);
+  if (usersRes?.ok) {
+    const json = (await usersRes.json().catch(() => ({}))) as {
+      data?: Array<{ id?: string | number; name?: string }>;
+    };
+    const users = Array.isArray(json.data) ? json.data : [];
+    const user = users.find((u) => u.name === name);
+    if (user?.id !== undefined && user.id !== null) {
+      await wuzapiFetch(`/admin/users/${encodeURIComponent(String(user.id))}`, {
+        method: "DELETE",
+        baseUrl: url,
+        adminToken
+      }).catch(() => undefined);
+    }
+  }
+
+  // 3) Reflete o estado no banco para o painel não mostrar "conectado" após reload.
   await prisma.companyBotConfig.updateMany({
     where: { companyId },
     data: { connectionStatus: "disconnected", qrCodeBase64: null, qrCodeExpiresAt: null }
-  });
+  }).catch(() => undefined);
 }
