@@ -25,14 +25,41 @@ function wuzapiConfig() {
   return { url, adminToken };
 }
 
-/** Token por empresa usado no header `Token` das rotas de sessão/chat. */
+/**
+ * Token base/fallback da empresa. O token REAL usado nas rotas de sessão/chat é
+ * único por tentativa de conexão (sufixo de timestamp) e fica persistido em
+ * CompanyBotConfig.whatsappInstance — leia-o via getInstanceToken().
+ */
 function companyToken(companyId: string) {
   return `wuzapi-${companyId}`;
 }
 
-/** Nome do usuário/instância na WuzAPI para a empresa. */
+/** Prefixo do nome de usuário/instância na WuzAPI para a empresa. */
 function instanceName(companyId: string) {
   return `company-${companyId}`;
+}
+
+/**
+ * true se `name` é um usuário desta empresa na WuzAPI: o atual com sufixo de
+ * timestamp ("company-{id}-{ts}") ou o legado de nome fixo ("company-{id}").
+ */
+function isCompanyInstance(name: string | undefined, companyId: string): boolean {
+  if (!name) return false;
+  const prefix = instanceName(companyId);
+  return name === prefix || name.startsWith(`${prefix}-`);
+}
+
+/**
+ * Token atual da sessão da empresa. Lê CompanyBotConfig.whatsappInstance (onde
+ * createInstance grava o token único da tentativa). Sem registro, cai no token
+ * base — relevante só para empresas ainda não conectadas.
+ */
+async function getInstanceToken(companyId: string): Promise<string> {
+  const config = await prisma.companyBotConfig.findUnique({
+    where: { companyId },
+    select: { whatsappInstance: true }
+  });
+  return config?.whatsappInstance ?? companyToken(companyId);
 }
 
 async function wuzapiFetch(
@@ -62,6 +89,29 @@ async function wuzapiFetch(
     throw new ApiError(502, "Erro ao conectar com WuzAPI.");
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+/**
+ * Remove da WuzAPI TODOS os usuários da empresa (qualquer name com o prefixo
+ * "company-{companyId}", incluindo o legado de nome fixo). Best-effort: ignora a
+ * lista indisponível e falhas individuais de DELETE.
+ */
+async function deleteCompanyInstances(baseUrl: string, adminToken: string, companyId: string): Promise<void> {
+  const listRes = await wuzapiFetch("/admin/users", { baseUrl, adminToken }).catch(() => null);
+  if (!listRes?.ok) return;
+  const json = (await listRes.json().catch(() => ({}))) as {
+    data?: Array<{ id?: string | number; name?: string }>;
+  };
+  const users = Array.isArray(json.data) ? json.data : [];
+  for (const user of users) {
+    if (isCompanyInstance(user.name, companyId) && user.id !== undefined && user.id !== null) {
+      await wuzapiFetch(`/admin/users/${encodeURIComponent(String(user.id))}`, {
+        method: "DELETE",
+        baseUrl,
+        adminToken
+      }).catch(() => undefined);
+    }
   }
 }
 
@@ -134,7 +184,7 @@ export function normalizePhone(phone: string): NormalizedPhone {
  */
 export async function sendTextMessage(companyId: string, phone: string, message: string) {
   const { url } = wuzapiConfig();
-  const token = companyToken(companyId);
+  const token = await getInstanceToken(companyId);
 
   const normalized = normalizePhone(phone);
   const number = normalized.digits ?? phone.replace(/\D/g, "");
@@ -169,7 +219,7 @@ export type ConnectionState = {
  */
 export async function testConnection(companyId: string): Promise<ConnectionState> {
   const { url } = wuzapiConfig();
-  const token = companyToken(companyId);
+  const token = await getInstanceToken(companyId);
   const instance = instanceName(companyId);
 
   const response = await wuzapiFetch("/session/status", { baseUrl: url, token });
@@ -195,43 +245,34 @@ export async function validateInstance(companyId: string): Promise<boolean> {
 /**
  * (Re)cria o usuário/sessão da empresa na WuzAPI e inicia a conexão.
  *
+ * A WuzAPI mantém a sessão em MEMÓRIA mesmo após deletar o usuário: recriar com o
+ * mesmo token faz a sessão antiga reconectar sem emitir QR. Por isso geramos um
+ * name + token ÚNICOS por tentativa (sufixo de timestamp) e persistimos o token em
+ * whatsappInstance (lido depois por getInstanceToken).
+ *
  * Fluxo:
- *  1) lista usuários (admin),
- *  2) remove o usuário antigo com o mesmo name (estado sujo não emite QR novo),
- *  3) aguarda a liberação do token/name,
+ *  1) remove TODOS os usuários antigos da empresa (qualquer name com o prefixo),
+ *  2) aguarda a WuzAPI liberar os recursos da sessão antiga,
+ *  3) gera name + token únicos,
  *  4) cria o usuário com webhook por empresa (evento "Message"),
  *  5) inicia a sessão (POST /session/connect) — o QR fica disponível em ~1-2s
  *     via GET /session/qr,
- *  6) marca connectionStatus="connecting".
+ *  6) persiste o token e marca connectionStatus="connecting".
  */
 export async function createInstance(companyId: string): Promise<{ instance: string }> {
   const { url, adminToken } = wuzapiConfig();
-  const name = instanceName(companyId);
-  const token = companyToken(companyId);
 
-  // 1) + 2) Remove usuário existente com o mesmo name (ignora erro se não houver).
-  try {
-    const listRes = await wuzapiFetch("/admin/users", { baseUrl: url, adminToken });
-    if (listRes.ok) {
-      const json = (await listRes.json().catch(() => ({}))) as {
-        data?: Array<{ id?: string | number; name?: string }>;
-      };
-      const users = Array.isArray(json.data) ? json.data : [];
-      const existing = users.find((u) => u.name === name);
-      if (existing?.id !== undefined && existing.id !== null) {
-        await wuzapiFetch(`/admin/users/${encodeURIComponent(String(existing.id))}`, {
-          method: "DELETE",
-          baseUrl: url,
-          adminToken
-        }).catch(() => undefined);
-      }
-    }
-  } catch {
-    // Lista indisponível — segue para tentar criar mesmo assim.
-  }
+  // 1) Remove todos os usuários antigos da empresa (ignora erros).
+  await deleteCompanyInstances(url, adminToken, companyId);
 
-  // 3) Aguarda a WuzAPI liberar o token/name antes de recriar.
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  // 2) Aguarda a WuzAPI liberar os recursos da sessão antiga antes de recriar.
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  // 3) Gera name + token únicos: a sessão em memória do WuzAPI fica atrelada ao
+  //    token, então um token novo garante conexão limpa e QR novo.
+  const stamp = Date.now();
+  const name = `${instanceName(companyId)}-${stamp}`;
+  const token = `${companyToken(companyId)}-${stamp}`;
 
   // 4) Cria o usuário com webhook por empresa.
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
@@ -252,7 +293,7 @@ export async function createInstance(companyId: string): Promise<{ instance: str
     throw new ApiError(502, `Falha ao criar usuário na WuzAPI (HTTP ${createRes.status}).`, detail.slice(0, 500));
   }
 
-  // 5) Inicia a sessão (best-effort: pode já estar conectando).
+  // 5) Inicia a sessão com o token novo (best-effort).
   await wuzapiFetch("/session/connect", {
     method: "POST",
     baseUrl: url,
@@ -260,13 +301,13 @@ export async function createInstance(companyId: string): Promise<{ instance: str
     body: { Subscribe: ["Message"], Immediate: true }
   }).catch(() => undefined);
 
-  // 6) Persiste o estado "connecting".
+  // 6) Persiste o token atual (whatsappInstance) e o estado "connecting".
   await prisma.companyBotConfig.upsert({
     where: { companyId },
-    update: { whatsappInstance: name, connectionStatus: "connecting", qrCodeBase64: null, qrCodeExpiresAt: null },
+    update: { whatsappInstance: token, connectionStatus: "connecting", qrCodeBase64: null, qrCodeExpiresAt: null },
     create: {
       companyId,
-      whatsappInstance: name,
+      whatsappInstance: token,
       connectionStatus: "connecting",
       reminderConfig: { enabled: true, send24h: true, send2h: true }
     }
@@ -295,7 +336,7 @@ export type QrCodeResult = {
  */
 export async function getQrCode(companyId: string): Promise<QrCodeResult> {
   const { url } = wuzapiConfig();
-  const token = companyToken(companyId);
+  const token = await getInstanceToken(companyId);
 
   // 1) Tenta obter o QR diretamente.
   try {
@@ -340,35 +381,20 @@ export async function getQrCode(companyId: string): Promise<QrCodeResult> {
 }
 
 /**
- * Desconecta a empresa da WuzAPI por completo: logout da sessão E remoção do
- * usuário (admin). Apagar o usuário garante que a próxima conexão recrie a sessão
- * do zero e sempre exija um QR Code novo (logout sozinho pode reconectar sem QR).
- * Reflete "disconnected" no banco — a WuzAPI não envia evento de conexão.
+ * Desconecta a empresa da WuzAPI por completo: logout da sessão atual E remoção de
+ * TODOS os usuários da empresa (admin). Apagar os usuários garante que a próxima
+ * conexão recrie a sessão do zero e sempre exija um QR Code novo. Reflete
+ * "disconnected" no banco — a WuzAPI não envia evento de conexão.
  */
 export async function disconnectInstance(companyId: string): Promise<void> {
   const { url, adminToken } = wuzapiConfig();
-  const token = companyToken(companyId);
-  const name = instanceName(companyId);
+  const token = await getInstanceToken(companyId);
 
-  // 1) Logout da sessão (ignora erro se não existir).
+  // 1) Logout da sessão atual (ignora erro se não existir).
   await wuzapiFetch("/session/logout", { method: "POST", baseUrl: url, token }).catch(() => undefined);
 
-  // 2) Remove o usuário na WuzAPI (admin) para forçar QR novo na reconexão.
-  const usersRes = await wuzapiFetch("/admin/users", { baseUrl: url, adminToken }).catch(() => null);
-  if (usersRes?.ok) {
-    const json = (await usersRes.json().catch(() => ({}))) as {
-      data?: Array<{ id?: string | number; name?: string }>;
-    };
-    const users = Array.isArray(json.data) ? json.data : [];
-    const user = users.find((u) => u.name === name);
-    if (user?.id !== undefined && user.id !== null) {
-      await wuzapiFetch(`/admin/users/${encodeURIComponent(String(user.id))}`, {
-        method: "DELETE",
-        baseUrl: url,
-        adminToken
-      }).catch(() => undefined);
-    }
-  }
+  // 2) Remove TODOS os usuários da empresa para forçar QR novo na reconexão.
+  await deleteCompanyInstances(url, adminToken, companyId);
 
   // 3) Reflete o estado no banco para o painel não mostrar "conectado" após reload.
   await prisma.companyBotConfig.updateMany({
