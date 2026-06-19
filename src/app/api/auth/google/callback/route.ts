@@ -3,7 +3,7 @@ import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { signAuthToken, type AuthTokenPayload } from "@/lib/security/jwt";
 import { exchangeCodeForTokens, getGoogleUserInfo } from "@/lib/services/google-oauth";
-import { sendWelcomeEmail } from "@/lib/services/notifications";
+import { sendNewTenantAlert, sendWelcomeEmail } from "@/lib/services/notifications";
 import { provisionTenant } from "@/lib/services/provision-tenant";
 
 /** Cookie de sessão (mesmo formato de /api/auth/login e /register). */
@@ -101,6 +101,14 @@ export async function GET(request: NextRequest) {
         planName: "Starter",
         trialDays: 7
       }).catch((err) => console.error("[Welcome Email Google]", err));
+
+      // Notifica o super admin sobre o novo cliente — fire-and-forget.
+      sendNewTenantAlert({
+        userName: result.user.name,
+        userEmail: result.user.email,
+        companyName: result.company.name,
+        source: "google"
+      }).catch(console.error);
 
       const response = NextResponse.redirect(new URL("/dashboard", request.url));
       setSessionCookie(response, token);

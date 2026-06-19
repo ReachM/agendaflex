@@ -6,7 +6,7 @@ import { assertSameOrigin } from "@/lib/security/csrf";
 import { signAuthToken } from "@/lib/security/jwt";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getRequestIp } from "@/lib/security/request";
-import { sendWelcomeEmail } from "@/lib/services/notifications";
+import { sendNewTenantAlert, sendWelcomeEmail } from "@/lib/services/notifications";
 import { provisionTenant } from "@/lib/services/provision-tenant";
 import { registerSchema } from "@/lib/validation/schemas";
 
@@ -106,6 +106,14 @@ export async function POST(request: NextRequest) {
       planName: "Starter",
       trialDays: 7
     }).catch((err) => console.error("[Welcome Email] failed:", err));
+
+    // Notifica o super admin sobre o novo cliente — fire-and-forget.
+    sendNewTenantAlert({
+      userName: result.user.name,
+      userEmail: result.user.email,
+      companyName: result.company.name,
+      source: "email"
+    }).catch(console.error);
 
     return response;
   } catch (error) {

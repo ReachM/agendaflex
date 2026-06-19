@@ -297,3 +297,37 @@ export async function sendWelcomeEmail(data: {
 
   await sendEmail(data.adminEmail, subject, html);
 }
+
+/**
+ * Notificação interna para o super admin sempre que um novo cliente (tenant) é
+ * cadastrado — seja por Google ou por e-mail. Envia um e-mail simples em texto
+ * para `SUPER_ADMIN_EMAIL` usando o mesmo transporter (sendEmail/Resend) do
+ * e-mail de boas-vindas. Lança em caso de falha para que o chamador trate como
+ * fire-and-forget.
+ */
+export async function sendNewTenantAlert(data: {
+  userName: string;
+  userEmail: string;
+  companyName: string;
+  source: "google" | "email";
+}): Promise<void> {
+  const to = process.env.SUPER_ADMIN_EMAIL ?? "contato@marcaiflex.com.br";
+
+  const sourceLabel = data.source === "google" ? "Google" : "E-mail";
+  const dateTimeBR = new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo"
+  }).format(new Date());
+
+  const subject = `🆕 Novo cliente: ${data.companyName}`;
+  const body =
+    `Um novo cliente acabou de se cadastrar no MarcaiFlex.\n\n` +
+    `Nome: ${data.userName}\n` +
+    `E-mail: ${data.userEmail}\n` +
+    `Empresa: ${data.companyName}\n` +
+    `Origem do cadastro: ${sourceLabel}\n` +
+    `Data/hora (Brasília): ${dateTimeBR}`;
+
+  await sendEmail(to, subject, body);
+}
