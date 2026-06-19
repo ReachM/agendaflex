@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       userEmail: result.user.email,
       companyName: result.company.name,
       source: "email"
-    }).catch(console.error);
+    }).catch((err) => console.error("[New Tenant Alert Email]", err));
 
     return response;
   } catch (error) {

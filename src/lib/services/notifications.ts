@@ -312,22 +312,17 @@ export async function sendNewTenantAlert(data: {
   source: "google" | "email";
 }): Promise<void> {
   const to = process.env.SUPER_ADMIN_EMAIL ?? "contato@marcaiflex.com.br";
-
-  const sourceLabel = data.source === "google" ? "Google" : "E-mail";
-  const dateTimeBR = new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "America/Sao_Paulo"
-  }).format(new Date());
+  const sourceLabel = data.source === "google" ? "Google OAuth" : "Formulário";
+  const dataBrasilia = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 
   const subject = `🆕 Novo cliente: ${data.companyName}`;
-  const body =
-    `Um novo cliente acabou de se cadastrar no MarcaiFlex.\n\n` +
-    `Nome: ${data.userName}\n` +
-    `E-mail: ${data.userEmail}\n` +
-    `Empresa: ${data.companyName}\n` +
-    `Origem do cadastro: ${sourceLabel}\n` +
-    `Data/hora (Brasília): ${dateTimeBR}`;
+  const html = `
+      <p><strong>Nome:</strong> ${data.userName}</p>
+      <p><strong>E-mail:</strong> ${data.userEmail}</p>
+      <p><strong>Empresa:</strong> ${data.companyName}</p>
+      <p><strong>Origem:</strong> ${sourceLabel}</p>
+      <p><strong>Data:</strong> ${dataBrasilia}</p>
+    `;
 
-  await sendEmail(to, subject, body);
+  await sendEmail(to, subject, html);
 }

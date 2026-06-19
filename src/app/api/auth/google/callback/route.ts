@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
         userEmail: result.user.email,
         companyName: result.company.name,
         source: "google"
-      }).catch(console.error);
+      }).catch((err) => console.error("[New Tenant Alert Google]", err));
 
       const response = NextResponse.redirect(new URL("/dashboard", request.url));
       setSessionCookie(response, token);
