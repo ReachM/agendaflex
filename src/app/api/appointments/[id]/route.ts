@@ -184,6 +184,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const discountPercent = access.canManageFinancial && typeof cv._discountPercent === "number" ? cv._discountPercent : undefined;
     const grandTotal = access.canManageFinancial && typeof cv._grandTotal === "number" ? cv._grandTotal : undefined;
 
+    // Remarcação: se o horário mudou, zera os lembretes por e-mail já enviados
+    // para que os novos horários (24h/2h) sejam recalculados e reenviados.
+    const rescheduled = !!body.startAt && body.startAt.getTime() !== oldAppointment.startAt.getTime();
+
     // Calculate lifecycle timestamps based on status transitions
     const lifecycleData: Record<string, unknown> = {};
     if (body.status && body.status !== oldAppointment.status) {
@@ -220,6 +224,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         ...(laborValue !== undefined ? { laborValue } : {}),
         ...(discountPercent !== undefined ? { discountPercent } : {}),
         ...(grandTotal !== undefined ? { totalValue: grandTotal } : {}),
+        ...(rescheduled ? { reminder24hSentAt: null, reminder2hSentAt: null } : {}),
         ...lifecycleData,
         updatedById: auth.user.id
       },

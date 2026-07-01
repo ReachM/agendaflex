@@ -327,6 +327,104 @@ export async function sendNewTenantAlert(data: {
   await sendEmail(to, subject, html);
 }
 
+// ─── Lembretes de agendamento (cliente final) ────────────────────────
+
+export type AppointmentReminderData = {
+  customerName: string;
+  companyName: string;
+  serviceName: string;
+  professionalName: string;
+  date: string;
+  time: string;
+  companyPhone?: string | null;
+  bookingUrl?: string | null;
+};
+
+/**
+ * HTML dos lembretes de agendamento por e-mail (24h e 2h antes). Segue a mesma
+ * identidade visual do e-mail de boas-vindas (logo MF, gradiente teal, card),
+ * para o cliente receber uma comunicação consistente. `variant` muda o tom:
+ * "24h" é informativo ("é amanhã"); "2h" é direto/urgente ("faltam ~2 horas").
+ */
+function buildReminderEmailHtml(variant: "24h" | "2h", data: AppointmentReminderData): string {
+  const is2h = variant === "2h";
+  const accent = is2h ? "#b45309" : "#0d9488"; // âmbar (urgente) x teal (informativo)
+  const accentSoft = is2h ? "#fffbeb" : "#f0fdfa";
+  const accentBorder = is2h ? "#fde68a" : "#99f6e4";
+  const heading = is2h ? "Faltam ~2 horas para o seu horário ⏰" : "Seu horário é amanhã 👋";
+  const lead = is2h
+    ? `Passando para lembrar: seu horário na <strong style="color:#0f172a;">${data.companyName}</strong> é daqui a aproximadamente 2 horas.`
+    : `Passando para lembrar do seu horário na <strong style="color:#0f172a;">${data.companyName}</strong> — é amanhã. Estamos te esperando!`;
+
+  const contactLine = data.companyPhone
+    ? `<p style="margin:0 0 6px;">Precisa remarcar ou cancelar? Fale com <strong>${data.companyName}</strong>: <a href="tel:${data.companyPhone.replace(/[^\d+]/g, "")}" style="color:${accent};">${data.companyPhone}</a></p>`
+    : `<p style="margin:0 0 6px;">Precisa remarcar ou cancelar? Entre em contato com <strong>${data.companyName}</strong>.</p>`;
+
+  const cta = data.bookingUrl
+    ? `<a href="${data.bookingUrl}" style="display:inline-block;margin-top:8px;background:${accent};color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700;font-size:14px;">Ver agenda</a>`
+    : "";
+
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Inter,ui-sans-serif,system-ui,sans-serif;">
+  <div style="max-width:560px;margin:0 auto;padding:36px 20px;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="display:inline-block;background:linear-gradient(135deg,#0d9488,#0f766e);border-radius:14px;width:52px;height:52px;line-height:52px;color:#fff;font-weight:900;font-size:20px;">MF</div>
+      <div style="margin-top:10px;font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;">Marcai<span style="color:#0d9488;">Flex</span></div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
+      <div style="display:inline-block;background:${accentSoft};border:1px solid ${accentBorder};color:${accent};font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;margin-bottom:14px;">
+        ${is2h ? "LEMBRETE • HOJE" : "LEMBRETE • AMANHÃ"}
+      </div>
+      <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;">${heading}</h1>
+      <p style="margin:0 0 22px;color:#64748b;font-size:15px;line-height:1.6;">
+        Olá, ${data.customerName}. ${lead}
+      </p>
+
+      <div style="background:${accentSoft};border:1px solid ${accentBorder};border-radius:12px;padding:18px 20px;margin-bottom:22px;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;color:#0f172a;">
+          <tr><td style="padding:4px 0;color:#64748b;width:110px;">Data</td><td style="padding:4px 0;font-weight:700;">${data.date}</td></tr>
+          <tr><td style="padding:4px 0;color:#64748b;">Horário</td><td style="padding:4px 0;font-weight:700;">${data.time}</td></tr>
+          <tr><td style="padding:4px 0;color:#64748b;">Serviço</td><td style="padding:4px 0;font-weight:700;">${data.serviceName}</td></tr>
+          <tr><td style="padding:4px 0;color:#64748b;">Profissional</td><td style="padding:4px 0;font-weight:700;">${data.professionalName}</td></tr>
+        </table>
+        ${cta}
+      </div>
+
+      <div style="font-size:13px;color:#64748b;line-height:1.6;">
+        ${contactLine}
+      </div>
+    </div>
+
+    <div style="text-align:center;font-size:12px;color:#94a3b8;line-height:1.6;margin-top:20px;">
+      <p style="margin:0;">Você recebeu este lembrete porque tem um horário agendado na ${data.companyName}.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Envia o lembrete de agendamento por e-mail. Lança em caso de falha para que o
+ * chamador (o processador do cron) NÃO marque o lembrete como enviado e tente de
+ * novo no próximo ciclo.
+ */
+export async function sendAppointmentReminderEmail(
+  variant: "24h" | "2h",
+  to: string,
+  data: AppointmentReminderData
+): Promise<void> {
+  const subject =
+    variant === "2h"
+      ? `⏰ Seu horário é daqui a ~2 horas — ${data.companyName}`
+      : `Lembrete: seu horário é amanhã — ${data.companyName}`;
+  await sendEmail(to, subject, buildReminderEmailHtml(variant, data));
+}
+
 /**
  * Aviso informativo ao super admin quando o PRIMEIRO pagamento de um tenant vindo
  * de cupom é confirmado. Reaproveita o mesmo transporter (sendEmail/Resend) do

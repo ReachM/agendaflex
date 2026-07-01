@@ -70,6 +70,7 @@ type CompanyProfile = {
   document: string | null;
   email: string;
   phone: string | null;
+  address: string | null;
   slug: string | null;
   segment: string;
   status: string;
@@ -220,6 +221,7 @@ export function SettingsView() {
   const [document, setDocument] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [hours, setHours] = useState<Partial<Record<Weekday, DayHours>>>({});
 
   // Local-only state
@@ -240,6 +242,7 @@ export function SettingsView() {
       setDocument(c.document ?? "");
       setEmail(c.email);
       setPhone(c.phone ?? "");
+      setAddress(c.address ?? "");
       setHours(c.businessHours ?? {});
       setError("");
     } catch (err) {
@@ -264,9 +267,10 @@ export function SettingsView() {
     if ((document || null) !== (c.document ?? null)) return true;
     if (email !== c.email) return true;
     if ((phone || null) !== (c.phone ?? null)) return true;
+    if ((address || null) !== (c.address ?? null)) return true;
     if (JSON.stringify(hours) !== JSON.stringify(c.businessHours ?? {})) return true;
     return false;
-  }, [data, name, tradeName, document, email, phone, hours]);
+  }, [data, name, tradeName, document, email, phone, address, hours]);
 
   async function handleSave() {
     if (!dirty) return;
@@ -280,6 +284,7 @@ export function SettingsView() {
           document: document || null,
           email,
           phone: phone || null,
+          address: address || null,
           businessHours: hours
         })
       });
@@ -300,6 +305,7 @@ export function SettingsView() {
     setDocument(c.document ?? "");
     setEmail(c.email);
     setPhone(c.phone ?? "");
+    setAddress(c.address ?? "");
     setHours(c.businessHours ?? {});
   }
 

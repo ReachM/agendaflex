@@ -24,6 +24,7 @@ const profileSchema = z.object({
   document: z.string().max(30).nullish(),
   email: z.string().email().optional(),
   phone: z.string().max(30).nullish(),
+  address: z.string().max(300).nullish(),
   slug: z.string().max(60).regex(/^[a-z0-9-]+$/).nullish(),
   businessHours: businessHoursSchema.optional()
 });
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
         document: true,
         email: true,
         phone: true,
+        address: true,
         slug: true,
         segment: true,
         status: true,
@@ -81,6 +83,7 @@ export async function GET(request: NextRequest) {
         document: company.document,
         email: company.email,
         phone: company.phone,
+        address: company.address,
         slug: company.slug,
         segment: company.segment,
         status: company.status,
@@ -137,6 +140,7 @@ export async function PATCH(request: NextRequest) {
         ...(body.document !== undefined ? { document: body.document } : {}),
         ...(body.email !== undefined ? { email: body.email } : {}),
         ...(body.phone !== undefined ? { phone: body.phone } : {}),
+        ...(body.address !== undefined ? { address: body.address } : {}),
         ...(body.slug !== undefined ? { slug: body.slug } : {}),
         ...(settingsUpdate !== undefined ? { settings: settingsUpdate } : {})
       }

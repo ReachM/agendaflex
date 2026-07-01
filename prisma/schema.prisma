@@ -310,6 +310,7 @@ model Company {
   document             String?
   email                String
   phone                String?
+  address              String? // endereço completo do negócio (texto livre)
   slug                 String?         @unique
   segment              BusinessSegment @default(PERSONALIZADO)
   status               CompanyStatus   @default(ACTIVE)
@@ -712,6 +713,11 @@ model Appointment {
   source             AppointmentSource @default(INTERNAL)
   approvalStatus     ApprovalStatus    @default(APPROVED)
   publicBookingToken String?           @unique
+  // Lembretes por e-mail (24h/2h antes). Timestamp = já enviado; nulo = pendente.
+  // Idempotência independente do canal WhatsApp (que usa a tabela SentReminder).
+  // Resetados para null quando o agendamento é remarcado (startAt muda).
+  reminder24hSentAt  DateTime?
+  reminder2hSentAt   DateTime?
   // Creator tracking
   createdById        String?
   updatedById        String?
