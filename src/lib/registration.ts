@@ -28,6 +28,8 @@ export type RegisterFormState = {
   companyName: string;
   document: string;
   companyPhone: string;
+  // Cupom de indicação de parceiro (opcional).
+  couponCode: string;
   // Passo 4 — plano escolhido (todos iniciam o trial por enquanto)
   planSlug: string;
 };
@@ -42,6 +44,7 @@ export const EMPTY_REGISTER_STATE: RegisterFormState = {
   companyName: "",
   document: "",
   companyPhone: "",
+  couponCode: "",
   planSlug: ""
 };
 
@@ -91,6 +94,7 @@ export type RegisterBody = {
   companyPhone?: string;
   segment: BusinessSegment;
   emailVerificationCode?: string;
+  couponCode?: string;
 };
 
 export function buildRegisterBody(
@@ -117,7 +121,8 @@ export function buildRegisterBody(
     document: optional(digitsOnly(state.document)),
     companyPhone: optional(digitsOnly(state.companyPhone)),
     segment: state.segment,
-    emailVerificationCode: emailVerificationCode || undefined
+    emailVerificationCode: emailVerificationCode || undefined,
+    couponCode: optional(state.couponCode.toUpperCase().replace(/\s+/g, ""))
   };
 }
 

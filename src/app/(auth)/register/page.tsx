@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, ArrowRight, Check, FileText, KeyRound, Lock, Mail, MessageCircle, Store, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Check, FileText, KeyRound, Lock, Mail, MessageCircle, Store, Ticket, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, KeyboardEvent, useState } from "react";
@@ -388,6 +388,18 @@ export default function RegisterPage() {
                 value={state.companyPhone}
                 onChange={(e) => update("companyPhone", formatPhone(e.target.value))}
                 required
+              />
+
+              <AuthInput
+                label="Cupom de indicação (opcional)"
+                type="text"
+                name="couponCode"
+                icon={<Ticket size={18} />}
+                placeholder="Tem um cupom de algum parceiro? Insira aqui"
+                autoComplete="off"
+                value={state.couponCode}
+                onChange={(e) => update("couponCode", e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                style={{ textTransform: "uppercase" }}
               />
 
               <div className="auth-field">

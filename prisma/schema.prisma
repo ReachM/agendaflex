@@ -349,6 +349,8 @@ model Company {
   botConfiguration       CompanyBotConfig?
   botConversationStates  BotConversationState[]
   integrations           CompanyIntegration[]
+  couponRedemption       CouponRedemption?
+  commissionPayments     CommissionPayment[]
 
   // Liga/desliga do bot — fonte única de verdade. Reaproveitado pelo bot Evolution API.
   botEnabled Boolean @default(false)
@@ -1314,4 +1316,90 @@ model CompanyIntegration {
 
   @@unique([companyId, type])
   @@index([companyId])
+}
+
+// ═══════════════════════════════════════════════════
+// INFLUENCERS / COUPONS / COMMISSIONS
+// Programa de indicação por influenciadores: cada influencer tem cupons; um
+// cupom vincula um tenant (Company) ao influencer no cadastro; enquanto o tenant
+// paga, geramos comissões mensais escalonadas por faixa de nº de assinantes.
+// OBS: o spec original usava "Tenant" — aqui o tenant é a Company.
+// ═══════════════════════════════════════════════════
+
+model Influencer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  pixKey    String?
+  active    Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coupons            Coupon[]
+  commissionPayments CommissionPayment[]
+
+  @@index([active])
+}
+
+model Coupon {
+  id           String   @id @default(cuid())
+  code         String   @unique // normalizado: uppercase, sem espaços
+  influencerId String
+  influencer   Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  discountPct  Decimal? @db.Decimal(5, 2) // desconto opcional pro cliente que assina
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  redemptions CouponRedemption[]
+
+  @@index([influencerId])
+  @@index([active])
+}
+
+model CouponRedemption {
+  id                    String   @id @default(cuid())
+  couponId              String
+  coupon                Coupon   @relation(fields: [couponId], references: [id])
+  companyId             String   @unique // um tenant só pode ter usado 1 cupom
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  commissionMonthsLimit Int      @default(12)
+  // Marcado quando o super admin é notificado do PRIMEIRO pagamento — evita
+  // reenviar o aviso nos meses seguintes.
+  notifiedAt            DateTime?
+  createdAt             DateTime @default(now())
+
+  @@index([couponId])
+}
+
+model CommissionTier {
+  id             String   @id @default(cuid())
+  minSubscribers Int
+  maxSubscribers Int? // null = sem limite superior
+  commissionPct  Decimal  @db.Decimal(5, 2)
+  createdAt      DateTime @default(now())
+
+  @@index([minSubscribers])
+}
+
+model CommissionPayment {
+  id                        String     @id @default(cuid())
+  influencerId              String
+  influencer                Influencer @relation(fields: [influencerId], references: [id])
+  companyId                 String
+  company                   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  referenceMonth            String // formato "2026-07"
+  subscriptionPaymentAmount Decimal    @db.Decimal(10, 2)
+  appliedCommissionPct      Decimal    @db.Decimal(5, 2)
+  commissionAmount          Decimal    @db.Decimal(10, 2)
+  status                    String     @default("pending") // pending, paid
+  paidAt                    DateTime?
+  createdAt                 DateTime   @default(now())
+
+  @@unique([companyId, referenceMonth]) // evita duplicar comissão no mesmo mês
+  @@index([influencerId])
+  @@index([influencerId, status])
+  @@index([referenceMonth])
 }

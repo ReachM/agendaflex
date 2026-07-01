@@ -382,6 +382,8 @@ export type MpPayment = {
   external_reference: string | null;
   /** Preapproval associada — preenchido quando o pagamento veio de uma assinatura. */
   preapprovalId: string | null;
+  /** Valor efetivamente cobrado (usado para calcular a comissão do influencer). */
+  transactionAmount: number | null;
 };
 
 /** GET /preapproval/{id} — consulta canônica do estado da assinatura. */
@@ -409,10 +411,12 @@ export async function fetchPayment(id: string): Promise<MpPayment | null> {
     return null;
   }
   const data = (await res.json()) as Record<string, unknown>;
+  const amount = Number(data.transaction_amount);
   return {
     id: String(data.id ?? id),
     status: String(data.status ?? ""),
     external_reference: data.external_reference != null ? String(data.external_reference) : null,
-    preapprovalId: data.preapproval_id != null ? String(data.preapproval_id) : null
+    preapprovalId: data.preapproval_id != null ? String(data.preapproval_id) : null,
+    transactionAmount: Number.isFinite(amount) ? amount : null
   };
 }

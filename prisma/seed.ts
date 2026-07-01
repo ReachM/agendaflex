@@ -546,6 +546,20 @@ async function main() {
     ]
   );
 
+  // Faixas de comissão do programa de influenciadores (idempotente: só popula
+  // se ainda não houver faixas cadastradas).
+  const tierCount = await prisma.commissionTier.count();
+  if (tierCount === 0) {
+    await prisma.commissionTier.createMany({
+      data: [
+        { minSubscribers: 1, maxSubscribers: 10, commissionPct: new Prisma.Decimal(5) },
+        { minSubscribers: 11, maxSubscribers: 30, commissionPct: new Prisma.Decimal(8) },
+        { minSubscribers: 31, maxSubscribers: null, commissionPct: new Prisma.Decimal(12) }
+      ]
+    });
+    console.log("→ Faixas de comissão populadas (5% / 8% / 12%).");
+  }
+
   // Audit log
   await prisma.auditLog.create({
     data: {

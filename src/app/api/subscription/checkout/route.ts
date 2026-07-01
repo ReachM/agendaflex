@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/security/auth";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { rateLimit } from "@/lib/security/rate-limit";
+import { redeemCoupon } from "@/lib/services/commissions";
 import { createSubscription } from "@/lib/services/mercadopago";
 import { subscriptionCheckoutSchema } from "@/lib/validation/schemas";
 
@@ -72,6 +73,16 @@ export async function POST(request: NextRequest) {
         payerEmail: result.payerEmail
       }
     });
+
+    // Cupom informado no checkout: vincula o tenant ao influencer se ainda não
+    // houver vínculo (idempotente). Inválido não bloqueia o checkout.
+    if (body.couponCode) {
+      try {
+        await redeemCoupon(context.companyId, body.couponCode);
+      } catch (err) {
+        console.error("[Coupon Redeem] falha ao vincular cupom no checkout:", err);
+      }
+    }
 
     // Auditoria SEM dados sensíveis (no fluxo redirect nem existe card token).
     await audit(request, context, {

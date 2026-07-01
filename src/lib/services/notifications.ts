@@ -326,3 +326,41 @@ export async function sendNewTenantAlert(data: {
 
   await sendEmail(to, subject, html);
 }
+
+/**
+ * Aviso informativo ao super admin quando o PRIMEIRO pagamento de um tenant vindo
+ * de cupom é confirmado. Reaproveita o mesmo transporter (sendEmail/Resend) do
+ * alerta de novo cliente. NÃO substitui o registro em CommissionPayment (que é a
+ * fonte de verdade para pagar a comissão) — é só um heads-up. Lança em caso de
+ * falha para o chamador tratar como fire-and-forget.
+ */
+export async function sendCommissionAlert(data: {
+  companyName: string;
+  planName: string;
+  couponCode: string;
+  influencerName: string;
+  paymentAmount: number;
+  commissionAmount: number;
+  commissionPct: number;
+}): Promise<void> {
+  const to = process.env.SUPER_ADMIN_EMAIL ?? "contato@marcaiflex.com.br";
+  const brl = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const dataBrasilia = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+
+  const subject = `💸 Comissão a calcular: ${data.companyName} (cupom ${data.couponCode})`;
+  const html = `
+      <p>O tenant <strong>${data.companyName}</strong> começou a pagar o plano
+      <strong>${data.planName}</strong> hoje, através do cupom
+      <strong>${data.couponCode}</strong> do influencer
+      <strong>${data.influencerName}</strong>.</p>
+      <p><strong>Valor pago:</strong> ${brl(data.paymentAmount)}</p>
+      <p><strong>Comissão a calcular:</strong> ${brl(data.commissionAmount)}
+      (${data.commissionPct}%)</p>
+      <p><strong>Data:</strong> ${dataBrasilia}</p>
+      <p style="color:#64748b;font-size:12px;">Este é apenas um aviso. O registro
+      oficial da comissão está em CommissionPayment (painel master → Comissões).</p>
+    `;
+
+  await sendEmail(to, subject, html);
+}

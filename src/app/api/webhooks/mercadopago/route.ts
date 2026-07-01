@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { handleApiError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { recordCommissionForPaidPeriod } from "@/lib/services/commissions";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getRequestIp } from "@/lib/security/request";
 import {
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
     let externalReference: string | null = null;
     let gatewaySubscriptionId: string | null = null;
     let paymentId: string | null = null;
+    let paymentAmount: number | null = null;
 
     if (event.kind === "preapproval") {
       const pre = await fetchPreapproval(event.resourceId);
@@ -110,6 +112,7 @@ export async function POST(request: NextRequest) {
       externalReference = pay.external_reference;
       gatewaySubscriptionId = pay.preapprovalId;
       paymentId = pay.id;
+      paymentAmount = pay.transactionAmount;
     }
 
     // 4) Localiza a assinatura: external_reference = CompanySubscription.id,
@@ -171,6 +174,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ received: true, duplicate: true }, { status: 200 });
       }
       throw error;
+    }
+
+    // Comissão de influencer: quando um período pago é concedido (pagamento
+    // aprovado / preapproval autorizada), registra a comissão do mês. Best-effort
+    // e idempotente — nunca quebra o webhook nem duplica no mesmo mês.
+    if (mapping?.advancePeriod) {
+      await recordCommissionForPaidPeriod({
+        companyId: current.companyId,
+        paymentAmount
+      }).catch((err) => console.error(`${LOG_PREFIX} falha ao registrar comissão:`, err));
     }
 
     console.log(

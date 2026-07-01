@@ -8,11 +8,15 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   MessageCircle,
+  Percent,
   Shield,
   Tag,
+  Ticket,
   ToggleLeft,
   Users,
+  Wallet,
   type LucideIcon
 } from "lucide-react";
 import Link from "next/link";
@@ -43,6 +47,15 @@ export const SA_NAV: { group: string; items: SANavItem[] }[] = [
       { href: "/master/whatsapp", label: "Instâncias WhatsApp", icon: MessageCircle },
       { href: "/master/notas-fiscais", label: "Notas fiscais", icon: FileText },
       { href: "/master/filas", label: "Filas & jobs", icon: Cpu }
+    ]
+  },
+  {
+    group: "INDICAÇÕES",
+    items: [
+      { href: "/master/influencers", label: "Influenciadores", icon: Megaphone },
+      { href: "/master/cupons", label: "Cupons", icon: Ticket },
+      { href: "/master/faixas-comissao", label: "Faixas de comissão", icon: Percent },
+      { href: "/master/comissoes", label: "Comissões", icon: Wallet }
     ]
   },
   {

@@ -10,6 +10,21 @@ const requiredString = (max = 255) => z.string().trim().min(1).max(max);
 
 const customValues = z.record(z.unknown()).optional();
 
+// Código de cupom normalizado: uppercase, sem espaços. Reaproveitado no cadastro,
+// no checkout, na validação pública e no CRUD de cupons do painel master.
+const couponCode = z
+  .string()
+  .trim()
+  .min(1)
+  .max(40)
+  .transform((v) => v.toUpperCase().replace(/\s+/g, ""));
+
+// Versão opcional: string vazia vira undefined (campo não preenchido no form).
+const optionalCouponCode = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  couponCode.optional()
+);
+
 export const loginSchema = z.object({
   email: z.string().trim().email(),
   password: z.string().min(8).max(200),
@@ -58,14 +73,69 @@ export const registerSchema = z.object({
     ),
   companyPhone: optionalString(30),
   // Código de 6 dígitos enviado por POST /api/auth/send-verification.
-  emailVerificationCode: z.string().trim().length(6).optional()
+  emailVerificationCode: z.string().trim().length(6).optional(),
+  // Cupom de indicação de parceiro (opcional). Se inválido, o cadastro NÃO é
+  // bloqueado — apenas não cria o vínculo.
+  couponCode: optionalCouponCode
 });
 
 export const subscriptionCheckoutSchema = z.object({
   planSlug: requiredString(60),
   // Fluxo redirect: NÃO recebemos dados de cartão no backend — o cliente é
   // levado para a página de autorização do Mercado Pago.
-  payerEmail: z.string().trim().email().max(255).optional()
+  payerEmail: z.string().trim().email().max(255).optional(),
+  // Cupom opcional aplicado no checkout (valida e vincula se ainda não houver).
+  couponCode: optionalCouponCode
+});
+
+// ── Programa de influenciadores / cupons / comissões (painel master) ──
+
+export const influencerCreateSchema = z.object({
+  name: requiredString(180),
+  email: z.string().trim().email().max(255).optional().or(z.literal("").transform(() => undefined)),
+  phone: optionalString(30),
+  pixKey: optionalString(140),
+  active: z.coerce.boolean().default(true),
+  notes: optionalString(2000)
+});
+
+export const influencerUpdateSchema = influencerCreateSchema.partial();
+
+export const couponCreateSchema = z.object({
+  code: couponCode,
+  influencerId: requiredString(80),
+  // Desconto opcional (0–100%). Vazio = sem desconto.
+  discountPct: z.coerce.number().min(0).max(100).optional(),
+  active: z.coerce.boolean().default(true)
+});
+
+export const couponUpdateSchema = z.object({
+  code: couponCode.optional(),
+  influencerId: optionalString(80),
+  discountPct: z.coerce.number().min(0).max(100).nullish(),
+  active: z.coerce.boolean().optional()
+});
+
+export const commissionTierCreateSchema = z
+  .object({
+    minSubscribers: z.coerce.number().int().min(0),
+    // null / vazio = sem limite superior.
+    maxSubscribers: z.coerce.number().int().min(0).nullish(),
+    commissionPct: z.coerce.number().min(0).max(100)
+  })
+  .refine((d) => d.maxSubscribers == null || d.maxSubscribers >= d.minSubscribers, {
+    message: "O máximo de assinantes deve ser maior ou igual ao mínimo.",
+    path: ["maxSubscribers"]
+  });
+
+export const commissionTierUpdateSchema = z.object({
+  minSubscribers: z.coerce.number().int().min(0).optional(),
+  maxSubscribers: z.coerce.number().int().min(0).nullish(),
+  commissionPct: z.coerce.number().min(0).max(100).optional()
+});
+
+export const validateCouponQuerySchema = z.object({
+  code: couponCode
 });
 
 export const companyCreateSchema = z.object({
