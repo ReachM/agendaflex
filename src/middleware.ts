@@ -98,7 +98,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Exclui do middleware qualquer caminho com extensão (contém "."), cobrindo
+  // TODOS os assets estáticos de public/ (favicon.svg, icon-*.png, apple-icon.png,
+  // og-image.*, manifest.json, sitemap.xml, robots.txt, etc.) sem precisar listar
+  // arquivo por arquivo — evita que novos ícones/assets voltem a cair no redirect
+  // 307 -> /login. Rotas de página não têm "." no pathname e seguem protegidas.
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)"
+    "/((?!api|_next/static|_next/image|.*\\..*).*)"
   ]
 };
