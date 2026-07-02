@@ -337,31 +337,39 @@ export type AppointmentReminderData = {
   date: string;
   time: string;
   companyPhone?: string | null;
+  companyAddress?: string | null;
   bookingUrl?: string | null;
 };
 
 /**
- * HTML dos lembretes de agendamento por e-mail (24h e 2h antes). Segue a mesma
- * identidade visual do e-mail de boas-vindas (logo MF, gradiente teal, card),
- * para o cliente receber uma comunicação consistente. `variant` muda o tom:
- * "24h" é informativo ("é amanhã"); "2h" é direto/urgente ("faltam ~2 horas").
+ * HTML dos lembretes de agendamento por e-mail (24h e 2h antes). Usa a paleta da
+ * marca: roxo (#534AB7) como cor primária (logo/marca e tema informativo do 24h)
+ * e verde (#1D9E75) como destaque em links e botões. `variant` muda o tom:
+ * "24h" é informativo ("é amanhã"); "2h" é direto/urgente ("faltam ~2 horas") e
+ * mantém um tom âmbar de urgência.
  */
 function buildReminderEmailHtml(variant: "24h" | "2h", data: AppointmentReminderData): string {
   const is2h = variant === "2h";
-  const accent = is2h ? "#b45309" : "#0d9488"; // âmbar (urgente) x teal (informativo)
-  const accentSoft = is2h ? "#fffbeb" : "#f0fdfa";
-  const accentBorder = is2h ? "#fde68a" : "#99f6e4";
+  const link = "#1D9E75"; // verde da marca — links e botões (CTA)
+  const accent = is2h ? "#b45309" : "#534AB7"; // âmbar (urgente) x roxo (informativo)
+  const accentSoft = is2h ? "#fffbeb" : "#f1f0fb";
+  const accentBorder = is2h ? "#fde68a" : "#d5d1f1";
   const heading = is2h ? "Faltam ~2 horas para o seu horário ⏰" : "Seu horário é amanhã 👋";
   const lead = is2h
     ? `Passando para lembrar: seu horário na <strong style="color:#0f172a;">${data.companyName}</strong> é daqui a aproximadamente 2 horas.`
     : `Passando para lembrar do seu horário na <strong style="color:#0f172a;">${data.companyName}</strong> — é amanhã. Estamos te esperando!`;
 
   const contactLine = data.companyPhone
-    ? `<p style="margin:0 0 6px;">Precisa remarcar ou cancelar? Fale com <strong>${data.companyName}</strong>: <a href="tel:${data.companyPhone.replace(/[^\d+]/g, "")}" style="color:${accent};">${data.companyPhone}</a></p>`
+    ? `<p style="margin:0 0 6px;">Precisa remarcar ou cancelar? Fale com <strong>${data.companyName}</strong>: <a href="tel:${data.companyPhone.replace(/[^\d+]/g, "")}" style="color:${link};">${data.companyPhone}</a></p>`
     : `<p style="margin:0 0 6px;">Precisa remarcar ou cancelar? Entre em contato com <strong>${data.companyName}</strong>.</p>`;
 
+  // Endereço opcional: só aparece se preenchido; sem placeholder quando vazio.
+  const addressLine = data.companyAddress
+    ? `<p style="margin:0 0 6px;">📍 ${data.companyAddress}</p>`
+    : "";
+
   const cta = data.bookingUrl
-    ? `<a href="${data.bookingUrl}" style="display:inline-block;margin-top:8px;background:${accent};color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700;font-size:14px;">Ver agenda</a>`
+    ? `<a href="${data.bookingUrl}" style="display:inline-block;margin-top:8px;background:${link};color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700;font-size:14px;">Ver agenda</a>`
     : "";
 
   return `
@@ -371,8 +379,8 @@ function buildReminderEmailHtml(variant: "24h" | "2h", data: AppointmentReminder
 <body style="margin:0;padding:0;background:#f8fafc;font-family:Inter,ui-sans-serif,system-ui,sans-serif;">
   <div style="max-width:560px;margin:0 auto;padding:36px 20px;">
     <div style="text-align:center;margin-bottom:28px;">
-      <div style="display:inline-block;background:linear-gradient(135deg,#0d9488,#0f766e);border-radius:14px;width:52px;height:52px;line-height:52px;color:#fff;font-weight:900;font-size:20px;">MF</div>
-      <div style="margin-top:10px;font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;">Marcai<span style="color:#0d9488;">Flex</span></div>
+      <div style="display:inline-block;background:linear-gradient(135deg,#534AB7,#3f379a);border-radius:14px;width:52px;height:52px;line-height:52px;color:#fff;font-weight:900;font-size:20px;">MF</div>
+      <div style="margin-top:10px;font-size:19px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;">Marcai<span style="color:#534AB7;">Flex</span></div>
     </div>
 
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
@@ -396,6 +404,7 @@ function buildReminderEmailHtml(variant: "24h" | "2h", data: AppointmentReminder
 
       <div style="font-size:13px;color:#64748b;line-height:1.6;">
         ${contactLine}
+        ${addressLine}
       </div>
     </div>
 

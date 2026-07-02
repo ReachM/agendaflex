@@ -396,6 +396,7 @@ export function SettingsView() {
               docNumber={document}
               email={email}
               phone={phone} setPhone={setPhone}
+              address={address} setAddress={setAddress}
               currentSlug={c.slug ?? ""}
             />
           )}
@@ -523,6 +524,7 @@ function ProfileSection({
   docNumber,
   email,
   phone, setPhone,
+  address, setAddress,
   currentSlug
 }: {
   name: string;
@@ -530,6 +532,7 @@ function ProfileSection({
   docNumber: string;
   email: string;
   phone: string; setPhone: (v: string) => void;
+  address: string; setAddress: (v: string) => void;
   currentSlug: string;
 }) {
   const bookingLink = `marcaiflex.com.br/agendar/${currentSlug || "sua-empresa"}`;
@@ -582,6 +585,16 @@ function ProfileSection({
             onChange={e => setPhone(maskPhone(e.target.value))}
             placeholder="(11) 99999-9999"
           />
+        </div>
+        <div className="cfg-field cfg-field--full">
+          <label htmlFor="cfg-address">Endereço</label>
+          <input
+            id="cfg-address"
+            value={address}
+            onChange={e => setAddress(e.target.value)}
+            placeholder="Rua, número, bairro, cidade"
+          />
+          <small>Aparece nos lembretes de agendamento enviados ao cliente.</small>
         </div>
         <div className="cfg-field">
           <label htmlFor="cfg-slug">Seu link de agendamento</label>

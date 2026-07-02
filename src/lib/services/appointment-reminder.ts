@@ -96,7 +96,7 @@ export async function processEmailReminders(
         customer: { select: { name: true, email: true } },
         service: { select: { name: true } },
         professional: { select: { name: true } },
-        company: { select: { name: true, tradeName: true, phone: true, slug: true } }
+        company: { select: { name: true, tradeName: true, phone: true, address: true, slug: true } }
       }
     });
 
@@ -119,6 +119,7 @@ export async function processEmailReminders(
           date: formatDate(appointment.startAt),
           time: formatTime(appointment.startAt),
           companyPhone: appointment.company.phone,
+          companyAddress: appointment.company.address,
           bookingUrl
         });
       } catch (error) {

@@ -186,6 +186,7 @@
 .cfg-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .cfg-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 .cfg-row-addr { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+.cfg-field--full { grid-column: 1 / -1; }
 @media (max-width: 720px) {
   .cfg-row-2, .cfg-row-3, .cfg-row-addr { grid-template-columns: 1fr; }
 }
